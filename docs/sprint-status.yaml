@@ -1,0 +1,111 @@
+# generated: 2025-11-02
+# project: vinyl-os
+# project_key: vinyl-os
+# tracking_system: file-system
+# story_location: {project-root}/docs/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic exists in epic file but not contexted
+#   - contexted: Next epic tech context created by *epic-tech-context (required)
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder by *create-story
+#   - ready-for-dev: Draft approved and story context created by *story-ready
+#   - in-progress: Developer actively working on implementation by *dev-story
+#   - review: Implementation complete, ready for review by *code-review
+#   - done: Story completed by *story-done
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done by *retrospective
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', dev reviews, then Dev moves to 'done'
+
+generated: 2025-11-02
+project: vinyl-os
+project_key: vinyl-os
+tracking_system: file-system
+story_location: "{project-root}/docs/stories"
+
+development_status:
+  # Epic V1 - Foundation Core (MVP)
+  epic-v1: contexted
+  v1-1-setup-inicial: drafted
+  v1-2-configuracao-prisma: drafted
+  v1-3-configuracao-icecast: drafted
+  v1-4-captura-audio-alsa: drafted
+  v1-5-pipeline-ffmpeg-icecast: drafted
+  v1-6-frontend-player-basico: drafted
+  v1-7-eventbus-core: drafted
+  v1-8-deteccao-silencio: drafted
+  v1-9-deteccao-clipping: drafted
+  v1-10-persistencia-eventos: drafted
+  v1-11-deteccao-sessao: drafted
+  v1-12-deteccao-troca-faixa: drafted
+  v1-13-dashboard-basico: drafted
+  v1-14-websocket-realtime: drafted
+  v1-15-ui-diagnostico: drafted
+  v1-16-log-eventos-ui: drafted
+  v1-17-historico-sessoes: drafted
+  v1-18-configuracoes-basicas: drafted
+  v1-19-error-handling: drafted
+  v1-20-pm2-config: drafted
+  v1-21-install-script: drafted
+  v1-22-documentacao-basica: drafted
+  epic-v1-retrospective: optional
+
+  # Epic V2 - Coleção & Reconhecimento Musical
+  epic-v2: backlog
+  v2-1-schema-dados-v2: drafted
+  v2-2-crud-albums-backend: drafted
+  v2-3-ui-gestao-colecao: drafted
+  v2-4-integracao-discogs: drafted
+  v2-5-reconhecimento-musical: drafted
+  v2-6-validacao-colecao: drafted
+  v2-7-ui-matching-confirmacao: drafted
+  v2-8-player-com-colecao: drafted
+  v2-9-historico-escuta-expandido: drafted
+  v2-10-estatisticas-colecao: drafted
+  v2-11-export-dados: drafted
+  v2-12-background-recognition-worker: drafted
+  epic-v2-retrospective: optional
+
+  # Epic V3 - Gravação & Análise
+  epic-v3: backlog
+  v3-1-schema-dados-v3: drafted
+  v3-2-dual-path-architecture: drafted
+  v3-3-gravacao-flac-automatica: drafted
+  v3-4-segmentacao-automatica: drafted
+  v3-5-gravacao-manual-preroll: drafted
+  v3-6-ui-gravacoes: drafted
+  v3-7-geracao-chromaprint: drafted
+  v3-8-reconhecimento-offline: drafted
+  v3-9-analise-snr-wow-flutter: drafted
+  v3-10-deteccao-clicks-pops: drafted
+  v3-11-health-score-relatorios: drafted
+  v3-12-ui-qa-visualizacoes: drafted
+  epic-v3-retrospective: optional
+
+  # Epic V4 - Polimento & Controles Avançados
+  epic-v4: backlog
+  v4-1-mobile-responsive: drafted
+  v4-2-performance-otimizada: drafted
+  v4-3-acessibilidade-basica: drafted
+  v4-4-configuracoes-avancadas: drafted
+  v4-5-dashboard-metricas: drafted
+  v4-6-integracao-lastfm: drafted
+  v4-7-integracao-mqtt: drafted
+  v4-8-webhooks: drafted
+  v4-9-notificacoes-slack-discord: drafted
+  v4-10-logs-debugging-tools: drafted
+  v4-11-backup-restore-ui: drafted
+  v4-12-eventbus-extensivel-plugins: drafted
+  epic-v4-retrospective: optional
+
