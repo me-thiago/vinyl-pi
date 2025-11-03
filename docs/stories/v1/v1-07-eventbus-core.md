@@ -1,6 +1,7 @@
 # Story V1.7: EventBus Core
 
-**Epic:** V1 - Foundation Core (MVP)
+**Epic:** V1 - Foundation Core (MVP)  
+**Status:** ready-for-dev
 
 **User Story:**
 Como desenvolvedor,  
@@ -23,4 +24,9 @@ para que componentes possam comunicar eventos de forma desacoplada.
 
 - [PRD v3.0](../prd-v3.md) - Seção 5.1.4 (EventBus Core)
 - [Epics](../epics.md) - Epic V1
+
+## Dev Agent Record
+
+### Context Reference
+- [Story Context XML](v1-7-eventbus-core.context.xml) - Generated 2025-11-03
 

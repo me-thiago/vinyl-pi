@@ -1,0 +1,233 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>4</storyId>
+    <title>Captura de Áudio ALSA via FFmpeg</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-04-captura-audio-alsa.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que o sistema capture áudio do dispositivo ALSA configurado</iWant>
+    <soThat>possa processar e fazer streaming do áudio do toca-discos</soThat>
+    <tasks>
+      <task id="1">Serviço `audio-manager.ts` criado com captura ALSA via FFmpeg</task>
+      <task id="2">Device de áudio configurável (default: `plughw:1,0`)</task>
+      <task id="3">Formato: 48kHz/16-bit/stereo (configurável)</task>
+      <task id="4">Buffer size configurável (512-2048 samples)</task>
+      <task id="5">Detecção de dispositivo desconectado com tratamento de erro</task>
+      <task id="6">Logging adequado de status de captura</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Serviço `audio-manager.ts` criado com captura ALSA via FFmpeg</criterion>
+    <criterion id="2">Device de áudio configurável (default: `plughw:1,0`)</criterion>
+    <criterion id="3">Formato: 48kHz/16-bit/stereo (configurável)</criterion>
+    <criterion id="4">Buffer size configurável (512-2048 samples)</criterion>
+    <criterion id="5">Detecção de dispositivo desconectado com tratamento de erro</criterion>
+    <criterion id="6">Logging adequado de status de captura</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Services and Modules - audio-manager.ts</section>
+        <snippet>AudioManager gerencia captura ALSA via FFmpeg child process e streaming para Icecast2. Input: ALSA device (plughw:1,0), Output: HTTP stream para Icecast2, audio level events via EventBus. Workflow: AudioManager spawn FFmpeg process, FFmpeg captura ALSA device, AudioManager monitora nível de áudio (FFmpeg metadata) e emite via EventBus.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>5.1.1 Captura de Áudio</section>
+        <snippet>Input: ALSA via plughw (device específico configurável). Formato interno: 48kHz/16-bit/stereo (padrão) ou 44.1kHz. Buffer: 512-2048 samples (configurável para latência vs estabilidade). Monitoramento: detecção de clipping, monitoramento de nível de áudio (VU meter), auto-stop após silêncio configurável (>10s padrão).</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>9.2 Configuração YAML - audio</section>
+        <snippet>Config YAML define audio com device "plughw:1,0" (Behringer UCA222), sample_rate 48000, channels 2, bit_depth 16, buffer_size 1024. Todos configuráveis via settings.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Workflow 1: Streaming Startup</section>
+        <snippet>Fluxo completo: User inicia backend, AudioManager inicializa spawn FFmpeg process, FFmpeg captura ALSA device (plughw:1,0), FFmpeg encode PCM → MP3 320kbps CBR, FFmpeg stream HTTP POST → Icecast2. AudioManager deve gerenciar lifecycle do processo FFmpeg e detectar erros de dispositivo.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura - Vinyl-OS</title>
+        <section>Pontos de Integração - Backend ↔ Audio</section>
+        <snippet>FFmpeg child process com stdin/stdout pipes para captura. Backend spawn FFmpeg como child process e gerencia lifecycle. Captura ALSA direta via FFmpeg com device configurável. Processamento de áudio via child process.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>backend/src/services/</path>
+        <kind>Services directory</kind>
+        <symbol>services/</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório vazio criado em V1.1. Deve conter audio-manager.ts que gerencia captura ALSA via FFmpeg child process.</reason>
+      </item>
+      <item>
+        <path>backend/src/index.ts</path>
+        <kind>Backend entry point</kind>
+        <symbol>index.ts</symbol>
+        <lines>1-19</lines>
+        <reason>Entry point do backend Express. Deve importar e inicializar AudioManager aqui para iniciar captura de áudio quando backend inicia.</reason>
+      </item>
+      <item>
+        <path>backend/src/utils/</path>
+        <kind>Utils directory</kind>
+        <symbol>utils/</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório para utilitários. Pode conter helpers para parsing de FFmpeg output, validação de device ALSA, etc.</reason>
+      </item>
+    </code>
+    <dependencies>
+      <ecosystem name="backend-node">
+        <package name="@types/node" version="^20.19.24" devDependency="true" installed="true" />
+        <note>Node.js child_process module nativo para spawn FFmpeg. Não requer pacote npm adicional.</note>
+      </ecosystem>
+      <ecosystem name="system">
+        <package name="ffmpeg" version="system-installed" installed="false" />
+        <package name="alsa-utils" version="system-installed" installed="false" />
+        <note>FFmpeg e ALSA são dependências do sistema operacional. FFmpeg usado para captura e encoding. ALSA-utils para verificação de devices (arecord -l).</note>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Serviço deve ser criado em backend/src/services/audio-manager.ts (classe AudioManager ou módulo exportando funções)</constraint>
+    <constraint>Usar Node.js child_process.spawn() para criar processo FFmpeg (não exec ou execSync)</constraint>
+    <constraint>FFmpeg deve capturar ALSA device diretamente: -f alsa -i {device} (ex: -f alsa -i plughw:1,0)</constraint>
+    <constraint>Formato de captura: -ar 48000 -ac 2 -f s16le (48kHz, 16-bit, stereo, little-endian)</constraint>
+    <constraint>Device padrão: plughw:1,0 (configurável via settings/config YAML)</constraint>
+    <constraint>Buffer size: configurável entre 512-2048 samples (FFmpeg flag -bufsize)</constraint>
+    <constraint>Monitorar stderr do FFmpeg para extrair nível de áudio (metadata output) e erros</constraint>
+    <constraint>Detectar dispositivo desconectado: verificar stderr por erros "No such file or directory", "Device or resource busy", ou exit code do processo</constraint>
+    <constraint>Emitir eventos via EventBus quando dispositivo desconectado (event-bus.ts será criado em story futura, mas interface deve ser preparada)</constraint>
+    <constraint>Logging via Winston: log status de captura (started, stopped, error), nível de áudio periódico, erros de dispositivo</constraint>
+    <constraint>Validar device ALSA antes de iniciar captura (usar arecord -l ou verificar /proc/asound/cards)</constraint>
+    <constraint>Formato configurável: suportar 48kHz ou 44.1kHz (via config YAML ou settings)</constraint>
+    <constraint>Gerenciar lifecycle do processo FFmpeg: start, stop, restart, cleanup on exit</constraint>
+    <constraint>Tratamento de erros: retry com backoff se dispositivo temporariamente indisponível, logging adequado, não crashar aplicação</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>AudioManager Class</name>
+      <kind>TypeScript Service Class</kind>
+      <signature>
+// backend/src/services/audio-manager.ts
+export class AudioManager {
+  private ffmpegProcess: ChildProcess | null = null;
+  private config: AudioConfig;
+  
+  constructor(config: AudioConfig) { }
+  
+  start(): Promise&lt;void&gt; { }
+  stop(): Promise&lt;void&gt; { }
+  restart(): Promise&lt;void&gt; { }
+  getStatus(): AudioCaptureStatus { }
+  on(event: 'audio_level' | 'error' | 'device_disconnected', handler: (data: any) => void): void { }
+}
+
+interface AudioConfig {
+  device: string;  // default: "plughw:1,0"
+  sampleRate: number;  // default: 48000
+  channels: number;  // default: 2
+  bitDepth: number;  // default: 16
+  bufferSize: number;  // default: 1024, range: 512-2048
+}
+
+interface AudioCaptureStatus {
+  isCapturing: boolean;
+  device: string;
+  levelDb?: number;  // Current audio level in dB
+  error?: string;
+}
+      </signature>
+      <path>backend/src/services/audio-manager.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpeg ALSA Capture Command</name>
+      <kind>Command-line interface</kind>
+      <signature>
+# Comando FFmpeg básico para captura ALSA
+ffmpeg -f alsa \
+  -i {device} \
+  -ar {sample_rate} \
+  -ac {channels} \
+  -f s16le \
+  -bufsize {buffer_size} \
+  -
+
+# Exemplo com device padrão
+ffmpeg -f alsa \
+  -i plughw:1,0 \
+  -ar 48000 \
+  -ac 2 \
+  -f s16le \
+  -bufsize 1024 \
+  -
+      </signature>
+      <path>N/A (command-line interface)</path>
+    </interface>
+    <interface>
+      <name>ALSA Device Verification</name>
+      <kind>System command</kind>
+      <signature>
+# Listar devices ALSA disponíveis
+arecord -l
+
+# Verificar device específico
+arecord -D plughw:1,0 -f cd -d 1 test.wav
+
+# Verificar cards ALSA
+cat /proc/asound/cards
+      </signature>
+      <path>N/A (system commands)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Esta story implementa serviço core de captura de áudio, requerendo testes funcionais e integração.
+      Testes devem verificar: (1) AudioManager cria processo FFmpeg corretamente, (2) Captura ALSA funciona com device configurado,
+      (3) Configurações (sample rate, buffer size) são aplicadas, (4) Detecção de dispositivo desconectado funciona,
+      (5) Logging adequado de eventos. Como é serviço com dependências externas (FFmpeg, ALSA), testes podem requerer ambiente com
+      hardware/dispositivo disponível, ou mocks para CI. Framework de testes ainda não configurado - validação inicial será manual.
+    </standards>
+    <locations>
+      <location>Testes unitários futuros: backend/src/__tests__/services/audio-manager.test.ts</location>
+      <location>Testes de integração: backend/src/__tests__/integration/audio-capture.test.ts</location>
+      <location>Validação manual: Testar com dispositivo ALSA real conectado</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verificar que arquivo backend/src/services/audio-manager.ts existe e exporta classe AudioManager ou módulo</idea>
+      <idea ac="1">Executar new AudioManager(config) cria instância sem erros</idea>
+      <idea ac="1">Verificar que AudioManager.spawn() ou start() cria processo FFmpeg via child_process.spawn</idea>
+      <idea ac="2">Verificar que device padrão é plughw:1,0 quando config não especifica device</idea>
+      <idea ac="2">Testar com device customizado: new AudioManager({ device: "plughw:0,0" }) usa device correto</idea>
+      <idea ac="2">Validar device ALSA antes de iniciar: verificar que arecord -l lista device ou erro apropriado</idea>
+      <idea ac="3">Verificar que formato de captura usa -ar 48000 -ac 2 -f s16le por padrão</idea>
+      <idea ac="3">Testar com sample rate customizado (44.1kHz): verificar flag -ar 44100 é passada para FFmpeg</idea>
+      <idea ac="4">Verificar que buffer size padrão é 1024 samples</idea>
+      <idea ac="4">Testar buffer size customizado (512): verificar flag -bufsize 512 é passada para FFmpeg</idea>
+      <idea ac="4">Testar buffer size customizado (2048): verificar flag -bufsize 2048 é passada para FFmpeg</idea>
+      <idea ac="5">Simular dispositivo desconectado: desconectar device físico e verificar que AudioManager detecta erro</idea>
+      <idea ac="5">Verificar stderr parsing: AudioManager detecta erros "No such file or directory", "Device or resource busy"</idea>
+      <idea ac="5">Verificar que evento 'device_disconnected' é emitido quando dispositivo desconectado</idea>
+      <idea ac="5">Verificar tratamento de erro: processo FFmpeg exit code não-zero não crasha aplicação</idea>
+      <idea ac="6">Verificar que logging ocorre quando captura inicia: Winston log "Audio capture started"</idea>
+      <idea ac="6">Verificar que logging ocorre quando captura para: Winston log "Audio capture stopped"</idea>
+      <idea ac="6">Verificar que erros são logados: Winston log error quando dispositivo desconectado</idea>
+      <idea ac="6">Verificar que nível de áudio é logado periodicamente (ex: a cada 5s) se disponível via FFmpeg metadata</idea>
+    </ideas>
+  </tests>
+</story-context>
+

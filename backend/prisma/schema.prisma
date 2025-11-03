@@ -10,4 +10,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Models will be added in subsequent stories
+// ============================================
+// V1 Models - Foundation Core
+// ============================================
+
+model Session {
+  id              String       @id @default(uuid())
+  startedAt       DateTime     @default(now())
+  endedAt         DateTime?
+  durationSeconds Int          @default(0)
+  eventCount      Int          @default(0)
+  audioEvents     AudioEvent[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([startedAt(sort: Desc)])
+}
+
+model AudioEvent {
+  id          String   @id @default(uuid())
+  sessionId   String?
+  session     Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  eventType   String
+  timestamp   DateTime @default(now())
+  metadata    Json?
+
+  @@index([sessionId, timestamp])
+  @@index([eventType, timestamp])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  type      String   @default("string")
+  updatedAt DateTime @updatedAt
+}

@@ -37,13 +37,13 @@ story_location: "{project-root}/docs/stories"
 development_status:
   # Epic V1 - Foundation Core (MVP)
   epic-v1: contexted
-  v1-1-setup-inicial: review
-  v1-2-configuracao-prisma: drafted
-  v1-3-configuracao-icecast: drafted
-  v1-4-captura-audio-alsa: drafted
-  v1-5-pipeline-ffmpeg-icecast: drafted
-  v1-6-frontend-player-basico: drafted
-  v1-7-eventbus-core: drafted
+  v1-1-setup-inicial: done
+  v1-2-configuracao-prisma: done
+  v1-3-configuracao-icecast: done
+  v1-4-captura-audio-alsa: review
+  v1-5-pipeline-ffmpeg-icecast: ready-for-dev
+  v1-6-frontend-player-basico: ready-for-dev
+  v1-7-eventbus-core: ready-for-dev
   v1-8-deteccao-silencio: drafted
   v1-9-deteccao-clipping: drafted
   v1-10-persistencia-eventos: drafted

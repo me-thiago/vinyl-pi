@@ -1,0 +1,247 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>5</storyId>
+    <title>Pipeline FFmpeg → Icecast (Streaming Engine)</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-05-pipeline-ffmpeg-icecast.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que o áudio capturado seja codificado e enviado para Icecast2</iWant>
+    <soThat>possa ouvir o stream em qualquer dispositivo na rede local</soThat>
+    <tasks>
+      <task id="1">FFmpeg processa captura ALSA e codifica para MP3 320kbps CBR</task>
+      <task id="2">Stream enviado para Icecast2 mount point `/stream` via HTTP POST</task>
+      <task id="3">Fallback: loop de silêncio quando sem input</task>
+      <task id="4">Suporte a até 20 clientes simultâneos</task>
+      <task id="5">Buffer do servidor: 64KB (latência vs estabilidade)</task>
+      <task id="6">Status de streaming disponível via API (`GET /api/status`)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">FFmpeg processa captura ALSA e codifica para MP3 320kbps CBR</criterion>
+    <criterion id="2">Stream enviado para Icecast2 mount point `/stream` via HTTP POST</criterion>
+    <criterion id="3">Fallback: loop de silêncio quando sem input</criterion>
+    <criterion id="4">Suporte a até 20 clientes simultâneos</criterion>
+    <criterion id="5">Buffer do servidor: 64KB (latência vs estabilidade)</criterion>
+    <criterion id="6">Status de streaming disponível via API (`GET /api/status`)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Workflow 1: Streaming Startup</section>
+        <snippet>Fluxo completo de streaming: AudioManager spawn FFmpeg process, FFmpeg captura ALSA device, FFmpeg encode PCM → MP3 320kbps CBR, FFmpeg stream HTTP POST → Icecast2 (/stream), Icecast2 disponibiliza mount point para clients. Frontend Player conecta em http://pi.local:8000/stream via HTML5 Audio element.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>5.1.2 Streaming Engine</section>
+        <snippet>Servidor: Icecast2. Encoder: FFmpeg com libmp3lame. Mount point: /stream (MP3 320kbps CBR). Fallback: Loop de silêncio quando sem input. Clients simultâneos: Até 20 (configurável). Buffer do servidor: 64KB (balanço latência/estabilidade).</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>6.3 Fluxo de Dados Principal (V1)</section>
+        <snippet>Pipeline completo: Toca-discos → ALSA → Node Audio Manager spawn FFmpeg → FFmpeg captura PCM → encode MP3 → stream HTTP → Icecast2 recebe source → distribui para clients → Browser/App conecta mountpoint → reproduz.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>APIs and Interfaces - GET /api/status</section>
+        <snippet>Response inclui streaming: { active, listeners, bitrate, mount_point }. Status de streaming deve estar disponível via API para frontend verificar se stream está ativo e quantos listeners conectados.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura - Vinyl-OS</title>
+        <section>Pontos de Integração - Backend ↔ Audio</section>
+        <snippet>HTTP POST para Icecast2 mount point (streaming). FFmpeg child process captura ALSA e envia stream via HTTP POST para Icecast2. Frontend conecta diretamente ao Icecast2 HTTP stream (http://pi.local:8000/stream) via HTML5 Audio element.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>Service (will be created in V1.4)</kind>
+        <symbol>AudioManager</symbol>
+        <lines>N/A</lines>
+        <reason>AudioManager criado na story V1.4 com captura ALSA básica. Esta story V1.5 estende AudioManager para incluir encoding MP3 e streaming HTTP POST para Icecast2. Deve adicionar método startStreaming() que modifica comando FFmpeg para incluir encoding e HTTP POST.</reason>
+      </item>
+      <item>
+        <path>backend/src/routes/</path>
+        <kind>Routes directory</kind>
+        <symbol>routes/</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório vazio criado em V1.1. Deve conter routes/status.ts que implementa GET /api/status retornando status de streaming (active, listeners, bitrate, mount_point) do AudioManager.</reason>
+      </item>
+      <item>
+        <path>backend/src/index.ts</path>
+        <kind>Backend entry point</kind>
+        <symbol>index.ts</symbol>
+        <lines>1-19</lines>
+        <reason>Entry point do backend Express. Deve registrar route /api/status e garantir que AudioManager está inicializado com streaming quando backend inicia.</reason>
+      </item>
+    </code>
+    <dependencies>
+      <ecosystem name="backend-node">
+        <package name="@types/node" version="^20.19.24" devDependency="true" installed="true" />
+        <note>Node.js child_process para FFmpeg, http/https nativos para verificar status do Icecast2 (opcional).</note>
+      </ecosystem>
+      <ecosystem name="system">
+        <package name="ffmpeg" version="system-installed" installed="false" />
+        <package name="icecast2" version="system-installed" installed="false" />
+        <note>FFmpeg deve ter suporte a libmp3lame (codec MP3) e HTTP protocol. Icecast2 configurado na story V1.3.</note>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Esta story estende AudioManager criado na V1.4 - não criar novo serviço, adicionar funcionalidades ao existente</constraint>
+    <constraint>FFmpeg deve usar libmp3lame para encoding MP3: -acodec libmp3lame</constraint>
+    <constraint>Bitrate fixo: 320kbps CBR (constant bitrate): -ab 320k -b:a 320k</constraint>
+    <constraint>Formato de output: -f mp3 ou -f mpeg (MP3 container)</constraint>
+    <constraint>URL Icecast2: icecast://source:{PASSWORD}@localhost:8000/stream (protocolo icecast:// do FFmpeg)</constraint>
+    <constraint>Mount point: /stream (conforme config Icecast2 da V1.3)</constraint>
+    <constraint>Fallback silêncio: FFmpeg deve usar anullsrc quando input ALSA falha (gerar silêncio em vez de erro)</constraint>
+    <constraint>Clients simultâneos: configurar max-listeners no Icecast2 config (story V1.3) ou verificar que suporta 20</constraint>
+    <constraint>Buffer Icecast2: 64KB configurado no icecast.xml (story V1.3) - não controlado pelo FFmpeg</constraint>
+    <constraint>AudioManager deve monitorar stderr do FFmpeg para extrair metadata de nível de áudio (já feito em V1.4)</constraint>
+    <constraint>Status de streaming: AudioManager deve expor método getStreamingStatus() retornando { active, listeners?, bitrate, mount_point }</constraint>
+    <constraint>API endpoint: GET /api/status deve retornar streaming.status do AudioManager</constraint>
+    <constraint>Tratamento de erros: se conexão Icecast2 falha, AudioManager deve detectar via stderr do FFmpeg e emitir evento via EventBus</constraint>
+    <constraint>Logging: Winston log quando streaming inicia, para, erros de conexão, status de listeners (se disponível via Icecast2 stats)</constraint>
+    <constraint>Verificar Icecast2 antes de iniciar streaming: checar se serviço está rodando e acessível na porta 8000</constraint>
+    <constraint>Password do Icecast2 deve vir de config/environment variable (não hardcoded)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>AudioManager Streaming Extension</name>
+      <kind>TypeScript Service Method</kind>
+      <signature>
+// Extensão do AudioManager (backend/src/services/audio-manager.ts)
+export class AudioManager {
+  // ... métodos da V1.4 ...
+  
+  startStreaming(config: StreamingConfig): Promise&lt;void&gt; { }
+  stopStreaming(): Promise&lt;void&gt; { }
+  getStreamingStatus(): StreamingStatus { }
+}
+
+interface StreamingConfig {
+  icecastHost: string;  // default: "localhost"
+  icecastPort: number;  // default: 8000
+  icecastPassword: string;  // from env/config
+  mountPoint: string;  // default: "/stream"
+  bitrate: number;  // default: 320
+  fallbackSilence: boolean;  // default: true
+}
+
+interface StreamingStatus {
+  active: boolean;
+  listeners?: number;  // if available from Icecast2 stats
+  bitrate: number;
+  mountPoint: string;
+  error?: string;
+}
+      </signature>
+      <path>backend/src/services/audio-manager.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpeg MP3 Encoding + Icecast Streaming Command</name>
+      <kind>Command-line interface</kind>
+      <signature>
+# Comando FFmpeg completo: ALSA → MP3 → Icecast2
+ffmpeg -f alsa \
+  -i plughw:1,0 \
+  -ar 48000 \
+  -ac 2 \
+  -f s16le \
+  -acodec libmp3lame \
+  -ab 320k \
+  -b:a 320k \
+  -f mp3 \
+  icecast://source:{PASSWORD}@localhost:8000/stream
+
+# Com fallback de silêncio (anullsrc)
+ffmpeg -f alsa -i plughw:1,0 \
+  -ar 48000 -ac 2 -f s16le \
+  -acodec libmp3lame -ab 320k -b:a 320k -f mp3 \
+  icecast://source:{PASSWORD}@localhost:8000/stream \
+  -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 \
+  -map 0 -map 1 -shortest
+      </signature>
+      <path>N/A (command-line interface)</path>
+    </interface>
+    <interface>
+      <name>GET /api/status Endpoint</name>
+      <kind>REST API</kind>
+      <signature>
+// backend/src/routes/status.ts
+GET /api/status
+
+Response: {
+  session: { id, started_at, duration, event_count } | null,
+  streaming: {
+    active: boolean,
+    listeners?: number,
+    bitrate: number,
+    mount_point: string
+  },
+  audio: {
+    level_db?: number,
+    clipping_detected: boolean,
+    silence_detected: boolean
+  }
+}
+      </signature>
+      <path>backend/src/routes/status.ts</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Esta story implementa pipeline completo de streaming, requerendo testes de integração entre FFmpeg, Icecast2 e API.
+      Testes devem verificar: (1) FFmpeg codifica MP3 320kbps corretamente, (2) Stream HTTP POST para Icecast2 funciona,
+      (3) Fallback de silêncio quando input falha, (4) API /api/status retorna status correto, (5) Tratamento de erros de conexão.
+      Como envolve serviços externos (FFmpeg, Icecast2), testes podem requerer ambiente com serviços configurados ou mocks.
+      Framework de testes ainda não configurado - validação inicial será manual e funcional.
+    </standards>
+    <locations>
+      <location>Testes unitários futuros: backend/src/__tests__/services/audio-manager-streaming.test.ts</location>
+      <location>Testes de integração: backend/src/__tests__/integration/streaming-pipeline.test.ts</location>
+      <location>Validação manual: Testar com Icecast2 rodando, verificar stream acessível via browser</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verificar que comando FFmpeg inclui -acodec libmp3lame para encoding MP3</idea>
+      <idea ac="1">Verificar que comando FFmpeg inclui -ab 320k -b:a 320k para bitrate 320kbps CBR</idea>
+      <idea ac="1">Verificar que comando FFmpeg inclui -f mp3 para formato MP3</idea>
+      <idea ac="1">Testar encoding: capturar áudio, verificar que output é MP3 válido (usar ffprobe ou similar)</idea>
+      <idea ac="2">Verificar que URL Icecast2 usa formato icecast://source:{PASSWORD}@localhost:8000/stream</idea>
+      <idea ac="2">Testar conexão: iniciar streaming e verificar que Icecast2 recebe stream no mount point /stream</idea>
+      <idea ac="2">Verificar stream acessível: abrir http://localhost:8000/stream no browser e verificar que reproduz áudio</idea>
+      <idea ac="2">Verificar que password vem de environment variable/config (não hardcoded)</idea>
+      <idea ac="3">Simular falha de input ALSA: desconectar dispositivo e verificar que fallback anullsrc ativa</idea>
+      <idea ac="3">Verificar que stream continua (silêncio) mesmo quando input ALSA falha</idea>
+      <idea ac="3">Verificar que FFmpeg não crasha quando input falha se fallback está configurado</idea>
+      <idea ac="4">Verificar que Icecast2 config permite até 20 clientes simultâneos (configurado em V1.3)</idea>
+      <idea ac="4">Testar múltiplos clients: abrir stream em múltiplos navegadores/devices simultaneamente</idea>
+      <idea ac="5">Verificar que buffer Icecast2 está configurado para 64KB no icecast.xml (configurado em V1.3)</idea>
+      <idea ac="5">Nota: Buffer do servidor não é testável diretamente pelo código, já está configurado no Icecast2</idea>
+      <idea ac="6">Verificar que GET /api/status retorna streaming.status com campos: active, bitrate, mount_point</idea>
+      <idea ac="6">Testar quando streaming ativo: GET /api/status retorna streaming.active = true</idea>
+      <idea ac="6">Testar quando streaming parado: GET /api/status retorna streaming.active = false</idea>
+      <idea ac="6">Verificar que streaming.bitrate = 320 e streaming.mount_point = "/stream"</idea>
+      <idea ac="6">Verificar que streaming.listeners está presente se disponível via Icecast2 stats</idea>
+      <idea ac="4">Testar tratamento de erro: parar Icecast2 e verificar que AudioManager detecta erro de conexão</idea>
+      <idea ac="4">Verificar que erro de conexão é logado via Winston</idea>
+      <idea ac="4">Verificar que evento 'error' é emitido quando conexão Icecast2 falha</idea>
+    </ideas>
+  </tests>
+</story-context>
+

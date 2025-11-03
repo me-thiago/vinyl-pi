@@ -38,6 +38,44 @@ Vinyl-OS é uma plataforma completa que permite capturar áudio de toca-discos v
 - Icecast2 instalado no sistema
 - ALSA configurado (para captura de áudio)
 
+## 🔧 Instalação de Dependências do Sistema
+
+Antes de instalar as dependências Node.js, você precisa instalar as ferramentas de sistema necessárias.
+
+### Raspberry Pi OS / Debian / Ubuntu
+
+```bash
+# Atualizar índice de pacotes
+sudo apt update
+
+# Instalar Icecast2 (servidor de streaming)
+sudo apt install -y icecast2
+
+# Durante a instalação, o Icecast2 perguntará sobre configuração inicial
+# Você pode aceitar os valores padrão, pois vamos usar um arquivo de configuração customizado
+
+# Instalar FFmpeg (processamento de áudio)
+sudo apt install -y ffmpeg
+
+# Verificar instalações
+which icecast2  # deve retornar /usr/bin/icecast2
+which ffmpeg    # deve retornar /usr/bin/ffmpeg
+
+# Verificar versões
+icecast2 --version
+ffmpeg -version
+```
+
+### ALSA (já vem instalado no Raspberry Pi OS)
+
+```bash
+# Verificar se ALSA está disponível
+aplay -l  # Lista dispositivos de reprodução
+arecord -l  # Lista dispositivos de captura
+```
+
+**Nota:** O Vinyl-OS usa um arquivo de configuração customizado (`config/icecast.xml`) ao invés do padrão do sistema (`/etc/icecast2/icecast.xml`), permitindo versionamento e configuração sem necessidade de sudo.
+
 ## 🚀 Instalação
 
 ### 1. Clone o repositório
@@ -76,6 +114,37 @@ npx prisma generate
 npx prisma db push
 ```
 
+### 5. Backup e Restore do Banco de Dados
+
+O Vinyl-OS utiliza SQLite em arquivo único (`data/vinyl-os.db`), facilitando backup e restore.
+
+#### Criar Backup
+
+```bash
+# Backup manual com timestamp
+cp data/vinyl-os.db data/backups/vinyl-os-$(date +%Y%m%d-%H%M%S).db
+
+# Ou backup simples
+cp data/vinyl-os.db data/backups/vinyl-os-backup.db
+```
+
+**Importante:** Crie a pasta `data/backups/` antes do primeiro backup:
+```bash
+mkdir -p data/backups
+```
+
+#### Restaurar Backup
+
+```bash
+# Restaurar de um backup específico
+cp data/backups/vinyl-os-20241102-194600.db data/vinyl-os.db
+
+# Ou restaurar do backup mais recente
+cp data/backups/$(ls -t data/backups/ | head -1) data/vinyl-os.db
+```
+
+**Dica:** Recomenda-se fazer backups regulares antes de atualizações ou migrations do banco de dados.
+
 ## 🏃 Executando o Projeto
 
 ### Desenvolvimento (Backend + Frontend simultaneamente)
@@ -107,6 +176,87 @@ npm run build
 # Build individual
 npm run build:backend
 npm run build:frontend
+```
+
+## 🔧 Gerenciamento via PM2
+
+O Vinyl-OS usa **PM2** para gerenciar os processos (Icecast2, backend, frontend) em produção ou para desenvolvimento com auto-restart.
+
+### Instalar PM2 (se ainda não instalado)
+
+```bash
+npm install -g pm2
+```
+
+### Gerenciar todos os serviços
+
+```bash
+# Iniciar todos os serviços (Icecast2 + Backend + Frontend)
+npm run pm2:start
+
+# Ver status de todos os processos
+npm run pm2:status
+
+# Parar todos os serviços
+npm run pm2:stop
+
+# Reiniciar todos os serviços
+npm run pm2:restart
+
+# Ver logs de todos os serviços
+npm run pm2:logs
+
+# Remover todos os processos do PM2
+npm run pm2:delete
+```
+
+### Gerenciar serviços individuais
+
+```bash
+# Apenas Icecast2
+npm run pm2:icecast
+
+# Apenas Backend
+npm run pm2:backend
+
+# Apenas Frontend
+npm run pm2:frontend
+
+# Parar serviço individual
+pm2 stop icecast2    # ou vinyl-backend, ou vinyl-frontend
+
+# Ver logs de um serviço específico
+pm2 logs icecast2
+```
+
+### Logs e Monitoramento
+
+Os logs dos serviços são salvos em `./logs/`:
+- `icecast2-*.log` - Logs do servidor de streaming
+- `backend-*.log` - Logs do backend Node.js
+- `frontend-*.log` - Logs do frontend React
+
+```bash
+# Ver logs em tempo real
+pm2 logs
+
+# Ver logs apenas do Icecast2
+pm2 logs icecast2 --lines 50
+
+# Monitoramento visual
+pm2 monit
+```
+
+### Auto-start no boot (Produção)
+
+```bash
+# Salvar configuração atual do PM2
+pm2 save
+
+# Configurar PM2 para iniciar no boot
+pm2 startup
+
+# Seguir instruções exibidas pelo comando acima
 ```
 
 ## 📁 Estrutura do Projeto

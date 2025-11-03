@@ -1,7 +1,7 @@
 # Story V1.1: Setup Inicial do Projeto
 
 **Epic:** V1 - Foundation Core (MVP)  
-**Status:** review
+**Status:** done
 
 **User Story:**
 Como desenvolvedor,  

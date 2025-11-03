@@ -1,0 +1,218 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>6</storyId>
+    <title>Frontend Player Básico</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-06-frontend-player-basico.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>poder ouvir o stream de áudio através de um player web</iWant>
+    <soThat>possa acessar o áudio do toca-discos em qualquer dispositivo</soThat>
+    <tasks>
+      <task id="1">Componente Player criado com HTML5 Audio element</task>
+      <task id="2">Play/Pause funcional</task>
+      <task id="3">Volume local (não afeta source)</task>
+      <task id="4">Indicador visual de streaming ativo</task>
+      <task id="5">URL do stream: `http://pi.local:8000/stream`</task>
+      <task id="6">Tratamento de erros de conexão</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Componente Player criado com HTML5 Audio element</criterion>
+    <criterion id="2">Play/Pause funcional</criterion>
+    <criterion id="3">Volume local (não afeta source)</criterion>
+    <criterion id="4">Indicador visual de streaming ativo</criterion>
+    <criterion id="5">URL do stream: `http://pi.local:8000/stream`</criterion>
+    <criterion id="6">Tratamento de erros de conexão</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>5.1.5 Interface Web (SPA MVP) - Player Principal</section>
+        <snippet>Player Principal: Play/Pause do stream, Volume local (não afeta source), Indicador visual de streaming ativo, Status do sistema (streaming on/off, sessão ativa). Frontend conecta diretamente ao Icecast2 HTTP stream (http://pi.local:8000/stream) via HTML5 Audio element.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Frontend Components</section>
+        <snippet>Player: HTML5 Audio element conectando em http://pi.local:8000/stream. Frontend Components: Player, Dashboard, Diagnostics, Sessions, Settings.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Padrões de Nomenclatura - Components React</section>
+        <snippet>Formato: PascalCase. Exemplos: Player.tsx, VUMeter.tsx, AlbumCard.tsx. Files: correspondem ao nome do component (Player.tsx exporta Player). Diretórios: kebab-case ou PascalCase para feature components (Player/, Dashboard/). shadcn/ui components: Em components/ui/, kebab-case (button.tsx, card.tsx).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Pontos de Integração - Frontend ↔ Audio Stream</section>
+        <snippet>HTTP streaming direto do Icecast2 (http://pi.local:8000/stream). HTML5 Audio element para reprodução.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics - V1 Foundation Core</title>
+        <section>Story V1.6: Frontend Player Básico</section>
+        <snippet>Como usuário, quero poder ouvir o stream de áudio através de um player web, para que possa acessar o áudio do toca-discos em qualquer dispositivo. Critérios: Componente Player com HTML5 Audio element, Play/Pause funcional, Volume local, Indicador visual de streaming ativo, URL do stream: http://pi.local:8000/stream, Tratamento de erros de conexão.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/v1/v1-5-pipeline-ffmpeg-icecast.context.xml</path>
+        <title>Story Context: Pipeline FFmpeg → Icecast</title>
+        <section>Workflow 1: Streaming Startup</section>
+        <snippet>Fluxo completo de streaming: AudioManager spawn FFmpeg process, FFmpeg captura ALSA device, FFmpeg encode PCM → MP3 320kbps CBR, FFmpeg stream HTTP POST → Icecast2 (/stream), Icecast2 disponibiliza mount point para clients. Frontend Player conecta em http://pi.local:8000/stream via HTML5 Audio element.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>frontend/src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-50</lines>
+        <reason>Entry point React app. Deve conter roteamento e layout base onde Player será integrado.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/ui/button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <lines>1-50</lines>
+        <reason>Componente shadcn/ui Button disponível para botões Play/Pause do Player.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/components/ui/card.tsx</path>
+        <kind>component</kind>
+        <symbol>Card</symbol>
+        <lines>1-50</lines>
+        <reason>Componente shadcn/ui Card disponível para container do Player.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/lib/utils.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <lines>1-10</lines>
+        <reason>Função utilitária cn() para merge de classes Tailwind, útil para estilização do Player.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/routes/</path>
+        <kind>directory</kind>
+        <symbol>routes</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório de rotas backend. Deve conter route /api/status para verificar status de streaming (criado na V1.5).</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/src/pages/</path>
+        <kind>directory</kind>
+        <symbol>pages</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório para páginas React. Player pode ser uma página ou componente reutilizável em outras páginas.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="^19.1.1" />
+        <package name="react-dom" version="^19.1.1" />
+        <package name="react-router-dom" version="^6.30.1" />
+        <package name="socket.io-client" version="^4.8.1" />
+      </ecosystem>
+      <ecosystem name="ui">
+        <package name="@radix-ui/react-slot" version="^1.2.3" />
+        <package name="class-variance-authority" version="^0.7.1" />
+        <package name="clsx" version="^2.1.1" />
+        <package name="tailwind-merge" version="^3.3.1" />
+        <package name="tailwindcss" version="^4.1.16" />
+        <package name="lucide-react" version="^0.552.0" />
+      </ecosystem>
+      <ecosystem name="build">
+        <package name="vite" version="^7.1.7" />
+        <package name="typescript" version="~5.9.3" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Componente deve usar HTML5 Audio element nativo do browser para reprodução do stream</constraint>
+    <constraint>URL do stream é fixa: http://pi.local:8000/stream (conforme config Icecast2 e story V1.5)</constraint>
+    <constraint>Volume controlado localmente no componente, não afeta o source de áudio (streaming source permanece inalterado)</constraint>
+    <constraint>Componente deve seguir padrões React: PascalCase (Player.tsx), arquivo corresponde ao nome do componente</constraint>
+    <constraint>Usar shadcn/ui components quando possível (Button, Card) para consistência visual</constraint>
+    <constraint>Indicador visual deve mostrar claramente quando streaming está ativo vs inativo</constraint>
+    <constraint>Tratamento de erros deve lidar com: conexão perdida, stream não disponível, dispositivo offline, erros de rede</constraint>
+    <constraint>Componente deve ser responsivo e funcionar em dispositivos móveis (mobile-responsive conforme arquitetura)</constraint>
+    <constraint>Opcional: Usar Socket.io client para receber updates de status de streaming em tempo real (não obrigatório para V1.6, pode ser adicionado em stories futuras)</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>HTML5 Audio Element API</name>
+      <kind>Browser API</kind>
+      <signature>
+const audio = new Audio('http://pi.local:8000/stream');
+audio.play(); // Inicia reprodução
+audio.pause(); // Pausa reprodução
+audio.volume = 0.5; // Volume local (0.0 - 1.0)
+audio.addEventListener('error', handleError); // Tratamento de erros
+audio.addEventListener('loadstart', handleLoadStart); // Indicador de carregamento
+      </signature>
+      <path>Browser native API</path>
+    </interface>
+    <interface>
+      <name>GET /api/status Endpoint</name>
+      <kind>REST API</kind>
+      <signature>
+GET /api/status
+
+Response: {
+  session: { id, started_at, duration, event_count } | null,
+  streaming: {
+    active: boolean,
+    listeners?: number,
+    bitrate: number,
+    mount_point: string
+  },
+  audio: {
+    level_db?: number,
+    clipping_detected: boolean,
+    silence_detected: boolean
+  }
+}
+      </signature>
+      <path>backend/src/routes/status.ts</path>
+    </interface>
+    <interface>
+      <name>Socket.io Status Updates (Opcional V1.6)</name>
+      <kind>WebSocket</kind>
+      <signature>
+// Client → Server
+socket.emit('subscribe', { channels: ['status'] });
+
+// Server → Client
+socket.on('status', (data) => {
+  // data: { streaming, listeners, session_active, audio_level_db }
+});
+      </signature>
+      <path>frontend/src/hooks/ (opcional, pode ser criado hook useSocketStatus)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Frontend utiliza React 19 com TypeScript. Testes devem ser escritos com ferramenta de teste padrão do projeto (a definir). Componentes devem ser testáveis isoladamente. HTML5 Audio API deve ser mockado em testes para evitar dependência de stream real.</standards>
+    <locations>Testes devem ser colocados próximos aos componentes ou em diretório tests/ no frontend. Estrutura: frontend/src/components/Player/Player.test.tsx ou frontend/tests/components/Player.test.tsx</locations>
+    <ideas>
+      <test idea="1" criterion="1">Testar renderização do componente Player com HTML5 Audio element criado e URL do stream configurada corretamente</test>
+      <test idea="2" criterion="2">Testar funcionalidade Play/Pause: verificar que botão Play inicia reprodução, botão Pause pausa reprodução, estado do botão muda conforme estado de reprodução</test>
+      <test idea="3" criterion="3">Testar controle de volume: verificar que slider/input de volume altera volume local do Audio element (0.0-1.0), volume não afeta outras instâncias ou source</test>
+      <test idea="4" criterion="4">Testar indicador visual de streaming: verificar que indicador mostra estado ativo quando stream está carregando/reproduzindo, mostra estado inativo quando stream está pausado/erro</test>
+      <test idea="5" criterion="5">Testar URL do stream: verificar que Audio element usa URL correta http://pi.local:8000/stream</test>
+      <test idea="6" criterion="6">Testar tratamento de erros: verificar que erros de conexão são capturados e exibidos ao usuário, erros de rede são tratados adequadamente, stream não disponível mostra mensagem apropriada, componente recupera quando stream volta a ficar disponível</test>
+      <test idea="7">Testar responsividade: verificar que componente funciona em diferentes tamanhos de tela (mobile, tablet, desktop)</test>
+      <test idea="8">Testar integração com API status (opcional): verificar que componente pode consultar GET /api/status para verificar se streaming está ativo antes de tentar conectar</test>
+    </ideas>
+  </tests>
+</story-context>
+

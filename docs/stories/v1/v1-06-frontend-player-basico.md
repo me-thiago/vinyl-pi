@@ -1,6 +1,7 @@
 # Story V1.6: Frontend Player Básico
 
-**Epic:** V1 - Foundation Core (MVP)
+**Epic:** V1 - Foundation Core (MVP)  
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  
@@ -24,4 +25,9 @@ para que possa acessar o áudio do toca-discos em qualquer dispositivo.
 
 - [PRD v3.0](../prd-v3.md) - Seção 5.1.5 (Interface Web - Player Principal)
 - [Epics](../epics.md) - Epic V1
+
+## Dev Agent Record
+
+### Context Reference
+- [Story Context XML](v1-6-frontend-player-basico.context.xml) - Generated 2025-11-03
 

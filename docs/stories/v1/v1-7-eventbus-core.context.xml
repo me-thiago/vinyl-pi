@@ -1,0 +1,204 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>7</storyId>
+    <title>EventBus Core</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-07-eventbus-core.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter um sistema de eventos pub/sub interno</iWant>
+    <soThat>componentes possam comunicar eventos de forma desacoplada</soThat>
+    <tasks>
+      <task id="1">Utilitário `event-bus.ts` criado com padrão publish/subscribe</task>
+      <task id="2">Eventos suportados: `audio.start`, `audio.stop`, `silence.detected`, `silence.ended`, `turntable.idle`, `turntable.active`, `track.change.detected`, `session.started`, `session.ended`, `clipping.detected`</task>
+      <task id="3">Múltiplos listeners por evento</task>
+      <task id="4">Payload serializável (objeto plano)</task>
+      <task id="5">Handlers async que não lançam exceções não tratadas</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Utilitário `event-bus.ts` criado com padrão publish/subscribe</criterion>
+    <criterion id="2">Eventos suportados: `audio.start`, `audio.stop`, `silence.detected`, `silence.ended`, `turntable.idle`, `turntable.active`, `track.change.detected`, `session.started`, `session.ended`, `clipping.detected`</criterion>
+    <criterion id="3">Múltiplos listeners por evento</criterion>
+    <criterion id="4">Payload serializável (objeto plano)</criterion>
+    <criterion id="5">Handlers async que não lançam exceções não tratadas</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>5.1.4 EventBus Core</section>
+        <snippet>Sistema de eventos interno básico. Padrão publish/subscribe simples. Eventos suportados: audio.start, audio.stop, silence.detected, silence.ended, turntable.idle, turntable.active, track.change.detected, session.started, session.ended, clipping.detected. Nota: Extensível na V3 para plugins, V1 mantém simples.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>EventBus Interface</section>
+        <snippet>API: eventBus.publish(event: string, payload: object): void, eventBus.subscribe(event: string, handler: (payload) => Promise&lt;void&gt;): void. Eventos V1: audio.start, audio.stop, silence.detected, silence.ended, turntable.idle, turntable.active, track.change.detected, session.started, session.ended, clipping.detected.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Services and Modules</section>
+        <snippet>event-bus.ts: Pub/sub interno para eventos. Input: publish events, Output: notify subscribers. EventDetector recebe audio level events via EventBus e emite eventos via EventBus (silence.detected, etc.). Socket.io Server recebe eventos via EventBus e emite WebSocket messages para clients.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Estrutura do Projeto - Backend</section>
+        <snippet>Backend estrutura: backend/src/utils/event-bus.ts - EventBus pub/sub (V1). EventBus Core: event-bus.ts em backend/src/utils/, pub/sub simples. Integrações futuras: EventBus extensível para Last.fm, MQTT, webhooks.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics - V1 Foundation Core</title>
+        <section>Story V1.7: EventBus Core</section>
+        <snippet>Como desenvolvedor, quero ter um sistema de eventos pub/sub interno, para que componentes possam comunicar eventos de forma desacoplada. Critérios: Utilitário event-bus.ts criado com padrão publish/subscribe, Eventos suportados listados, Múltiplos listeners por evento, Payload serializável (objeto plano), Handlers async que não lançam exceções não tratadas.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/v1/v1-04-captura-audio-alsa.md</path>
+        <title>Story Context: Captura de Áudio ALSA</title>
+        <section>Dev Agent Record</section>
+        <snippet>Interface preparada para EventBus futuro (story v1-7). Story V1.7 irá adicionar EventBus para emitir eventos de áudio. Constraint: Emitir eventos via EventBus quando dispositivo desconectado (event-bus.ts será criado em story futura, mas interface deve ser preparada).</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-division-analysis.md</path>
+        <title>PRD Division Analysis</title>
+        <section>EventBus Core</section>
+        <snippet>EventBus V1: Core criado, Core básico. OK, mas manter simples, extensão V3. Design simples, extensível depois. EventBus V1 precisa ser extensível desde o início ou podemos fazer refactor na V3? Decisão: manter simples V1, extensão V3.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>backend/src/utils/</path>
+        <kind>directory</kind>
+        <symbol>utils</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório onde event-bus.ts deve ser criado. Atualmente vazio, conforme estrutura de projeto definida na arquitetura.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>service</kind>
+        <symbol>AudioManager</symbol>
+        <lines>N/A</lines>
+        <reason>AudioManager será um publisher no EventBus, emitindo eventos de áudio (audio.start, audio.stop). Criado na story V1.4, deve ser atualizado para usar EventBus quando disponível.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/event-detector.ts</path>
+        <kind>service</kind>
+        <symbol>EventDetector</symbol>
+        <lines>N/A</lines>
+        <reason>EventDetector será subscriber e publisher no EventBus. Recebe audio level events via EventBus e emite eventos detectados (silence.detected, clipping.detected, etc.). Criado em stories futuras (V1.8-V1.12), mas designado para usar EventBus.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/index.ts</path>
+        <kind>entry</kind>
+        <symbol>index</symbol>
+        <lines>N/A</lines>
+        <reason>Entry point do backend. Deve inicializar EventBus e disponibilizar instância singleton para uso por outros serviços.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/routes/</path>
+        <kind>directory</kind>
+        <symbol>routes</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório de rotas. Routes podem precisar escutar eventos do EventBus para atualizações em tempo real (futuro, integração com Socket.io).</reason>
+      </artifact>
+      <artifact>
+        <path>backend/prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>AudioEvent</symbol>
+        <lines>30-40</lines>
+        <reason>Model AudioEvent no Prisma schema. EventType String corresponde aos tipos de eventos do EventBus. Metadata Json armazena payload serializável dos eventos. Relacionamento com Session será usado quando eventos forem persistidos (V1.10).</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="typescript" version="^5.9.3" />
+      </ecosystem>
+      <ecosystem name="build">
+        <package name="typescript" version="^5.9.3" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>EventBus deve ser implementado como utilitário simples, sem dependências externas (apenas TypeScript nativo)</constraint>
+    <constraint>Padrão publish/subscribe: permitir múltiplos subscribers para o mesmo evento</constraint>
+    <constraint>Payload deve ser objeto plano (plain object) serializável via JSON.stringify</constraint>
+    <constraint>Handlers devem ser funções async (async (payload) => Promise&lt;void&gt;)</constraint>
+    <constraint>Handlers que lançam exceções devem ser tratadas internamente pelo EventBus para não quebrar outros handlers</constraint>
+    <constraint>EventBus deve ser singleton, exportado como instância única para uso em todo o backend</constraint>
+    <constraint>Localização: backend/src/utils/event-bus.ts</constraint>
+    <constraint>EventBus V1 mantém simples - extensibilidade para plugins será adicionada na V4 (YAGNI principle)</constraint>
+    <constraint>Eventos suportados devem usar dot notation (ex: "audio.start", "silence.detected") conforme especificado</constraint>
+    <constraint>EventBus não deve ter dependências de outras partes do sistema - deve ser criado primeiro e usado por outros serviços</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>EventBus API</name>
+      <kind>Internal API</kind>
+      <signature>
+// backend/src/utils/event-bus.ts
+
+type EventHandler = (payload: Record&lt;string, any&gt;) => Promise&lt;void&gt;;
+
+class EventBus {
+  publish(event: string, payload: Record&lt;string, any&gt;): void;
+  subscribe(event: string, handler: EventHandler): void;
+  unsubscribe(event: string, handler: EventHandler): void;
+}
+
+export const eventBus = new EventBus();
+      </signature>
+      <path>backend/src/utils/event-bus.ts</path>
+    </interface>
+    <interface>
+      <name>Event Types (V1)</name>
+      <kind>Type Definition</kind>
+      <signature>
+// Event types supported in V1
+type EventType = 
+  | 'audio.start'
+  | 'audio.stop'
+  | 'silence.detected'
+  | 'silence.ended'
+  | 'turntable.idle'
+  | 'turntable.active'
+  | 'track.change.detected'
+  | 'session.started'
+  | 'session.ended'
+  | 'clipping.detected';
+
+// Payload examples (plain objects, serializable)
+// audio.start/stop: { timestamp: string }
+// silence.detected: { timestamp: string, level_db: number, duration: number }
+// clipping.detected: { timestamp: string, level_db: number }
+// session.started/ended: { session_id?: string, timestamp: string }
+      </signature>
+      <path>backend/src/utils/event-bus.ts (type definitions)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Backend utiliza TypeScript. Testes devem ser escritos com ferramenta de teste padrão do projeto (a definir, possivelmente Jest ou Vitest). EventBus deve ser testável isoladamente, sem dependências externas. Handlers devem ser mockados em testes.</standards>
+    <locations>Testes devem ser colocados próximos ao arquivo ou em diretório tests/ no backend. Estrutura: backend/src/utils/event-bus.test.ts ou backend/tests/utils/event-bus.test.ts</locations>
+    <ideas>
+      <test idea="1" criterion="1">Testar criação do utilitário event-bus.ts: verificar que classe EventBus pode ser instanciada, verificar que singleton export funciona, verificar métodos publish e subscribe existem</test>
+      <test idea="2" criterion="2">Testar eventos suportados: verificar que todos os 10 tipos de eventos podem ser publicados e recebidos, verificar que eventos inválidos são tratados adequadamente</test>
+      <test idea="3" criterion="3">Testar múltiplos listeners: verificar que múltiplos handlers podem ser registrados para o mesmo evento, verificar que todos os handlers são executados quando evento é publicado, verificar ordem de execução (ou que ordem não importa)</test>
+      <test idea="4" criterion="4">Testar payload serializável: verificar que objetos simples podem ser passados como payload, verificar que JSON.stringify funciona no payload, verificar que objetos complexos (Date, functions) são tratados adequadamente</test>
+      <test idea="5" criterion="5">Testar handlers async e tratamento de exceções: verificar que handlers async são suportados, verificar que exceções em um handler não impedem execução de outros handlers, verificar que erros são logados mas não propagados, verificar que Promise rejection em handler não quebra o EventBus</test>
+      <test idea="6">Testar unsubscribe: verificar que handlers podem ser removidos, verificar que handler removido não recebe mais eventos, verificar que outros handlers continuam funcionando após unsubscribe</test>
+      <test idea="7">Testar performance: verificar que múltiplos eventos publicados rapidamente são tratados corretamente, verificar que não há vazamento de memória com muitos handlers registrados</test>
+      <test idea="8">Testar integração: verificar que outros serviços podem importar e usar o EventBus, verificar que publish/subscribe funciona entre diferentes módulos</test>
+    </ideas>
+  </tests>
+</story-context>
+

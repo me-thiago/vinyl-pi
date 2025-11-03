@@ -1,0 +1,191 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>3</storyId>
+    <title>Configuração Icecast2</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-03-configuracao-icecast.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter Icecast2 configurado e pronto para receber streams</iWant>
+    <soThat>possa fazer streaming de áudio</soThat>
+    <tasks>
+      <task id="1">Icecast2 instalado (ou instruções de instalação documentadas)</task>
+      <task id="2">Arquivo `config/icecast.xml` configurado com mount point `/stream`</task>
+      <task id="3">Senhas configuradas (source password)</task>
+      <task id="4">Serviço Icecast2 iniciado e acessível na porta 8000</task>
+      <task id="5">Teste manual de conexão bem-sucedido</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Icecast2 instalado (ou instruções de instalação documentadas)</criterion>
+    <criterion id="2">Arquivo `config/icecast.xml` configurado com mount point `/stream`</criterion>
+    <criterion id="3">Senhas configuradas (source password)</criterion>
+    <criterion id="4">Serviço Icecast2 iniciado e acessível na porta 8000</criterion>
+    <criterion id="5">Teste manual de conexão bem-sucedido</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>External Services</section>
+        <snippet>Icecast2 (porta 8000): Servidor de streaming instalado no sistema. Frontend Player conecta em http://pi.local:8000/stream via HTML5 Audio element. AudioManager faz HTTP POST stream para Icecast2 mount point /stream após FFmpeg encoder MP3 320kbps CBR.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>10.1 Quick Start - Configurar Icecast</section>
+        <snippet>Icecast instalado via apt (sudo apt install icecast2). Configuração em /etc/icecast2/icecast.xml (ajustar passwords e paths). Reiniciar serviço: sudo systemctl restart icecast2. Config YAML define streaming.icecast com host localhost, port 8000, password, mount_point /stream.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>9.2 Configuração YAML - streaming</section>
+        <snippet>Config YAML define streaming com enabled true, encoder mp3, bitrate 320, mount_point /stream. Seção icecast: host localhost, port 8000, password, name "Vinyl Stream", description, genre. Environment variables: ICECAST_SOURCE_PASSWORD e ICECAST_ADMIN_PASSWORD no .env.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>10.2 Validação Pós-Instalação - Testar streaming</section>
+        <snippet>Teste manual de streaming: ffmpeg -f alsa -i plughw:1,0 -acodec mp3 -ab 320k -content_type audio/mpeg icecast://source:password@localhost:8000/test.mp3. Verificar logs: tail -f /var/log/icecast2/error.log. Verificar status: sudo systemctl status icecast2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura - Vinyl-OS</title>
+        <section>Pontos de Integração - Backend ↔ Audio</section>
+        <snippet>Backend faz HTTP POST para Icecast2 mount point para streaming. FFmpeg child process captura ALSA e codifica, depois envia stream para Icecast2. Frontend conecta diretamente ao Icecast2 HTTP stream (http://pi.local:8000/stream) via HTML5 Audio element.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>config/</path>
+        <kind>Configuration directory</kind>
+        <symbol>config/</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório vazio criado em V1.1. Deve conter arquivo config/icecast.xml com configuração do Icecast2 para mount point /stream.</reason>
+      </item>
+      <item>
+        <path>README.md</path>
+        <kind>Documentation</kind>
+        <symbol>README.md</symbol>
+        <lines>N/A</lines>
+        <reason>README menciona Icecast2 como requisito do sistema, mas não detalha configuração. Story deve documentar instalação e configuração no README se necessário.</reason>
+      </item>
+    </code>
+    <dependencies>
+      <ecosystem name="system">
+        <package name="icecast2" version="system-installed" installed="false" />
+        <note>Icecast2 é instalado no sistema operacional via apt (sudo apt install icecast2), não via npm. Story deve incluir instruções de instalação ou verificação.</note>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Icecast2 é dependência do sistema operacional, não Node.js - instalação via apt no Raspberry Pi OS</constraint>
+    <constraint>Arquivo de configuração: config/icecast.xml (não /etc/icecast2/icecast.xml) para permitir versionamento e não requerer sudo para editar</constraint>
+    <constraint>Mount point obrigatório: /stream (conforme Tech Spec e workflows de streaming)</constraint>
+    <constraint>Porta padrão: 8000 (conforme Tech Spec - Frontend Player conecta em http://pi.local:8000/stream)</constraint>
+    <constraint>Source password necessário para FFmpeg fazer POST stream para Icecast2</constraint>
+    <constraint>Bind apenas em rede local (192.168.x.x / 10.x.x.x) por segurança (conforme PRD seção 11.2)</constraint>
+    <constraint>Senhas devem ser configuráveis via environment variables (.env) e não hardcoded</constraint>
+    <constraint>Teste manual deve usar comando ffmpeg exemplo do PRD (seção 10.2) para validar conexão</constraint>
+    <constraint>Se Icecast2 já instalado no sistema, verificar configuração existente antes de criar novo arquivo</constraint>
+    <constraint>Documentar instalação no README ou criar arquivo INSTALL.md se não houver espaço suficiente</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Icecast2 Configuration File</name>
+      <kind>XML Configuration</kind>
+      <signature>
+<!-- config/icecast.xml -->
+&lt;icecast&gt;
+  &lt;location&gt;Vinyl-OS&lt;/location&gt;
+  &lt;admin&gt;admin@localhost&lt;/admin&gt;
+  &lt;hostname&gt;localhost&lt;/hostname&gt;
+  &lt;listen-socket&gt;
+    &lt;port&gt;8000&lt;/port&gt;
+    &lt;bind-address&gt;127.0.0.1&lt;/bind-address&gt;
+  &lt;/listen-socket&gt;
+  &lt;mount&gt;
+    &lt;mount-name&gt;/stream&lt;/mount-name&gt;
+    &lt;username&gt;source&lt;/username&gt;
+    &lt;password&gt;{ICECAST_SOURCE_PASSWORD}&lt;/password&gt;
+    &lt;max-listeners&gt;10&lt;/max-listeners&gt;
+    &lt;stream-name&gt;Vinyl Stream&lt;/stream-name&gt;
+    &lt;stream-description&gt;Live from turntable&lt;/stream-description&gt;
+    &lt;stream-genre&gt;Various&lt;/stream-genre&gt;
+  &lt;/mount&gt;
+&lt;/icecast&gt;
+      </signature>
+      <path>config/icecast.xml</path>
+    </interface>
+    <interface>
+      <name>Icecast2 Service (systemd)</name>
+      <kind>System Service</kind>
+      <signature>
+# Verificar status
+sudo systemctl status icecast2
+
+# Iniciar/Parar/Reiniciar
+sudo systemctl start icecast2
+sudo systemctl stop icecast2
+sudo systemctl restart icecast2
+
+# Habilitar auto-start
+sudo systemctl enable icecast2
+      </signature>
+      <path>/etc/systemd/system/icecast2.service</path>
+    </interface>
+    <interface>
+      <name>FFmpeg Icecast Connection</name>
+      <kind>Stream Protocol</kind>
+      <signature>
+# Formato de URL para streaming
+icecast://source:{PASSWORD}@localhost:8000/stream
+
+# Comando FFmpeg exemplo (teste)
+ffmpeg -f alsa -i plughw:1,0 -acodec mp3 -ab 320k \
+  -content_type audio/mpeg \
+  icecast://source:{PASSWORD}@localhost:8000/stream
+      </signature>
+      <path>N/A (command-line interface)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Esta story de configuração de serviço externo (Icecast2) requer validação manual e verificação funcional.
+      Testes devem verificar: (1) Icecast2 instalado corretamente no sistema, (2) Arquivo de configuração válido e aplicado,
+      (3) Serviço iniciado e rodando, (4) Porta 8000 acessível, (5) Conexão de teste bem-sucedida via FFmpeg.
+      Como é configuração de sistema externo, não há testes unitários - validação é através de comandos CLI e verificação manual.
+    </standards>
+    <locations>
+      <location>Validação manual via: sudo systemctl status icecast2, curl http://localhost:8000, ffmpeg test command</location>
+      <location>Verificação de logs: tail -f /var/log/icecast2/error.log</location>
+      <location>Teste de conexão: Comando ffmpeg conforme PRD seção 10.2</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verificar que icecast2 está instalado: which icecast2 ou dpkg -l | grep icecast2</idea>
+      <idea ac="1">Se não instalado, documentar comando: sudo apt install icecast2 (Raspberry Pi OS)</idea>
+      <idea ac="2">Verificar que arquivo config/icecast.xml existe e contém mount point /stream configurado</idea>
+      <idea ac="2">Validar XML está bem formado (sintaxe válida, tags fechadas corretamente)</idea>
+      <idea ac="2">Verificar que arquivo referencia variável de ambiente para password (não hardcoded)</idea>
+      <idea ac="3">Confirmar que senha source está configurada (via .env ou no config/icecast.xml)</idea>
+      <idea ac="3">Verificar que senha não está exposta em logs ou commits (usar .env ou .gitignore)</idea>
+      <idea ac="4">Executar sudo systemctl status icecast2 verifica serviço está rodando (active/running)</idea>
+      <idea ac="4">Testar porta 8000 acessível: curl -I http://localhost:8000 ou telnet localhost 8000</idea>
+      <idea ac="4">Verificar logs não mostram erros: tail -f /var/log/icecast2/error.log</idea>
+      <idea ac="5">Executar comando FFmpeg teste do PRD: ffmpeg -f alsa -i plughw:1,0 -acodec mp3 -ab 320k -content_type audio/mpeg icecast://source:password@localhost:8000/stream</idea>
+      <idea ac="5">Verificar que stream está acessível em http://localhost:8000/stream (retorna content-type audio/mpeg)</idea>
+      <idea ac="5">Validar que mount point aparece no status do Icecast2 (admin interface ou logs)</idea>
+    </ideas>
+  </tests>
+</story-context>
+

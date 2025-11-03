@@ -15,7 +15,16 @@
     "build:backend": "cd backend && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "start": "cd backend && npm start",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:delete": "pm2 delete ecosystem.config.js",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status",
+    "pm2:icecast": "pm2 start ecosystem.config.js --only vinyl-os-icecast",
+    "pm2:backend": "pm2 start ecosystem.config.js --only vinyl-backend",
+    "pm2:frontend": "pm2 start ecosystem.config.js --only vinyl-frontend"
   },
   "keywords": [
     "vinyl",

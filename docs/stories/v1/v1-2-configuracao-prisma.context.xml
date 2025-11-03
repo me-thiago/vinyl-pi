@@ -1,0 +1,204 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>2</storyId>
+    <title>Configuração Prisma e Database</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-02-configuracao-prisma.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter o banco de dados SQLite configurado com Prisma e schema V1 inicial</iWant>
+    <soThat>possa persistir dados de sessões e eventos</soThat>
+    <tasks>
+      <task id="1">Prisma schema criado com modelos Session, AudioEvent, Setting</task>
+      <task id="2">Migration inicial criada e aplicada</task>
+      <task id="3">Prisma Client gerado e configurado</task>
+      <task id="4">Database SQLite criado em `data/vinyl-os.db`</task>
+      <task id="5">Scripts de backup documentados</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Prisma schema criado com modelos Session, AudioEvent, Setting</criterion>
+    <criterion id="2">Migration inicial criada e aplicada</criterion>
+    <criterion id="3">Prisma Client gerado e configurado</criterion>
+    <criterion id="4">Database SQLite criado em `data/vinyl-os.db`</criterion>
+    <criterion id="5">Scripts de backup documentados</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Data Models and Contracts - Prisma Schema (V1)</section>
+        <snippet>Define schema completo V1 com três modelos: Session (sessões de escuta com campos id, startedAt, endedAt, durationSeconds, eventCount), AudioEvent (eventos detectados com id, sessionId, eventType, timestamp, metadata JSON), e Setting (configurações com key-value pairs e type). Relacionamento 1:N entre Session e AudioEvent com cascade delete. Provider SQLite com DATABASE_URL do env.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>Product Requirements Document v3.0</title>
+        <section>5.1.6 Persistência de Dados (SQLite Básico)</section>
+        <snippet>Database SQLite em arquivo único para backup fácil. Três tabelas V1: sessions (rastrear períodos de uso do toca-discos), audio_events (eventos detectados: silêncio, clipping, track_change), settings (configurações do sistema). SQLite via better-sqlite3 no backend, zero configuração, performance suficiente para menos de 10k tracks/ano.</snippet>
+      </doc>
+      <doc>
+        <path>README.md</path>
+        <title>Vinyl-OS - Sistema de monitoramento de vinis</title>
+        <section>Inicialização do banco de dados</section>
+        <snippet>Stack usa Prisma com SQLite3. DATABASE_URL="file:../data/vinyl-os.db" no .env. Comandos para inicializar: npx prisma generate (gera client), npx prisma db push (aplica schema). Estrutura: data/ para banco de dados SQLite.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>backend/prisma/schema.prisma</path>
+        <kind>Prisma schema</kind>
+        <symbol>schema.prisma</symbol>
+        <lines>1-14</lines>
+        <reason>Schema Prisma inicial já criado em V1.1 com generator client e datasource db (SQLite). Precisa ser expandido com os modelos Session, AudioEvent, Setting.</reason>
+      </item>
+      <item>
+        <path>backend/prisma.config.ts</path>
+        <kind>Prisma configuration</kind>
+        <symbol>prisma.config.ts</symbol>
+        <lines>1-14</lines>
+        <reason>Configuração Prisma v6 já existente com dotenv/config, define schema path, migrations path, e datasource url. Necessário para Prisma CLI funcionar corretamente.</reason>
+      </item>
+      <item>
+        <path>backend/src/index.ts</path>
+        <kind>Backend entry point</kind>
+        <symbol>index.ts</symbol>
+        <lines>1-19</lines>
+        <reason>Entry point do backend Express já configurado. Será necessário importar e inicializar Prisma Client aqui para disponibilizar no app.</reason>
+      </item>
+      <item>
+        <path>backend/src/prisma/</path>
+        <kind>Prisma client directory</kind>
+        <symbol>prisma/</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório vazio criado em V1.1. Deve conter o arquivo de inicialização do Prisma Client (ex: client.ts) para ser importado pelos services.</reason>
+      </item>
+      <item>
+        <path>data/</path>
+        <kind>Database directory</kind>
+        <symbol>data/</symbol>
+        <lines>N/A</lines>
+        <reason>Diretório vazio criado em V1.1. O arquivo vinyl-os.db será criado aqui automaticamente pelo Prisma quando rodar migration ou db push.</reason>
+      </item>
+    </code>
+    <dependencies>
+      <ecosystem name="backend-node">
+        <package name="@prisma/client" version="^6.18.0" installed="true" />
+        <package name="prisma" version="^6.18.0" devDependency="true" installed="true" />
+        <package name="dotenv" version="^16.6.1" installed="true" />
+        <package name="typescript" version="^5.9.3" devDependency="true" installed="true" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Seguir schema V1 definido em docs/tech-spec-epic-v1.md seção "Data Models and Contracts"</constraint>
+    <constraint>Usar Prisma 6.x com provider SQLite</constraint>
+    <constraint>Database location: data/vinyl-os.db (relativo ao root do projeto)</constraint>
+    <constraint>DATABASE_URL no .env: "file:../data/vinyl-os.db"</constraint>
+    <constraint>Criar Prisma Client singleton em backend/src/prisma/client.ts para reutilização</constraint>
+    <constraint>Modelos obrigatórios V1: Session, AudioEvent, Setting</constraint>
+    <constraint>Session: id (uuid), startedAt, endedAt (nullable), durationSeconds, eventCount, timestamps</constraint>
+    <constraint>AudioEvent: id (uuid), sessionId (nullable, FK), eventType (string), timestamp, metadata (JSON)</constraint>
+    <constraint>Setting: key (PK string), value (string), type (string default "string"), updatedAt</constraint>
+    <constraint>Relacionamento: Session 1:N AudioEvent com cascade delete</constraint>
+    <constraint>Índices: Session por startedAt desc, AudioEvent por sessionId+timestamp e eventType+timestamp</constraint>
+    <constraint>Usar comandos Prisma v6: npx prisma generate, npx prisma migrate dev (ou db push para prototipagem)</constraint>
+    <constraint>Documentar scripts de backup básicos (ex: cp data/vinyl-os.db backups/vinyl-os-YYYY-MM-DD.db)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Prisma Schema V1</name>
+      <kind>Database schema definition</kind>
+      <signature>
+// backend/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id              String       @id @default(uuid())
+  startedAt       DateTime     @default(now())
+  endedAt         DateTime?
+  durationSeconds Int          @default(0)
+  eventCount      Int          @default(0)
+  audioEvents     AudioEvent[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  @@index([startedAt(sort: Desc)])
+}
+
+model AudioEvent {
+  id          String   @id @default(uuid())
+  sessionId   String?
+  session     Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  eventType   String
+  timestamp   DateTime @default(now())
+  metadata    Json?
+  @@index([sessionId, timestamp])
+  @@index([eventType, timestamp])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  type      String   @default("string")
+  updatedAt DateTime @updatedAt
+}
+      </signature>
+      <path>backend/prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>Prisma Client Singleton</name>
+      <kind>Database client initialization</kind>
+      <signature>
+// backend/src/prisma/client.ts
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+export default prisma
+      </signature>
+      <path>backend/src/prisma/client.ts</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Esta story de configuração de database foca em validação estrutural e funcional básica do Prisma setup.
+      Testes devem verificar: (1) Schema válido e aplicável, (2) Migrations/DB push executam sem erro, 
+      (3) Prisma Client gera corretamente, (4) Database file criado no local correto, 
+      (5) Singleton client conecta e executa queries básicas. Framework de testes ainda não está configurado no projeto
+      (será adicionado em stories futuras), então validação será principalmente manual via comandos CLI.
+    </standards>
+    <locations>
+      <location>Testes unitários futuros: backend/src/__tests__/ ou backend/tests/</location>
+      <location>Validação manual via: npx prisma validate, npx prisma generate, npx prisma db push</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verificar schema.prisma possui os três modelos (Session, AudioEvent, Setting) com todos os campos especificados no Tech Spec</idea>
+      <idea ac="1">Executar 'npx prisma validate' confirma schema está correto sem erros de sintaxe ou relacionamentos</idea>
+      <idea ac="2">Executar 'npx prisma migrate dev --name init' (ou db push) cria migration e aplica ao banco sem erros</idea>
+      <idea ac="2">Verificar que arquivo data/vinyl-os.db é criado após migration/push</idea>
+      <idea ac="3">Executar 'npx prisma generate' gera Prisma Client em node_modules/@prisma/client sem erros</idea>
+      <idea ac="3">Verificar que backend/src/prisma/client.ts importa PrismaClient e exporta singleton corretamente</idea>
+      <idea ac="4">Confirmar DATABASE_URL no .env aponta para file:../data/vinyl-os.db</idea>
+      <idea ac="4">Verificar que arquivo vinyl-os.db existe em data/ após aplicar migrations</idea>
+      <idea ac="5">Documentar comando de backup: 'cp data/vinyl-os.db data/backups/vinyl-os-$(date +%Y%m%d-%H%M%S).db'</idea>
+      <idea ac="5">Testar restore: copiar backup de volta para data/vinyl-os.db e verificar que aplicação acessa dados</idea>
+    </ideas>
+  </tests>
+</story-context>
+
