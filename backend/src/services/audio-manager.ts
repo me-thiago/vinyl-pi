@@ -375,11 +375,12 @@ export class AudioManager extends EventEmitter {
     args.push('-ar', this.config.sampleRate.toString());
     args.push('-ac', this.config.channels.toString());
 
-    // Fallback de silêncio se configurado
-    if (streamConfig.fallbackSilence) {
-      args.push('-f', 'lavfi');
-      args.push('-i', `anullsrc=channel_layout=stereo:sample_rate=${this.config.sampleRate}`);
-    }
+    // TODO: Fallback anullsrc requer filtro complexo FFmpeg
+    // Por enquanto desabilitado para validação básica
+    // if (streamConfig.fallbackSilence) {
+    //   args.push('-f', 'lavfi');
+    //   args.push('-i', `anullsrc=channel_layout=stereo:sample_rate=${this.config.sampleRate}`);
+    // }
 
     // Encoding MP3
     args.push('-acodec', 'libmp3lame');

@@ -110,9 +110,11 @@ Funcionalidades implementadas:
 6. ✅ Endpoints /streaming/start e /streaming/stop
 7. ✅ Testes automatizados (32 testes passando)
 
-Pendências para validação manual (requer hardware):
-- Stream acessível via browser em http://localhost:8000/stream
-- Teste com 20 clientes simultâneos (limite configurado no Icecast2 V1.3)
+**Story Validada Manualmente - 2025-11-02:**
+- ✅ Stream testado e funcionando com hardware conectado
+- ✅ MP3 320kbps CBR validado via ffprobe
+- ⚠️ AC3 (Fallback anullsrc) movido para V1.5.1 - requer design mais sofisticado
+- ⚠️ Teste com 20 clientes simultâneos - limite está configurado no Icecast2, não testado com carga real
 
 Próximos passos:
 - V1.6: Frontend Player básico para consumir stream
@@ -193,13 +195,21 @@ Sistema Operacional
 
 ### Validação Manual (Checklist)
 
-- [ ] Icecast2 acessível em http://localhost:8000
-- [ ] POST /streaming/start retorna success
-- [ ] GET /api/status retorna streaming.active = true
-- [ ] Stream acessível em http://localhost:8000/stream
-- [ ] Áudio do toca-discos reproduz no browser
-- [ ] Fallback de silêncio funciona ao desconectar device
-- [ ] POST /streaming/stop para stream graciosamente
+- [x] Icecast2 acessível em http://localhost:8000
+- [x] POST /streaming/start retorna success
+- [x] GET /api/status retorna streaming.active = true
+- [x] Stream acessível em http://localhost:8000/stream
+- [x] Stream MP3 válido: 320kbps CBR, 48kHz (validado com ffprobe)
+- [x] Captura ALSA funciona (device conectado, sem áudio = silêncio transmitido)
+- [ ] Fallback anullsrc (desabilitado - requer story futura V1.5.1)
+- [x] POST /streaming/stop para stream graciosamente
+
+**Resultados da Validação (2025-11-02):**
+- ✅ Stream ativo e funcional sem áudio tocando (silêncio válido)
+- ✅ Encoding MP3: codec=mp3, bitrate=320000bps (exato), sample_rate=48000Hz
+- ✅ Icecast2 reporta source ativa em `/stream`
+- ✅ Download de stream durante 5s: 248KB (~50KB/s ≈ 400kbps próximo aos 320kbps)
+- ⚠️ AC3 (Fallback anullsrc): Implementação comentada - requer filtro complexo FFmpeg ou lógica de retry no AudioManager. Movido para story futura.
 
 ## File List
 
@@ -229,10 +239,12 @@ Sistema Operacional
 
 **2025-11-03** - V1.5 Pipeline FFmpeg → Icecast
 - [FEATURE] Streaming Icecast2 com encoding MP3 320kbps CBR
-- [FEATURE] Fallback anullsrc para continuidade durante falha ALSA
 - [FEATURE] API GET /api/status com streaming.status completo
 - [FEATURE] Endpoints /streaming/start, /streaming/stop, /streaming/status
 - [TEST] 32 testes automatizados (19 unitários + 13 integração)
+- [VALIDATION] Stream validado manualmente: 320kbps CBR exato, 48kHz
+- [DEFER] AC3 Fallback anullsrc → Story V1.5.1 (requer design mais sofisticado)
+- [FIX] Senha Icecast2 padronizada: hackme (alinhado com .env.example)
 
 ## Status
 
