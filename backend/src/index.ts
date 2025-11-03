@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { AudioManager } from './services/audio-manager';
+import { createStatusRouter } from './routes/status';
 
 dotenv.config();
 
@@ -35,6 +36,17 @@ audioManager.on('device_disconnected', (info) => {
   console.error('Audio device disconnected:', info);
 });
 
+audioManager.on('streaming_started', (info) => {
+  console.log('Streaming started:', info);
+});
+
+audioManager.on('streaming_stopped', () => {
+  console.log('Streaming stopped');
+});
+
+// Registrar routes
+app.use('/api', createStatusRouter(audioManager));
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Vinyl-OS Backend is running' });
 });
@@ -65,6 +77,48 @@ app.post('/audio/stop', async (req, res) => {
     const errorMsg = error instanceof Error ? error.message : String(error);
     res.status(500).json({ success: false, error: errorMsg });
   }
+});
+
+// Endpoint para iniciar streaming
+app.post('/streaming/start', async (req, res) => {
+  try {
+    const config = {
+      icecastHost: process.env.ICECAST_HOST || 'localhost',
+      icecastPort: parseInt(process.env.ICECAST_PORT || '8000'),
+      icecastPassword: process.env.ICECAST_SOURCE_PASSWORD || 'hackme',
+      mountPoint: process.env.ICECAST_MOUNT_POINT || '/stream',
+      bitrate: 320,
+      fallbackSilence: true
+    };
+
+    await audioManager.startStreaming(config);
+    res.json({ success: true, message: 'Streaming started', config: {
+      host: config.icecastHost,
+      port: config.icecastPort,
+      mountPoint: config.mountPoint,
+      bitrate: config.bitrate
+    }});
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
+// Endpoint para parar streaming
+app.post('/streaming/stop', async (req, res) => {
+  try {
+    await audioManager.stopStreaming();
+    res.json({ success: true, message: 'Streaming stopped' });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
+// Endpoint para status de streaming
+app.get('/streaming/status', (req, res) => {
+  const status = audioManager.getStreamingStatus();
+  res.json(status);
 });
 
 app.listen(PORT, () => {

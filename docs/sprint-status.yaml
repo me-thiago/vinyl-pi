@@ -40,11 +40,11 @@ development_status:
   v1-1-setup-inicial: done
   v1-2-configuracao-prisma: done
   v1-3-configuracao-icecast: done
-  v1-4-captura-audio-alsa: review
-  v1-5-pipeline-ffmpeg-icecast: ready-for-dev
+  v1-4-captura-audio-alsa: done
+  v1-5-pipeline-ffmpeg-icecast: review
   v1-6-frontend-player-basico: ready-for-dev
   v1-7-eventbus-core: ready-for-dev
-  v1-8-deteccao-silencio: drafted
+  v1-8-deteccao-silencio: ready-for-dev
   v1-9-deteccao-clipping: drafted
   v1-10-persistencia-eventos: drafted
   v1-11-deteccao-sessao: drafted

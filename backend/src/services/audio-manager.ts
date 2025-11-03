@@ -29,6 +29,29 @@ export interface AudioConfig {
 }
 
 /**
+ * Configuração de streaming para Icecast2
+ */
+export interface StreamingConfig {
+  icecastHost: string;     // Host do Icecast2 (ex: "localhost")
+  icecastPort: number;     // Porta do Icecast2 (ex: 8000)
+  icecastPassword: string; // Password do source
+  mountPoint: string;      // Mount point (ex: "/stream")
+  bitrate: number;         // Bitrate MP3 em kbps (ex: 320)
+  fallbackSilence: boolean; // Usar fallback de silêncio quando input falha
+}
+
+/**
+ * Status do streaming
+ */
+export interface StreamingStatus {
+  active: boolean;         // Se streaming está ativo
+  listeners?: number;      // Número de listeners (se disponível)
+  bitrate: number;         // Bitrate configurado
+  mountPoint: string;      // Mount point
+  error?: string;          // Mensagem de erro (se houver)
+}
+
+/**
  * Status da captura de áudio
  */
 export interface AudioCaptureStatus {
@@ -47,7 +70,9 @@ export interface AudioCaptureStatus {
 export class AudioManager extends EventEmitter {
   private ffmpegProcess: ChildProcess | null = null;
   private config: AudioConfig;
+  private streamingConfig?: StreamingConfig;
   private isCapturing: boolean = false;
+  private isStreaming: boolean = false;
   private currentError?: string;
   private levelDb?: number;
 
@@ -194,6 +219,91 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
+   * Inicia streaming para Icecast2
+   * @param config Configuração de streaming
+   * @returns Promise que resolve quando streaming iniciar
+   */
+  async startStreaming(config: StreamingConfig): Promise<void> {
+    if (this.isStreaming) {
+      logger.warn('Streaming already active');
+      return;
+    }
+
+    try {
+      // Validar device ALSA antes de iniciar
+      await this.validateDevice();
+
+      // Armazenar config de streaming
+      this.streamingConfig = config;
+
+      // Construir comando FFmpeg com streaming
+      const args = this.buildStreamingFFmpegArgs(config);
+
+      logger.info(`Starting FFmpeg streaming with args: ${args.join(' ')}`);
+
+      // Spawn processo FFmpeg
+      this.ffmpegProcess = spawn('ffmpeg', args, {
+        stdio: ['ignore', 'ignore', 'pipe']  // stdin: ignore, stdout: ignore, stderr: pipe
+      });
+
+      // Configurar handlers
+      this.setupProcessHandlers();
+
+      this.isCapturing = true;
+      this.isStreaming = true;
+      this.currentError = undefined;
+
+      logger.info(`Streaming started successfully to ${config.icecastHost}:${config.icecastPort}${config.mountPoint}`);
+      this.emit('streaming_started', {
+        host: config.icecastHost,
+        port: config.icecastPort,
+        mountPoint: config.mountPoint,
+        bitrate: config.bitrate
+      });
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.currentError = errorMsg;
+      logger.error(`Failed to start streaming: ${errorMsg}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Para o streaming
+   * @returns Promise que resolve quando streaming parar
+   */
+  async stopStreaming(): Promise<void> {
+    if (!this.isStreaming) {
+      logger.warn('Streaming not active');
+      return;
+    }
+
+    await this.stop();
+    this.isStreaming = false;
+    this.streamingConfig = undefined;
+
+    logger.info('Streaming stopped');
+    this.emit('streaming_stopped');
+  }
+
+  /**
+   * Retorna o status atual do streaming
+   * @returns Status do streaming
+   */
+  getStreamingStatus(): StreamingStatus {
+    const baseStatus: StreamingStatus = {
+      active: this.isStreaming,
+      bitrate: this.streamingConfig?.bitrate || 0,
+      mountPoint: this.streamingConfig?.mountPoint || '',
+      listeners: undefined, // TODO: Implementar query ao Icecast2 stats
+      error: this.currentError
+    };
+
+    return baseStatus;
+  }
+
+  /**
    * Valida se o device ALSA está disponível
    * @private
    */
@@ -250,6 +360,41 @@ export class AudioManager extends EventEmitter {
       '-bufsize', this.config.bufferSize.toString(),
       '-' // Output para stdout
     ];
+  }
+
+  /**
+   * Constrói argumentos para o comando FFmpeg com streaming Icecast2
+   * @private
+   */
+  private buildStreamingFFmpegArgs(streamConfig: StreamingConfig): string[] {
+    const args: string[] = [];
+
+    // Input ALSA principal
+    args.push('-f', 'alsa');
+    args.push('-i', this.config.device);
+    args.push('-ar', this.config.sampleRate.toString());
+    args.push('-ac', this.config.channels.toString());
+
+    // Fallback de silêncio se configurado
+    if (streamConfig.fallbackSilence) {
+      args.push('-f', 'lavfi');
+      args.push('-i', `anullsrc=channel_layout=stereo:sample_rate=${this.config.sampleRate}`);
+    }
+
+    // Encoding MP3
+    args.push('-acodec', 'libmp3lame');
+    args.push('-ab', `${streamConfig.bitrate}k`);
+    args.push('-b:a', `${streamConfig.bitrate}k`);
+    args.push('-f', 'mp3');
+
+    // Configurações adicionais
+    args.push('-content_type', 'audio/mpeg');
+
+    // URL Icecast2
+    const icecastUrl = `icecast://source:${streamConfig.icecastPassword}@${streamConfig.icecastHost}:${streamConfig.icecastPort}${streamConfig.mountPoint}`;
+    args.push(icecastUrl);
+
+    return args;
   }
 
   /**
