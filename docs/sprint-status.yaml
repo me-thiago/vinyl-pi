@@ -37,7 +37,7 @@ story_location: "{project-root}/docs/stories"
 development_status:
   # Epic V1 - Foundation Core (MVP)
   epic-v1: contexted
-  v1-1-setup-inicial: drafted
+  v1-1-setup-inicial: review
   v1-2-configuracao-prisma: drafted
   v1-3-configuracao-icecast: drafted
   v1-4-captura-audio-alsa: drafted

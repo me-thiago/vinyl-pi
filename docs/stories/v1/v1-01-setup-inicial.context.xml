@@ -1,0 +1,207 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/v1-01-setup-inicial" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>1</storyId>
+    <title>Setup Inicial do Projeto</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-02</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-01-setup-inicial.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter a estrutura base do projeto configurada com dependências e ferramentas necessárias</iWant>
+    <soThat>possa começar a implementação das funcionalidades principais</soThat>
+    <tasks>
+      <task>Criar estrutura de diretórios conforme arquitetura</task>
+      <task>Inicializar backend com Express, TypeScript, Prisma</task>
+      <task>Inicializar frontend com React, Vite, TypeScript</task>
+      <task>Configurar package.json root com scripts de conveniência</task>
+      <task>Configurar .gitignore</task>
+      <task>Criar README.md básico</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1">Estrutura de diretórios criada conforme arquitetura (backend/, frontend/, config/, data/, scripts/)</criterion>
+    <criterion id="AC-2">Backend inicializado com Express, TypeScript, Prisma configurados</criterion>
+    <criterion id="AC-3">Frontend inicializado com React, Vite, TypeScript configurados</criterion>
+    <criterion id="AC-4">Package.json root com scripts de conveniência (dev, build, start)</criterion>
+    <criterion id="AC-5">.gitignore configurado apropriadamente</criterion>
+    <criterion id="AC-6">README.md básico criado</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD v3.0 - Vinyl-OS</title>
+        <section>6.1 Stack Tecnológico</section>
+        <snippet>Stack completo definido: Backend (Node.js 20 LTS, Express 4.x, Prisma, SQLite3), Frontend (React 18, Vite, TailwindCSS 4.x, shadcn/ui), Áudio (FFmpeg, Icecast2, ALSA).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura - Vinyl-OS</title>
+        <section>Estrutura do Projeto</section>
+        <snippet>Estrutura completa definida com /backend (src/services, routes, middleware, utils, prisma), /frontend (src/components, pages, hooks, lib), /config, /data, /scripts. Includes package.json specs para backend e frontend.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura - Vinyl-OS</title>
+        <section>Inicialização do Projeto</section>
+        <snippet>Comandos completos de setup: Backend (npm init, install Express/Prisma/Socket.io/Winston, prisma init), Frontend (npm create vite, install react-router/socket.io-client/tailwindcss/recharts, npx shadcn init, add tweakcn theme). TypeScript configurado por padrão.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Tech Spec Epic V1 - Foundation Core</title>
+        <section>Dependencies and Integrations</section>
+        <snippet>Backend dependencies: express@^4.21.2, socket.io@^4.8.2, @prisma/client@^6.16.0, winston@^3.15.0, dotenv@^16.4.7, js-yaml@^4.1.0. Frontend: react@^18.3.1, vite@^6.0.0, react-router-dom@^6.20.0, tailwindcss@^4.1.2, recharts@^2.15.0, date-fns@^4.1.0.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics - Vinyl-OS</title>
+        <section>Story V1.1: Setup Inicial do Projeto</section>
+        <snippet>Story completa com critérios de aceitação detalhados. Pré-requisitos: Nenhum (épico fundacional).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>N/A</path>
+        <kind>N/A</kind>
+        <symbol>N/A</symbol>
+        <lines>N/A</lines>
+        <reason>Não há código existente - esta é a story de setup inicial do projeto</reason>
+      </item>
+    </code>
+    <dependencies>
+      <ecosystem name="backend-node">
+        <package name="express" version="^4.21.2" />
+        <package name="socket.io" version="^4.8.2" />
+        <package name="@prisma/client" version="^6.16.0" />
+        <package name="winston" version="^3.15.0" />
+        <package name="winston-daily-rotate-file" version="^5.0.0" />
+        <package name="dotenv" version="^16.4.7" />
+        <package name="js-yaml" version="^4.1.0" />
+        <package name="@types/node" version="^20.0.0" devDependency="true" />
+        <package name="@types/express" version="^5.0.0" devDependency="true" />
+        <package name="typescript" version="^5.7.3" devDependency="true" />
+        <package name="ts-node" version="^10.9.2" devDependency="true" />
+        <package name="prisma" version="^6.16.0" devDependency="true" />
+      </ecosystem>
+      <ecosystem name="frontend-node">
+        <package name="react" version="^18.3.1" />
+        <package name="react-dom" version="^18.3.1" />
+        <package name="react-router-dom" version="^6.20.0" />
+        <package name="socket.io-client" version="^4.8.2" />
+        <package name="tailwindcss" version="^4.1.2" />
+        <package name="@tailwindcss/vite" version="^4.1.2" />
+        <package name="recharts" version="^2.15.0" />
+        <package name="date-fns" version="^4.1.0" />
+        <package name="@types/react" version="^19.0.10" devDependency="true" />
+        <package name="@types/react-dom" version="^19.0.3" devDependency="true" />
+        <package name="@vitejs/plugin-react" version="^4.3.4" devDependency="true" />
+        <package name="vite" version="^6.0.0" devDependency="true" />
+        <package name="typescript" version="^5.7.3" devDependency="true" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Seguir estrutura de diretórios definida em docs/architecture.md seção "Estrutura do Projeto"</constraint>
+    <constraint>TypeScript deve ser habilitado por padrão (backend e frontend)</constraint>
+    <constraint>Backend: Express framework, Prisma ORM, SQLite database via Prisma</constraint>
+    <constraint>Frontend: React 18 com Vite, TailwindCSS v4 + shadcn/ui, tema tweakcn (Modern Minimal)</constraint>
+    <constraint>Prisma: Inicializar com datasource provider SQLite, criar schema.prisma inicial</constraint>
+    <constraint>Frontend: Configurar Tailwind v4 no vite.config.ts com @tailwindcss/vite plugin</constraint>
+    <constraint>shadcn/ui: Inicializar com npx shadcn@latest init (Style: New York, Base color: Neutral, CSS variables: true)</constraint>
+    <constraint>Root package.json: Scripts de conveniência para dev, build, start (ambos backend e frontend)</constraint>
+    <constraint>.gitignore: Incluir node_modules/, dist/, .env, data/*.db, logs/</constraint>
+    <constraint>README.md: Incluir overview do projeto, requisitos de sistema, instruções básicas de setup</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>package.json (root)</name>
+      <kind>NPM workspace configuration</kind>
+      <signature>
+{
+  "name": "vinyl-os",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd backend && npm start"
+  }
+}
+      </signature>
+      <path>package.json</path>
+    </interface>
+    <interface>
+      <name>vite.config.ts (frontend)</name>
+      <kind>Vite + Tailwind v4 configuration</kind>
+      <signature>
+import path from "path"
+import tailwindcss from "@tailwindcss/vite"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+})
+      </signature>
+      <path>frontend/vite.config.ts</path>
+    </interface>
+    <interface>
+      <name>prisma/schema.prisma</name>
+      <kind>Prisma schema initial setup</kind>
+      <signature>
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Models will be added in subsequent stories
+      </signature>
+      <path>backend/prisma/schema.prisma</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Setup stories geralmente não requerem testes unitários extensivos. Validação será feita através de:
+      1) Verificação manual da estrutura de diretórios criada
+      2) Execução de comandos npm install em backend e frontend sem erros
+      3) Execução de npm run dev e verificação que servidores iniciam corretamente
+      4) Prisma generate e verificação que Prisma Client é gerado
+      5) shadcn/ui init completo com sucesso
+    </standards>
+    <locations>
+      <location>N/A para setup inicial - testes serão adicionados em stories subsequentes</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-1">Verificar que todos os diretórios existem: backend/, frontend/, config/, data/, scripts/, backend/src/, frontend/src/</idea>
+      <idea ac="AC-2">Executar 'cd backend && npm install' sem erros; verificar que node_modules, package.json, tsconfig.json, prisma/schema.prisma existem</idea>
+      <idea ac="AC-3">Executar 'cd frontend && npm install' sem erros; verificar que node_modules, package.json, tsconfig.json, vite.config.ts existem</idea>
+      <idea ac="AC-4">Verificar que root package.json contém scripts: dev, build, start; testar 'npm run dev' inicia ambos servidores</idea>
+      <idea ac="AC-5">Verificar que .gitignore contém: node_modules/, dist/, .env, data/*.db, logs/</idea>
+      <idea ac="AC-6">Verificar que README.md existe e contém seções: Overview, Requirements, Setup Instructions</idea>
+    </ideas>
+  </tests>
+</story-context>
+
