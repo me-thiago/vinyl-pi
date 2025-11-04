@@ -1,6 +1,7 @@
 # Story V1.8: Detecção de Silêncio
 
-**Epic:** V1 - Foundation Core (MVP)
+**Epic:** V1 - Foundation Core (MVP)  
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  
@@ -24,4 +25,9 @@ para que possa identificar quando o toca-discos está parado.
 
 - [PRD v3.0](../prd-v3.md) - Seção 5.1.3 (Reconhecimento Sonoro - Detecção de Silêncio)
 - [Epics](../epics.md) - Epic V1
+
+## Dev Agent Record
+
+### Context Reference
+- [Story Context XML](v1-8-deteccao-silencio.context.xml) - Generated 2025-11-03
 

@@ -418,4 +418,269 @@ describe('AudioManager', () => {
       );
     });
   });
+
+  describe('Race Conditions & State Consistency (V1.5.1)', () => {
+    let audioManager: AudioManager;
+    let mockProcess: any;
+
+    beforeEach(() => {
+      audioManager = new AudioManager();
+
+      mockProcess = {
+        stdout: { on: jest.fn() },
+        stderr: { on: jest.fn() },
+        on: jest.fn().mockReturnThis(),
+        once: jest.fn().mockReturnThis(),
+        kill: jest.fn(),
+        killed: false
+      };
+
+      const mockArecord = {
+        stdout: {
+          on: jest.fn((event, callback) => {
+            if (event === 'data') {
+              // Usar setTimeout para garantir callback assíncrono
+              setTimeout(() => callback(Buffer.from('card 1: Device [USB Audio Device]\n')), 0);
+            }
+          })
+        },
+        on: jest.fn((event, callback) => {
+          if (event === 'close') {
+            // Usar setTimeout para garantir callback assíncrono
+            setTimeout(() => callback(0), 0);
+          }
+        })
+      };
+
+      mockSpawn.mockImplementation((cmd: string) => {
+        if (cmd === 'arecord') return mockArecord;
+        if (cmd === 'ffmpeg') return mockProcess;
+        return mockArecord;
+      });
+    });
+
+    describe('AC1: Estado Sempre Consistente', () => {
+      test('stop() com SIGTERM graceful deve limpar estado completamente', async () => {
+        await audioManager.start();
+        expect(audioManager.getStatus().isCapturing).toBe(true);
+
+        // Simular SIGTERM gracioso - processo termina imediatamente
+        const exitHandler = mockProcess.once.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+
+        const stopPromise = audioManager.stop();
+
+        // Simular que processo terminou graciosamente
+        if (exitHandler) exitHandler(0, 'SIGTERM');
+
+        await stopPromise;
+
+        // Verificar estado limpo
+        const status = audioManager.getStatus();
+        expect(status.isCapturing).toBe(false);
+        expect(audioManager.getStreamingStatus().active).toBe(false);
+      });
+
+      test('stop() com SIGKILL forçado deve limpar estado completamente', async () => {
+        jest.useFakeTimers();
+
+        await audioManager.start();
+        expect(audioManager.getStatus().isCapturing).toBe(true);
+
+        // Não chamar exitHandler para simular processo que não responde SIGTERM
+        const stopPromise = audioManager.stop();
+
+        // Avançar timeout de SIGTERM (5s)
+        jest.advanceTimersByTime(5000);
+
+        // Verificar que SIGKILL foi enviado
+        expect(mockProcess.kill).toHaveBeenCalledWith('SIGKILL');
+
+        // Avançar timeout de cleanup forçado (1s)
+        jest.advanceTimersByTime(1000);
+
+        await stopPromise;
+
+        // Verificar estado limpo
+        const status = audioManager.getStatus();
+        expect(status.isCapturing).toBe(false);
+        expect(audioManager.getStreamingStatus().active).toBe(false);
+
+        jest.useRealTimers();
+      });
+
+      test('múltiplos stop() consecutivos não devem causar crash', async () => {
+        await audioManager.start();
+
+        const exitHandler = mockProcess.once.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+
+        // Chamar stop múltiplas vezes sem await
+        const stop1 = audioManager.stop();
+        const stop2 = audioManager.stop();
+        const stop3 = audioManager.stop();
+
+        // Simular término do processo
+        if (exitHandler) exitHandler(0, 'SIGTERM');
+
+        // Não deve lançar erro
+        await expect(Promise.all([stop1, stop2, stop3])).resolves.not.toThrow();
+
+        // Estado deve ser consistente
+        expect(audioManager.getStatus().isCapturing).toBe(false);
+      });
+    });
+
+    describe('AC2: Recuperação de Falhas', () => {
+      test('start() após stop() com SIGKILL deve funcionar sem erro', async () => {
+        jest.useFakeTimers();
+
+        // Primeiro start
+        await audioManager.start();
+
+        // Stop com SIGKILL
+        const stopPromise = audioManager.stop();
+        jest.advanceTimersByTime(6000); // 5s + 1s
+        await stopPromise;
+
+        jest.useRealTimers();
+
+        // Segundo start deve funcionar
+        await expect(audioManager.start()).resolves.not.toThrow();
+        expect(audioManager.getStatus().isCapturing).toBe(true);
+      });
+
+      test('getStreamingStatus() sempre reflete realidade do processo', async () => {
+        // Estado inicial: não streaming
+        expect(audioManager.getStreamingStatus().active).toBe(false);
+
+        // Após start de streaming
+        const config = {
+          icecastHost: 'localhost',
+          icecastPort: 8000,
+          icecastPassword: 'test',
+          mountPoint: '/stream',
+          bitrate: 320,
+          fallbackSilence: false
+        };
+
+        await audioManager.startStreaming(config);
+        expect(audioManager.getStreamingStatus().active).toBe(true);
+
+        // Após stop
+        const exitHandler = mockProcess.once.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+        const stopPromise = audioManager.stopStreaming();
+        if (exitHandler) exitHandler(0, 'SIGTERM');
+        await stopPromise;
+
+        expect(audioManager.getStreamingStatus().active).toBe(false);
+      });
+    });
+
+    describe('AC3: Testes de Race Condition', () => {
+      test('stop() + imediato start() deve funcionar sem erro', async () => {
+        await audioManager.start();
+
+        const exitHandler = mockProcess.once.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+
+        // Stop e start imediatos
+        const stopPromise = audioManager.stop();
+        if (exitHandler) exitHandler(0, 'SIGTERM');
+        await stopPromise;
+
+        // Start imediato após stop
+        await expect(audioManager.start()).resolves.not.toThrow();
+        expect(audioManager.getStatus().isCapturing).toBe(true);
+      });
+
+      test('múltiplos stop() paralelos não devem causar crash', async () => {
+        await audioManager.start();
+
+        const exitHandler = mockProcess.once.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+
+        // Múltiplos stop() paralelos
+        const stops = [
+          audioManager.stop(),
+          audioManager.stop(),
+          audioManager.stop()
+        ];
+
+        // Simular término
+        if (exitHandler) exitHandler(0, 'SIGTERM');
+
+        // Não deve lançar erro
+        await expect(Promise.all(stops)).resolves.not.toThrow();
+      });
+
+      test('SIGKILL path deve manter estado consistente', async () => {
+        jest.useFakeTimers();
+
+        await audioManager.start();
+
+        // Simular streaming ativo
+        const config = {
+          icecastHost: 'localhost',
+          icecastPort: 8000,
+          icecastPassword: 'test',
+          mountPoint: '/stream',
+          bitrate: 320,
+          fallbackSilence: false
+        };
+
+        // Reiniciar para ter streaming
+        let exitHandler = mockProcess.once.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+        const stopPromise1 = audioManager.stop();
+        if (exitHandler) exitHandler(0, 'SIGTERM');
+        await stopPromise1;
+
+        jest.useRealTimers();
+        await audioManager.startStreaming(config);
+        jest.useFakeTimers();
+
+        expect(audioManager.getStreamingStatus().active).toBe(true);
+
+        // Stop com SIGKILL
+        const stopPromise2 = audioManager.stopStreaming();
+        jest.advanceTimersByTime(6000);
+        await stopPromise2;
+
+        // Verificar estado: isStreaming deve ser false
+        expect(audioManager.getStreamingStatus().active).toBe(false);
+
+        jest.useRealTimers();
+      });
+    });
+
+    describe('AC4: Auto-Recovery em startStreaming()', () => {
+      test('startStreaming() detecta estado inconsistente e auto-recover', async () => {
+        // Criar estado inconsistente manualmente
+        // Nota: Não podemos acessar propriedades privadas diretamente,
+        // mas podemos simular o cenário via processo morto
+
+        const config = {
+          icecastHost: 'localhost',
+          icecastPort: 8000,
+          icecastPassword: 'test',
+          mountPoint: '/stream',
+          bitrate: 320,
+          fallbackSilence: false
+        };
+
+        // Start streaming
+        await audioManager.startStreaming(config);
+        expect(audioManager.getStreamingStatus().active).toBe(true);
+
+        // Simular processo morrendo inesperadamente (sem stop() controlado)
+        // Fazendo processo ser null mas flag continuar true
+        const exitHandler = mockProcess.on.mock.calls.find((call: any[]) => call[0] === 'exit')?.[1];
+
+        // Marcar processo como killed para simular morte
+        mockProcess.killed = true;
+
+        // Simular exit inesperado com código de erro
+        if (exitHandler) exitHandler(1, null);
+
+        // Tentar startStreaming novamente - deve auto-recover
+        await expect(audioManager.startStreaming(config)).resolves.not.toThrow();
+      });
+    });
+  });
 });

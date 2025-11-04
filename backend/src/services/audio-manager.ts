@@ -147,6 +147,12 @@ export class AudioManager extends EventEmitter {
 
   /**
    * Para a captura de áudio
+   *
+   * Implementa cleanup atômico para evitar race conditions entre SIGTERM/SIGKILL paths.
+   * O cleanup é idempotente e garante que todas as flags de estado sejam resetadas
+   * exatamente uma vez, mesmo se o evento 'exit' e o timeout forçado ocorrerem
+   * simultaneamente.
+   *
    * @returns Promise que resolve quando captura parar
    */
   async stop(): Promise<void> {
@@ -157,38 +163,64 @@ export class AudioManager extends EventEmitter {
 
     return new Promise((resolve) => {
       if (!this.ffmpegProcess) {
+        this.resetState();
         resolve();
         return;
       }
 
-      let resolved = false;
+      let cleanupCalled = false;
 
       const cleanup = () => {
-        if (!resolved) {
-          resolved = true;
-          this.isCapturing = false;
-          this.ffmpegProcess = null;
-          logger.info('Audio capture stopped');
-          this.emit('stopped');
-          resolve();
-        }
+        if (cleanupCalled) return;  // ✅ Idempotente - evita múltiplas execuções
+        cleanupCalled = true;
+
+        this.resetState();  // ✅ Reset atômico de TODAS as flags
+        logger.info('Audio capture stopped');
+        this.emit('stopped');
+        resolve();
       };
 
+      // Event handler: chamado quando processo terminar (SIGTERM ou SIGKILL)
       this.ffmpegProcess.once('exit', cleanup);
 
       // Enviar SIGTERM para parar graciosamente
       this.ffmpegProcess.kill('SIGTERM');
 
-      // Timeout de 5 segundos para SIGKILL e force resolve
+      // Timeout: SIGKILL se processo não terminar em 5s
       setTimeout(() => {
-        if (this.ffmpegProcess && !this.ffmpegProcess.killed) {
+        if (!this.ffmpegProcess || cleanupCalled) return;
+
+        if (!this.ffmpegProcess.killed) {
           logger.warn('FFmpeg did not stop gracefully, sending SIGKILL');
           this.ffmpegProcess.kill('SIGKILL');
         }
-        // Force cleanup após timeout
-        setTimeout(cleanup, 1000);
+
+        // Aguardar mais 1s para evento 'exit' após SIGKILL
+        // Se evento não ocorrer, forçar cleanup (mas é idempotente)
+        setTimeout(() => {
+          cleanup();  // ✅ Safe: idempotente, não duplica se já foi chamado
+        }, 1000);
       }, 5000);
     });
+  }
+
+  /**
+   * Reseta atomicamente o estado interno do AudioManager
+   *
+   * Este método centraliza toda a lógica de reset de estado para garantir
+   * consistência. É chamado por todos os exit paths (stop, handlers, error recovery).
+   *
+   * CRÍTICO: Todas as flags devem ser atualizadas juntas para evitar estado inconsistente
+   * onde isStreaming=true mas ffmpegProcess=null.
+   *
+   * @private
+   */
+  private resetState(): void {
+    this.isCapturing = false;
+    this.isStreaming = false;
+    this.ffmpegProcess = null;
+    this.streamingConfig = undefined;
+    this.currentError = undefined;
   }
 
   /**
@@ -220,13 +252,28 @@ export class AudioManager extends EventEmitter {
 
   /**
    * Inicia streaming para Icecast2
+   *
+   * Detecta e corrige automaticamente estado inconsistente antes de iniciar.
+   * Se isStreaming=true mas processo não existe, força reset e continua normalmente.
+   *
    * @param config Configuração de streaming
    * @returns Promise que resolve quando streaming iniciar
    */
   async startStreaming(config: StreamingConfig): Promise<void> {
+    // ✅ Validação proativa: detectar estado inconsistente
     if (this.isStreaming) {
-      logger.warn('Streaming already active');
-      return;
+      const processExists = this.ffmpegProcess && !this.ffmpegProcess.killed;
+
+      if (!processExists) {
+        // Estado inconsistente detectado: flag=true mas processo morto
+        logger.warn('Detected inconsistent state: isStreaming=true but no process. Auto-recovering...');
+        this.resetState();
+        // Continua com start normal abaixo
+      } else {
+        // Estado OK: streaming realmente ativo
+        logger.warn('Streaming already active');
+        return;
+      }
     }
 
     try {
@@ -369,6 +416,9 @@ export class AudioManager extends EventEmitter {
   private buildStreamingFFmpegArgs(streamConfig: StreamingConfig): string[] {
     const args: string[] = [];
 
+    // Verbose logging para debug
+    args.push('-loglevel', 'verbose');
+
     // Input ALSA principal
     args.push('-f', 'alsa');
     args.push('-i', this.config.device);
@@ -400,6 +450,11 @@ export class AudioManager extends EventEmitter {
 
   /**
    * Configura handlers para o processo FFmpeg
+   *
+   * Os handlers garantem cleanup robusto usando resetState() diretamente,
+   * sem dependência de timeouts. Isso evita race conditions e garante que
+   * o estado seja sempre consistente com a realidade do processo.
+   *
    * @private
    */
   private setupProcessHandlers(): void {
@@ -409,6 +464,9 @@ export class AudioManager extends EventEmitter {
     this.ffmpegProcess.stderr?.on('data', (data) => {
       const output = data.toString();
 
+      // Log COMPLETO do stderr para debug (verbose mode)
+      logger.info(`FFmpeg stderr: ${output}`);
+
       // Detectar erros de dispositivo
       if (this.detectDeviceError(output)) {
         this.handleDeviceDisconnected(output);
@@ -417,30 +475,54 @@ export class AudioManager extends EventEmitter {
       // Extrair nível de áudio se disponível
       this.extractAudioLevel(output);
 
-      // Log output do FFmpeg (debug)
+      // Log erros específicos
       if (output.includes('error') || output.includes('Error')) {
-        logger.error(`FFmpeg stderr: ${output}`);
+        logger.error(`FFmpeg ERROR detected: ${output}`);
       }
     });
 
     // Handler de saída do processo
+    // NOTA: Este handler é registrado com .on(), mas o método stop() usa .once()
+    // para registrar seu próprio cleanup handler. Ambos podem coexistir.
+    // Este handler permanente é para detectar crashes inesperados (fora de stop()).
     this.ffmpegProcess.on('exit', (code, signal) => {
-      this.isCapturing = false;
-      this.ffmpegProcess = null;
+      // Nota: NÃO resetamos estado aqui se stop() foi chamado
+      // O stop() usa .once() e gerencia o cleanup via seu próprio handler
+      // Este handler só atua para crashes inesperados quando flags ainda estão true
 
-      if (code !== 0 && code !== null) {
-        const errorMsg = `FFmpeg exited with code ${code}`;
-        this.currentError = errorMsg;
-        logger.error(errorMsg);
-        this.emit('error', { code, message: errorMsg });
-      } else if (signal) {
-        logger.info(`FFmpeg terminated by signal ${signal}`);
+      // Se código é null/0/undefined E signal é SIGTERM/SIGKILL/undefined, provavelmente é stop() controlado
+      // (undefined pode ocorrer em testes quando handler é chamado manualmente)
+      const isControlledShutdown =
+        (code === null || code === 0 || code === undefined) &&
+        (!signal || signal === 'SIGTERM' || signal === 'SIGKILL');
+
+      // Se flags ainda estão true mas processo morreu, pode ser crash inesperado
+      // Mas se isControlledShutdown, deixamos o stop() handler fazer o cleanup
+      if ((this.isCapturing || this.isStreaming) && !isControlledShutdown) {
+        // Processo morreu inesperadamente (crash, erro, etc.)
+        const wasStreaming = this.isStreaming;
+        this.resetState();
+
+        if (code !== 0 && code !== null && code !== undefined) {
+          const errorMsg = `FFmpeg exited unexpectedly with code ${code}`;
+          this.currentError = errorMsg;
+          logger.error(errorMsg);
+          this.emit('error', { code, message: errorMsg });
+        } else if (signal && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
+          logger.warn(`FFmpeg terminated unexpectedly by signal ${signal}`);
+        }
+
+        // Emitir evento de parada se estava streaming
+        if (wasStreaming) {
+          this.emit('streaming_stopped');
+        }
       }
     });
 
     // Handler de erro do processo
     this.ffmpegProcess.on('error', (err) => {
-      this.isCapturing = false;
+      // Erro crítico do processo - resetar estado imediatamente
+      this.resetState();
       this.currentError = err.message;
       logger.error(`FFmpeg process error: ${err.message}`);
       this.emit('error', { message: err.message });

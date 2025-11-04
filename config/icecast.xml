@@ -9,7 +9,7 @@
     <client-timeout>30</client-timeout>
     <header-timeout>15</header-timeout>
     <source-timeout>10</source-timeout>
-    <burst-size>65535</burst-size>
+    <burst-size>16384</burst-size>
   </limits>
 
   <authentication>
@@ -36,7 +36,7 @@
     <password>hackme</password>
     <max-listeners>10</max-listeners>
     <dump-file>/tmp/dump-stream.mp3</dump-file>
-    <burst-size>65536</burst-size>
+    <burst-size>16384</burst-size>
     <stream-name>Vinyl Stream</stream-name>
     <stream-description>Live from turntable</stream-description>
     <stream-url>http://localhost:8000</stream-url>
@@ -52,7 +52,7 @@
   <!-- Paths -->
   <paths>
     <basedir>/usr/share/icecast2</basedir>
-    <logdir>/home/thiago/projects/vinyl-os/logs</logdir>
+    <logdir>/var/log/icecast2</logdir>
     <webroot>/usr/share/icecast2/web</webroot>
     <adminroot>/usr/share/icecast2/admin</adminroot>
     <alias source="/" destination="/status.xsl"/>
@@ -62,12 +62,16 @@
   <logging>
     <accesslog>access.log</accesslog>
     <errorlog>error.log</errorlog>
-    <loglevel>3</loglevel> <!-- 4 = debug, 3 = info, 2 = warn, 1 = error -->
+    <loglevel>4</loglevel> <!-- 4 = debug, 3 = info, 2 = warn, 1 = error -->
     <logsize>10000</logsize> <!-- Max size of log file in kilobytes -->
   </logging>
 
   <!-- Security -->
   <security>
     <chroot>0</chroot>
+    <changeowner>
+      <user>icecast2</user>
+      <group>icecast</group>
+    </changeowner>
   </security>
 </icecast>

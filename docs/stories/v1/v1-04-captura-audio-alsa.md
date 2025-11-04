@@ -1,7 +1,7 @@
 # Story V1.4: Captura de Áudio ALSA via FFmpeg
 
 **Epic:** V1 - Foundation Core (MVP)
-**Status:** review
+**Status:** done
 
 **User Story:**
 Como usuário,  
@@ -115,6 +115,9 @@ para que possa processar e fazer streaming do áudio do toca-discos.
 - Stdout será reconectado ao Icecast na Story V1.5
 
 ### Completion Notes
+
+**Completed:** 2025-11-02
+**Definition of Done:** All acceptance criteria met, code reviewed, tests passing
 
 Implementação concluída com sucesso. AudioManager criado como serviço standalone de captura de áudio ALSA via FFmpeg.
 

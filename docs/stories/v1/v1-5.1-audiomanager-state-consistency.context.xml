@@ -1,0 +1,236 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>5.1</storyId>
+    <title>AudioManager State Consistency Fix</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-5.1-audiomanager-state-consistency.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que o AudioManager mantenha estado consistente após falhas de parada de processo</iWant>
+    <soThat>o backend sempre reflita o estado real do streaming</soThat>
+    <tasks>
+      <core-fix>
+        <task id="1" title="Refatorar método stop() para cleanup atômico">
+          <subtask>Remover race condition entre event handler e timeout</subtask>
+          <subtask>Garantir que cleanup() seja chamado exatamente uma vez</subtask>
+          <subtask>Usar flag resolved para evitar múltiplas execuções</subtask>
+          <subtask>Atualizar flags (isCapturing, isStreaming) ANTES de resolver Promise</subtask>
+        </task>
+        <task id="2" title="Adicionar método resetState() privado">
+          <subtask>Centralizar lógica de reset de estado</subtask>
+          <subtask>Garantir atomicidade: todas as flags atualizadas juntas</subtask>
+          <subtask>Limpar ffmpegProcess e streamingConfig</subtask>
+          <subtask>Chamar resetState() de todos os exit paths</subtask>
+        </task>
+        <task id="3" title="Implementar validação de estado em startStreaming()">
+          <subtask>Antes de iniciar, verificar se há processo zombie</subtask>
+          <subtask>Se isStreaming === true mas processo não existe, forçar reset</subtask>
+          <subtask>Log warning se inconsistência detectada e corrigida</subtask>
+        </task>
+        <task id="4" title="Melhorar setupProcessHandlers() para cleanup robusto">
+          <subtask>Event handler exit deve chamar resetState() diretamente</subtask>
+          <subtask>Remover dependência de timeouts para state cleanup</subtask>
+          <subtask>Adicionar flag isCleaningUp para evitar reentrada</subtask>
+        </task>
+      </core-fix>
+      <tests>
+        <task id="5" title="Criar testes para race conditions">
+          <subtask>Teste: stop() + imediato start() → sem erro</subtask>
+          <subtask>Teste: múltiplos stop() paralelos → sem crash</subtask>
+          <subtask>Teste: SIGKILL path → estado consistente</subtask>
+          <subtask>Mock de processo que demora &gt;5s para terminar</subtask>
+        </task>
+        <task id="6" title="Teste de stress">
+          <subtask>Loop de 100x: start() → stop() → verificar estado</subtask>
+          <subtask>Verificar ausência de leaks de processos zombie</subtask>
+          <subtask>Validar que ps aux | grep ffmpeg sempre bate com isStreaming</subtask>
+        </task>
+      </tests>
+      <documentation>
+        <task id="7" title="Atualizar comentários no código">
+          <subtask>Documentar por que usamos atomicidade no cleanup</subtask>
+          <subtask>Explicar race condition que foi evitada</subtask>
+          <subtask>Adicionar exemplo de uso correto de stop()</subtask>
+        </task>
+      </documentation>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Estado Sempre Consistente">
+      <requirement>isStreaming === true SE E SOMENTE SE processo FFmpeg está rodando</requirement>
+      <requirement>Após stop(), flags SEMPRE resetadas (isStreaming = false, isCapturing = false)</requirement>
+      <requirement>Nenhuma race condition entre SIGTERM/SIGKILL paths</requirement>
+    </criterion>
+    <criterion id="AC2" title="Recuperação de Falhas">
+      <requirement>Após SIGKILL, próximo startStreaming() funciona sem restart do backend</requirement>
+      <requirement>getStreamingStatus() sempre reflete realidade do processo</requirement>
+    </criterion>
+    <criterion id="AC3" title="Testes Automatizados">
+      <requirement>Teste: stop() com SIGTERM (graceful) → estado limpo</requirement>
+      <requirement>Teste: stop() com SIGKILL (forçado) → estado limpo</requirement>
+      <requirement>Teste: start() após stop() SIGKILL → sucesso</requirement>
+      <requirement>Teste: múltiplos stop() consecutivos → sem crash</requirement>
+    </criterion>
+    <criterion id="AC4" title="Logging Melhorado">
+      <requirement>Log clear quando entra no path SIGKILL</requirement>
+      <requirement>Log warning se detectar estado inconsistente</requirement>
+      <requirement>Log de recuperação automática (se implementada)</requirement>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/troubleshooting/2025-11-03-streaming-regression.md</path>
+        <title>Troubleshooting Session: Streaming Regression</title>
+        <section>Próximos Passos (V1.5.1) - Investigação e Fix Definitivo</section>
+        <snippet>Documentação completa do bug de estado inconsistente no AudioManager. Root cause: race condition entre event handler `exit` e timeout forçado em `stop()`. Quando SIGKILL é necessário, `cleanup()` pode ser chamado duas vezes, deixando flags true com processo null.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/v1/v1-05-pipeline-ffmpeg-icecast.md</path>
+        <title>Story V1.5: Pipeline FFmpeg → Icecast</title>
+        <section>Known Issues / Regression - Bug Remanescente → V1.5.1</section>
+        <snippet>AudioManager state inconsistency: Quando stop() usa SIGKILL, flag isStreaming pode ficar true com processo morto. Impacto: requer pm2 restart para recuperar. Workaround: reiniciar backend manualmente.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-v1.md</path>
+        <title>Epic Technical Specification: Foundation Core (MVP)</title>
+        <section>Services and Modules - AudioManager</section>
+        <snippet>AudioManager é responsável por captura ALSA via FFmpeg, encode MP3, stream para Icecast2, e monitoring de nível de áudio. Input: ALSA device (plughw:1,0), Output: HTTP stream para Icecast2, audio level events via EventBus.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>service</kind>
+        <symbol>stop()</symbol>
+        <lines>152-192</lines>
+        <reason>Método que contém o bug de race condition. Cleanup pode ser chamado duas vezes (event handler + timeout), deixando estado inconsistente quando SIGKILL é necessário.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>class</kind>
+        <symbol>AudioManager</symbol>
+        <lines>70-99</lines>
+        <reason>Classe principal com propriedades de estado (isCapturing, isStreaming, ffmpegProcess) que precisam ser gerenciadas atomicamente.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>interface</kind>
+        <symbol>StreamingConfig, StreamingStatus, AudioCaptureStatus</symbol>
+        <lines>34-62</lines>
+        <reason>Interfaces que definem tipos de configuração e status do streaming.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>method</kind>
+        <symbol>start(), startStreaming(), stopStreaming()</symbol>
+        <lines>110, 226, 276</lines>
+        <reason>Métodos relacionados ao lifecycle do streaming que interagem com o estado gerenciado por stop().</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <dependency name="typescript" version="^5.9.3" scope="dev">TypeScript para type safety</dependency>
+        <dependency name="jest" version="^30.2.0" scope="dev">Framework de testes unitários</dependency>
+        <dependency name="ts-jest" version="^29.4.5" scope="dev">Jest preset para TypeScript</dependency>
+        <dependency name="@types/jest" version="^30.0.0" scope="dev">Tipos TypeScript para Jest</dependency>
+        <dependency name="@types/node" version="^20.19.24" scope="dev">Tipos TypeScript para Node.js</dependency>
+        <dependency name="winston" version="^3.18.3" scope="runtime">Logger estruturado</dependency>
+      </node>
+      <system>
+        <dependency name="Node.js" version="20.x LTS">Runtime JavaScript</dependency>
+        <dependency name="FFmpeg" version="≥5.0">Captura e encoding de áudio</dependency>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="concurrency">
+      Cleanup deve ser idempotente - método pode ser chamado múltiplas vezes sem efeitos colaterais duplicados. Usar flag `cleanupCalled` para garantir execução única.
+    </constraint>
+    <constraint type="state-management">
+      Estado (isCapturing, isStreaming, ffmpegProcess) deve ser atualizado atomicamente. Criar método privado resetState() para centralizar lógica de reset.
+    </constraint>
+    <constraint type="reliability">
+      SIGKILL não garante evento 'exit' imediato. Sempre ter fallback com timeout forçado, mas garantir que não cause race condition.
+    </constraint>
+    <constraint type="recovery">
+      startStreaming() deve detectar estado inconsistente (isStreaming=true mas processo null) e forçar reset automático com log de warning.
+    </constraint>
+    <constraint type="testing">
+      Cobertura de testes ≥80% nas funções modificadas. Testes devem cobrir: SIGTERM graceful, SIGKILL forçado, múltiplos stop() consecutivos, start() após SIGKILL.
+    </constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>AudioManager.stop()</name>
+      <kind>async method</kind>
+      <signature>async stop(): Promise&lt;void&gt;</signature>
+      <path>backend/src/services/audio-manager.ts:152</path>
+      <description>Para captura de áudio. Deve garantir cleanup atômico e estado consistente mesmo com SIGKILL.</description>
+    </interface>
+    <interface>
+      <name>AudioManager.start()</name>
+      <kind>async method</kind>
+      <signature>async start(): Promise&lt;void&gt;</signature>
+      <path>backend/src/services/audio-manager.ts:110</path>
+      <description>Inicia captura de áudio. Pode precisar validar estado antes de iniciar.</description>
+    </interface>
+    <interface>
+      <name>AudioManager.resetState()</name>
+      <kind>private method</kind>
+      <signature>private resetState(): void</signature>
+      <path>backend/src/services/audio-manager.ts:NEW</path>
+      <description>Novo método para reset atômico de estado. Centraliza lógica de reset de isCapturing, isStreaming, ffmpegProcess, streamingConfig.</description>
+    </interface>
+    <interface>
+      <name>AudioManager.startStreaming()</name>
+      <kind>async method</kind>
+      <signature>async startStreaming(config: StreamingConfig): Promise&lt;void&gt;</signature>
+      <path>backend/src/services/audio-manager.ts:226</path>
+      <description>Inicia streaming. Deve detectar e corrigir estado inconsistente antes de iniciar.</description>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Framework: Jest (v30.2.0) com ts-jest preset para TypeScript. Estrutura: describe/test blocks. Mocking: jest.mock() para child_process e winston. Pattern: Arrange-Act-Assert. Coverage target: ≥80% nas funções modificadas. Test files: backend/src/__tests__/services/*.test.ts
+    </standards>
+    <locations>
+      <location>backend/src/__tests__/services/audio-manager.test.ts</location>
+      <location>backend/src/__tests__/services/audio-manager-streaming.test.ts</location>
+    </locations>
+    <ideas>
+      <test-idea ac="AC1">
+        <title>Estado consistente após stop() com SIGTERM graceful</title>
+        <description>Mock FFmpeg exit gracioso (SIGTERM). Chamar stop(). Verificar: isCapturing=false, isStreaming=false, ffmpegProcess=null após Promise resolve.</description>
+      </test-idea>
+      <test-idea ac="AC1">
+        <title>Estado consistente após stop() com SIGKILL forçado</title>
+        <description>Mock FFmpeg que não responde SIGTERM (evento exit nunca emitido no timeout de 5s). Forçar path SIGKILL. Verificar: estado limpo após 6s (5s + 1s), sem race condition.</description>
+      </test-idea>
+      <test-idea ac="AC1">
+        <title>Cleanup idempotente - múltiplos stop() consecutivos</title>
+        <description>Chamar stop() múltiplas vezes sem await. Verificar: sem crash, sem múltiplas emissões de 'stopped' event, estado final consistente.</description>
+      </test-idea>
+      <test-idea ac="AC2">
+        <title>startStreaming() após SIGKILL detecta e corrige estado inconsistente</title>
+        <description>Simular estado ruim (isStreaming=true, ffmpegProcess=null). Chamar startStreaming(). Verificar: log warning emitido, resetState() chamado, streaming inicia com sucesso.</description>
+      </test-idea>
+      <test-idea ac="AC3">
+        <title>Testes automatizados - start() após stop() SIGKILL</title>
+        <description>Executar stop() com path SIGKILL. Aguardar completar. Chamar start(). Verificar: sucesso sem erros, streaming reinicia normalmente.</description>
+      </test-idea>
+      <test-idea>
+        <title>resetState() centraliza lógica de reset</title>
+        <description>Verificar que resetState() atualiza TODAS as flags atomicamente: isCapturing=false, isStreaming=false, ffmpegProcess=null, streamingConfig=undefined.</description>
+      </test-idea>
+    </ideas>
+  </tests>
+</story-context>
