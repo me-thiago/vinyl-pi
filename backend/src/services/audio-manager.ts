@@ -1,6 +1,12 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, exec, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import { unlink, access } from 'fs';
+import { promisify } from 'util';
 import winston from 'winston';
+
+const execAsync = promisify(exec);
+const unlinkAsync = promisify(unlink);
+const accessAsync = promisify(access);
 
 // Configurar logger Winston
 const logger = winston.createLogger({
@@ -69,12 +75,14 @@ export interface AudioCaptureStatus {
  */
 export class AudioManager extends EventEmitter {
   private ffmpegProcess: ChildProcess | null = null;
+  private ffmpegMp3Process: ChildProcess | null = null; // Segundo FFmpeg para MP3
   private config: AudioConfig;
   private streamingConfig?: StreamingConfig;
   private isCapturing: boolean = false;
   private isStreaming: boolean = false;
   private currentError?: string;
   private levelDb?: number;
+  private fifoPath: string = '/tmp/vinyl-audio.fifo';
 
   /**
    * Cria uma instância do AudioManager
@@ -219,8 +227,14 @@ export class AudioManager extends EventEmitter {
     this.isCapturing = false;
     this.isStreaming = false;
     this.ffmpegProcess = null;
+    this.ffmpegMp3Process = null;
     this.streamingConfig = undefined;
     this.currentError = undefined;
+
+    // Cleanup FIFO se existir
+    this.cleanupFifo().catch(err => {
+      logger.warn(`Failed to cleanup FIFO during reset: ${err}`);
+    });
   }
 
   /**
@@ -251,10 +265,11 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Inicia streaming para Icecast2
+   * Inicia streaming dual: Raw PCM para frontend + MP3 para Icecast2
    *
-   * Detecta e corrige automaticamente estado inconsistente antes de iniciar.
-   * Se isStreaming=true mas processo não existe, força reset e continua normalmente.
+   * Arquitetura:
+   * ALSA → FFmpeg #1 (principal) → stdout (Raw PCM) → Express /stream.wav
+   *                               → FIFO (Raw PCM) → FFmpeg #2 → MP3 → Icecast2
    *
    * @param config Configuração de streaming
    * @returns Promise que resolve quando streaming iniciar
@@ -265,12 +280,9 @@ export class AudioManager extends EventEmitter {
       const processExists = this.ffmpegProcess && !this.ffmpegProcess.killed;
 
       if (!processExists) {
-        // Estado inconsistente detectado: flag=true mas processo morto
         logger.warn('Detected inconsistent state: isStreaming=true but no process. Auto-recovering...');
         this.resetState();
-        // Continua com start normal abaixo
       } else {
-        // Estado OK: streaming realmente ativo
         logger.warn('Streaming already active');
         return;
       }
@@ -283,24 +295,41 @@ export class AudioManager extends EventEmitter {
       // Armazenar config de streaming
       this.streamingConfig = config;
 
-      // Construir comando FFmpeg com streaming
-      const args = this.buildStreamingFFmpegArgs(config);
+      // Criar FIFO para comunicação entre processos FFmpeg
+      await this.createFifo();
 
-      logger.info(`Starting FFmpeg streaming with args: ${args.join(' ')}`);
+      // Construir comandos FFmpeg
+      const mainArgs = this.buildStreamingFFmpegArgs(config);
+      const mp3Args = this.buildMp3FFmpegArgs(config);
 
-      // Spawn processo FFmpeg
-      this.ffmpegProcess = spawn('ffmpeg', args, {
-        stdio: ['ignore', 'ignore', 'pipe']  // stdin: ignore, stdout: ignore, stderr: pipe
+      logger.info(`Starting main FFmpeg with args: ${mainArgs.join(' ')}`);
+      logger.info(`Starting MP3 FFmpeg with args: ${mp3Args.join(' ')}`);
+
+      // Iniciar segundo FFmpeg PRIMEIRO (leitor do FIFO)
+      // IMPORTANTE: Leitor deve estar esperando antes do writer escrever no FIFO
+      this.ffmpegMp3Process = spawn('ffmpeg', mp3Args, {
+        stdio: ['ignore', 'ignore', 'pipe']  // stderr para logs
       });
 
-      // Configurar handlers
+      // Configurar handlers para processo MP3
+      this.setupMp3ProcessHandlers();
+
+      // Aguardar 100ms para garantir que processo MP3 abriu o FIFO
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Iniciar FFmpeg principal (ALSA → stdout + FIFO)
+      this.ffmpegProcess = spawn('ffmpeg', mainArgs, {
+        stdio: ['ignore', 'pipe', 'pipe']  // stdout=pipe (Raw PCM), stderr=pipe (logs)
+      });
+
+      // Configurar handlers para processo principal
       this.setupProcessHandlers();
 
       this.isCapturing = true;
       this.isStreaming = true;
       this.currentError = undefined;
 
-      logger.info(`Streaming started successfully to ${config.icecastHost}:${config.icecastPort}${config.mountPoint}`);
+      logger.info(`Dual streaming started: PCM→Express + MP3→Icecast2 (${config.icecastHost}:${config.icecastPort}${config.mountPoint})`);
       this.emit('streaming_started', {
         host: config.icecastHost,
         port: config.icecastPort,
@@ -312,12 +341,16 @@ export class AudioManager extends EventEmitter {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.currentError = errorMsg;
       logger.error(`Failed to start streaming: ${errorMsg}`);
+
+      // Cleanup em caso de erro
+      await this.cleanupFifo();
+
       throw error;
     }
   }
 
   /**
-   * Para o streaming
+   * Para o streaming (ambos processos FFmpeg)
    * @returns Promise que resolve quando streaming parar
    */
   async stopStreaming(): Promise<void> {
@@ -326,11 +359,39 @@ export class AudioManager extends EventEmitter {
       return;
     }
 
+    // Parar processo principal
     await this.stop();
+
+    // Parar processo MP3
+    if (this.ffmpegMp3Process && !this.ffmpegMp3Process.killed) {
+      logger.info('Stopping MP3 FFmpeg process');
+      this.ffmpegMp3Process.kill('SIGTERM');
+
+      // Aguardar processo terminar
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          if (this.ffmpegMp3Process && !this.ffmpegMp3Process.killed) {
+            logger.warn('MP3 FFmpeg did not stop gracefully, sending SIGKILL');
+            this.ffmpegMp3Process.kill('SIGKILL');
+          }
+          resolve();
+        }, 5000);
+
+        this.ffmpegMp3Process?.once('exit', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+    }
+
+    // Limpar FIFO
+    await this.cleanupFifo();
+
     this.isStreaming = false;
     this.streamingConfig = undefined;
+    this.ffmpegMp3Process = null;
 
-    logger.info('Streaming stopped');
+    logger.info('Streaming stopped (both processes)');
     this.emit('streaming_stopped');
   }
 
@@ -348,6 +409,70 @@ export class AudioManager extends EventEmitter {
     };
 
     return baseStatus;
+  }
+
+  /**
+   * Retorna o stream WAV (stdout do FFmpeg)
+   *
+   * Usado pelo endpoint /stream.wav para servir áudio PCM de baixa latência.
+   * Valida que o processo está rodando e o stdout está disponível.
+   *
+   * @returns ReadableStream do WAV ou null se não disponível
+   */
+  getWavStream(): NodeJS.ReadableStream | null {
+    if (!this.isStreaming || !this.ffmpegProcess) {
+      logger.warn('Cannot get WAV stream: streaming not active');
+      return null;
+    }
+
+    if (!this.ffmpegProcess.stdout) {
+      logger.error('Cannot get WAV stream: stdout not available');
+      return null;
+    }
+
+    return this.ffmpegProcess.stdout;
+  }
+
+  /**
+   * Cria Named Pipe (FIFO) para compartilhar áudio entre processos
+   * @private
+   */
+  private async createFifo(): Promise<void> {
+    try {
+      // Verificar se FIFO já existe
+      await accessAsync(this.fifoPath);
+      // Existe, remover primeiro
+      await unlinkAsync(this.fifoPath);
+      logger.info(`Removed existing FIFO at ${this.fifoPath}`);
+    } catch (err) {
+      // Não existe, OK
+    }
+
+    try {
+      // Criar FIFO usando comando mkfifo do sistema
+      await execAsync(`mkfifo ${this.fifoPath}`);
+      // Ajustar permissões
+      await execAsync(`chmod 666 ${this.fifoPath}`);
+      logger.info(`Created FIFO at ${this.fifoPath}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to create FIFO: ${errorMsg}`);
+      throw new Error(`Failed to create FIFO: ${errorMsg}`);
+    }
+  }
+
+  /**
+   * Remove Named Pipe (FIFO)
+   * @private
+   */
+  private async cleanupFifo(): Promise<void> {
+    try {
+      await unlinkAsync(this.fifoPath);
+      logger.info(`Cleaned up FIFO at ${this.fifoPath}`);
+    } catch (err) {
+      // Ignorar erro se não existir
+      logger.warn(`FIFO cleanup warning (may not exist): ${err}`);
+    }
   }
 
   /**
@@ -410,11 +535,19 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Constrói argumentos para o comando FFmpeg com streaming Icecast2
+   * Constrói argumentos para o comando FFmpeg principal (ALSA → stdout + FIFO)
+   *
+   * Usa -map para duplicar output:
+   * 1. Raw PCM → stdout (pipe:1) - baixa latência para Express /stream.wav
+   * 2. Raw PCM → FIFO - para segundo FFmpeg processar MP3 → Icecast2
+   *
    * @private
    */
   private buildStreamingFFmpegArgs(streamConfig: StreamingConfig): string[] {
     const args: string[] = [];
+
+    // Sobrescrever arquivos automaticamente sem perguntar
+    args.push('-y');
 
     // Verbose logging para debug
     args.push('-loglevel', 'verbose');
@@ -425,20 +558,46 @@ export class AudioManager extends EventEmitter {
     args.push('-ar', this.config.sampleRate.toString());
     args.push('-ac', this.config.channels.toString());
 
-    // TODO: Fallback anullsrc requer filtro complexo FFmpeg
-    // Por enquanto desabilitado para validação básica
-    // if (streamConfig.fallbackSilence) {
-    //   args.push('-f', 'lavfi');
-    //   args.push('-i', `anullsrc=channel_layout=stereo:sample_rate=${this.config.sampleRate}`);
-    // }
+    // Output 1: Raw PCM para stdout (pipe:1)
+    // Frontend constrói AudioBuffer manualmente
+    args.push('-map', '0:a');
+    args.push('-c:a', 'pcm_s16le');
+    args.push('-f', 's16le');
+    args.push('pipe:1');
 
-    // Encoding MP3
-    args.push('-acodec', 'libmp3lame');
-    args.push('-ab', `${streamConfig.bitrate}k`);
+    // Output 2: Raw PCM para FIFO
+    // Segundo FFmpeg lerá daqui e enviará MP3 para Icecast2
+    args.push('-map', '0:a');
+    args.push('-c:a', 'pcm_s16le');
+    args.push('-f', 's16le');
+    args.push(this.fifoPath);
+
+    return args;
+  }
+
+  /**
+   * Constrói argumentos para segundo FFmpeg (FIFO → MP3 → Icecast2)
+   * @private
+   */
+  private buildMp3FFmpegArgs(streamConfig: StreamingConfig): string[] {
+    const args: string[] = [];
+
+    // Sobrescrever arquivos automaticamente sem perguntar
+    args.push('-y');
+
+    // Verbose logging
+    args.push('-loglevel', 'verbose');
+
+    // Input: FIFO com raw PCM
+    args.push('-f', 's16le');
+    args.push('-ar', this.config.sampleRate.toString());
+    args.push('-ac', this.config.channels.toString());
+    args.push('-i', this.fifoPath);
+
+    // Output: MP3 para Icecast2 usando libshine
+    args.push('-c:a', 'libshine');
     args.push('-b:a', `${streamConfig.bitrate}k`);
     args.push('-f', 'mp3');
-
-    // Configurações adicionais
     args.push('-content_type', 'audio/mpeg');
 
     // URL Icecast2
@@ -449,7 +608,41 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Configura handlers para o processo FFmpeg
+   * Configura handlers para o processo FFmpeg MP3 (FIFO → Icecast2)
+   * @private
+   */
+  private setupMp3ProcessHandlers(): void {
+    if (!this.ffmpegMp3Process) return;
+
+    // Monitorar stderr para logs
+    this.ffmpegMp3Process.stderr?.on('data', (data) => {
+      const output = data.toString();
+      logger.info(`FFmpeg MP3 stderr: ${output}`);
+
+      // Detectar erros
+      if (output.includes('error') || output.includes('Error')) {
+        logger.error(`FFmpeg MP3 ERROR: ${output}`);
+      }
+    });
+
+    // Handler de saída
+    this.ffmpegMp3Process.on('exit', (code, signal) => {
+      logger.info(`FFmpeg MP3 process exited with code ${code}, signal ${signal}`);
+
+      // Se saída inesperada (não controlada), logar
+      if (code !== 0 && code !== null && this.isStreaming) {
+        logger.error(`FFmpeg MP3 exited unexpectedly with code ${code}`);
+      }
+    });
+
+    // Handler de erro
+    this.ffmpegMp3Process.on('error', (err) => {
+      logger.error(`FFmpeg MP3 process error: ${err.message}`);
+    });
+  }
+
+  /**
+   * Configura handlers para o processo FFmpeg principal (ALSA → stdout + FIFO)
    *
    * Os handlers garantem cleanup robusto usando resetState() diretamente,
    * sem dependência de timeouts. Isso evita race conditions e garante que

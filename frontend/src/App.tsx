@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { Player } from "@/components/Player/Player"
 
 function App() {
   return (
@@ -47,6 +48,13 @@ function App() {
             Captura, processa e transmite áudio de toca-discos com detecção
             inteligente de eventos e monitoramento em tempo real.
           </p>
+        </div>
+
+        <Separator className="my-8" />
+
+        {/* Player Section */}
+        <div className="mb-12">
+          <Player streamUrl="http://localhost:8000/stream" />
         </div>
 
         <Separator className="my-8" />

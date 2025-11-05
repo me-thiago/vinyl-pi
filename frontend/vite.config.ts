@@ -11,4 +11,29 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      '/stream': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        ws: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            // Adicionar headers CORS se necessário
+            proxyReq.setHeader('Accept', 'audio/mpeg, audio/*');
+          });
+        },
+      },
+      '/stream.wav': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, _req, _res) => {
+            proxyReq.setHeader('Accept', 'audio/wav, audio/*');
+          });
+        },
+      },
+    },
+  },
 })

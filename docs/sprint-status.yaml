@@ -43,7 +43,7 @@ development_status:
   v1-4-captura-audio-alsa: done
   v1-5-pipeline-ffmpeg-icecast: done
   v1-5.1-audiomanager-state-consistency: done
-  v1-6-frontend-player-basico: ready-for-dev
+  v1-6-frontend-player-basico: review
   v1-7-eventbus-core: ready-for-dev
   v1-8-deteccao-silencio: ready-for-dev
   v1-9-deteccao-clipping: drafted

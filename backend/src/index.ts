@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import { PassThrough } from 'stream';
 import { AudioManager } from './services/audio-manager';
 import { createStatusRouter } from './routes/status';
 
@@ -9,6 +10,48 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
+
+// WAV Stream Broadcaster
+// Mantém lista de clientes conectados e transmite dados para todos simultaneamente
+let wavBroadcaster: PassThrough | null = null;
+const wavClients = new Set<PassThrough>();
+
+function getOrCreateBroadcaster(source: NodeJS.ReadableStream): PassThrough {
+  if (!wavBroadcaster) {
+    wavBroadcaster = new PassThrough();
+
+    // Ler do source e escrever para o broadcaster
+    source.on('data', (chunk) => {
+      if (wavBroadcaster) {
+        wavBroadcaster.write(chunk);
+      }
+      // Broadcast para todos os clientes ativos
+      wavClients.forEach((client) => {
+        try {
+          client.write(chunk);
+        } catch (err) {
+          console.error('Error writing to client:', err);
+          wavClients.delete(client);
+        }
+      });
+    });
+
+    source.on('end', () => {
+      console.log('WAV source ended');
+      wavBroadcaster = null;
+      wavClients.forEach(c => c.end());
+      wavClients.clear();
+    });
+
+    source.on('error', (err) => {
+      console.error('WAV source error:', err);
+      wavBroadcaster = null;
+      wavClients.forEach(c => c.destroy(err));
+      wavClients.clear();
+    });
+  }
+  return wavBroadcaster;
+}
 
 // Inicializar AudioManager
 const audioManager = new AudioManager({
@@ -119,6 +162,51 @@ app.post('/streaming/stop', async (req, res) => {
 app.get('/streaming/status', (req, res) => {
   const status = audioManager.getStreamingStatus();
   res.json(status);
+});
+
+// Endpoint para WAV streaming (baixa latência)
+// Serve o stdout do FFmpeg (PCM WAV) via HTTP chunked com suporte a múltiplos clientes
+app.get('/stream.wav', (req, res) => {
+  const wavStream = audioManager.getWavStream();
+
+  if (!wavStream) {
+    res.status(503).json({
+      success: false,
+      error: 'WAV streaming not available. Start streaming first.'
+    });
+    return;
+  }
+
+  // Headers para streaming chunked
+  res.setHeader('Content-Type', 'audio/pcm'); // Raw PCM, não WAV
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Inicializar broadcaster se necessário
+  getOrCreateBroadcaster(wavStream);
+
+  // Criar stream individual para este cliente
+  const clientStream = new PassThrough();
+  wavClients.add(clientStream);
+
+  console.log(`Client connected to WAV stream (total: ${wavClients.size})`);
+
+  // Enviar para response
+  clientStream.pipe(res);
+
+  // Cleanup quando cliente desconectar
+  const cleanup = () => {
+    wavClients.delete(clientStream);
+    clientStream.destroy();
+    console.log(`Client disconnected from WAV stream (remaining: ${wavClients.size})`);
+  };
+
+  req.on('close', cleanup);
+  res.on('error', cleanup);
+  clientStream.on('error', cleanup);
 });
 
 app.listen(PORT, () => {
