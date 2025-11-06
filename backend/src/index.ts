@@ -130,7 +130,7 @@ app.post('/streaming/start', async (req, res) => {
       icecastPort: parseInt(process.env.ICECAST_PORT || '8000'),
       icecastPassword: process.env.ICECAST_SOURCE_PASSWORD || 'hackme',
       mountPoint: process.env.ICECAST_MOUNT_POINT || '/stream',
-      bitrate: 320,
+      bitrate: 128,
       fallbackSilence: true
     };
 

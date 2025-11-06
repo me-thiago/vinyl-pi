@@ -594,8 +594,8 @@ export class AudioManager extends EventEmitter {
     args.push('-ac', this.config.channels.toString());
     args.push('-i', this.fifoPath);
 
-    // Output: MP3 para Icecast2 usando libshine
-    args.push('-c:a', 'libshine');
+    // Output: MP3 para Icecast2 usando libmp3lame
+    args.push('-c:a', 'libmp3lame');
     args.push('-b:a', `${streamConfig.bitrate}k`);
     args.push('-f', 'mp3');
     args.push('-content_type', 'audio/mpeg');
