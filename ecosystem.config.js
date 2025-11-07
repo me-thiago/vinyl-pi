@@ -25,6 +25,7 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: 3001,
+        AUDIO_DEVICE: 'plughw:0,0',
       },
       error_file: './logs/backend-error.log',
       out_file: './logs/backend-out.log',

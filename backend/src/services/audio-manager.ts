@@ -549,8 +549,8 @@ export class AudioManager extends EventEmitter {
     // Sobrescrever arquivos automaticamente sem perguntar
     args.push('-y');
 
-    // Verbose logging para debug
-    args.push('-loglevel', 'verbose');
+    // Log apenas erros (reduzir tamanho de logs)
+    args.push('-loglevel', 'error');
 
     // Input ALSA principal
     args.push('-f', 'alsa');
@@ -585,8 +585,8 @@ export class AudioManager extends EventEmitter {
     // Sobrescrever arquivos automaticamente sem perguntar
     args.push('-y');
 
-    // Verbose logging
-    args.push('-loglevel', 'verbose');
+    // Log apenas erros (reduzir tamanho de logs)
+    args.push('-loglevel', 'error');
 
     // Input: FIFO com raw PCM
     args.push('-f', 's16le');

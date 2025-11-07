@@ -21,12 +21,12 @@
   </authentication>
 
   <!-- Hostname para identificação do servidor -->
-  <hostname>localhost</hostname>
+  <hostname>192.168.86.35</hostname>
 
-  <!-- Listen socket - Bind em localhost apenas (segurança) -->
+  <!-- Listen socket - Bind em todas as interfaces para acesso remoto -->
   <listen-socket>
     <port>8000</port>
-    <bind-address>127.0.0.1</bind-address>
+    <bind-address>0.0.0.0</bind-address>
   </listen-socket>
 
   <!-- Mount Point Principal: /stream -->
@@ -52,7 +52,7 @@
   <!-- Paths -->
   <paths>
     <basedir>/usr/share/icecast2</basedir>
-    <logdir>/var/log/icecast2</logdir>
+    <logdir>/home/thiago/projects/vinyl-os/logs</logdir>
     <webroot>/usr/share/icecast2/web</webroot>
     <adminroot>/usr/share/icecast2/admin</adminroot>
     <alias source="/" destination="/status.xsl"/>
@@ -69,9 +69,5 @@
   <!-- Security -->
   <security>
     <chroot>0</chroot>
-    <changeowner>
-      <user>icecast2</user>
-      <group>icecast</group>
-    </changeowner>
   </security>
 </icecast>
