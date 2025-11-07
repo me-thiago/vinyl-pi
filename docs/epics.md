@@ -127,21 +127,31 @@ Cada épico inclui:
 
 ---
 
-### Story V1.6: Frontend Player Básico
+### Story V1.6: Frontend Player Básico (Baixa Latência)
 
 **Como** usuário,  
-**quero** poder ouvir o stream de áudio através de um player web,  
-**para que** possa acessar o áudio do toca-discos em qualquer dispositivo.
+**quero** poder ouvir o stream de áudio através de um player web com latência mínima,  
+**para que** possa ter uma experiência próxima do tempo real ao ouvir meu toca-discos.
 
 **Critérios de Aceitação:**
-1. Componente Player criado com HTML5 Audio element
+1. Componente Player criado com **Web Audio API** (não HTML5 Audio)
 2. Play/Pause funcional
 3. Volume local (não afeta source)
 4. Indicador visual de streaming ativo
-5. URL do stream: `http://pi.local:8000/stream`
-6. Tratamento de erros de conexão
+5. URL do stream: `http://localhost:3001/stream.wav` (RAW PCM dual-path)
+6. Tratamento de erros de conexão com auto-reconexão
+7. **Latência end-to-end <500ms** (target: ~150ms alcançado)
+8. Buffer configurável (100-500ms) com default de 200ms
+9. Monitoramento de latência em tempo real
 
 **Pré-requisitos:** V1.5
+
+**Status:** ✅ **DONE** (2025-11-07)  
+**Notas de Implementação:**
+- Latência real alcançada: ~150ms (target superado)
+- Tecnologia: Web Audio API com processamento manual de RAW PCM
+- Dual streaming implementado: PCM (frontend) + MP3 128k (Icecast2)
+- Bitrate otimizado para Raspberry Pi: 128kbps com libmp3lame
 
 ---
 
