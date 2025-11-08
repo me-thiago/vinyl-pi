@@ -6,6 +6,7 @@ export interface AudioStreamState {
   error: string | null;
   latency: number; // em ms
   volume: number; // 0.0 - 1.0
+  analyser: AnalyserNode | null; // Para visualização de frequência
 }
 
 export interface UseAudioStreamOptions {
@@ -25,10 +26,12 @@ export function useAudioStream({
     error: null,
     latency: 0,
     volume: 1.0,
+    analyser: null,
   });
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const bufferQueueRef = useRef<AudioBuffer[]>([]);
@@ -67,8 +70,20 @@ export function useAudioStream({
 
       // Criar GainNode para controle de volume
       const gainNode = context.createGain();
-      gainNode.connect(context.destination);
       gainNodeRef.current = gainNode;
+
+      // Criar AnalyserNode para visualização de frequência
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      // Pipeline: gainNode -> analyser -> destination
+      gainNode.connect(analyser);
+      analyser.connect(context.destination);
+
+      // Atualizar state com analyser
+      setState((prev) => ({ ...prev, analyser }));
 
       // Resumir contexto se suspenso (necessário em alguns browsers)
       if (context.state === 'suspended') {
@@ -251,6 +266,7 @@ export function useAudioStream({
         // Fallback para MP3 Icecast2 se WAV falhar
         console.warn('WAV streaming failed, trying MP3 fallback:', wavError);
 
+        const isDev = import.meta.env.DEV;
         const mp3Url = isDev && streamUrl.includes('localhost:8000')
           ? streamUrl.replace('http://localhost:8000', '')
           : streamUrl;
@@ -431,6 +447,7 @@ export function useAudioStream({
     startStream,
     stopStream,
     webAudioSupported,
+    state, // Expor state completo para acesso ao analyser
   };
 }
 

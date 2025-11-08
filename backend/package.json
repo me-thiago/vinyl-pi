@@ -10,7 +10,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:manual": "ts-node src/__tests__/manual/audio-manager-test.ts"
+    "test:manual": "ts-node src/__tests__/manual/audio-manager-test.ts",
+    "setup:logs": "sudo ../scripts/setup-persistent-logs.sh"
   },
   "keywords": [],
   "author": "",

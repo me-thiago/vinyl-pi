@@ -1,0 +1,242 @@
+---
+name: "eventbus-safety"
+description: "EventBus Memory Leak Prevention Guidelines"
+alwaysApply: false
+---
+
+# EventBus Memory Safety Guidelines
+
+Reference this rule with `@eventbus-safety` when working with EventBus subscriptions.
+
+## Critical Warning
+
+🚨 **MEMORY LEAK RISK**: EventBus handlers create JavaScript closures that capture the component's entire context. Forgetting to unsubscribe causes the component and all its data to remain in memory forever.
+
+For a 24/7 always-on system like Vinyl-OS, this causes unbounded memory growth leading to:
+- Memory exhaustion
+- Performance degradation
+- System crashes
+
+## Required Pattern
+
+**Every component using EventBus MUST follow this pattern:**
+
+### ✅ Correct Implementation
+
+```typescript
+import { eventBus, EventHandler } from './utils/event-bus';
+
+class MyService {
+  private audioStartHandler: EventHandler;
+  private audioStopHandler: EventHandler;
+
+  constructor() {
+    // ✅ Store handlers as class properties
+    this.audioStartHandler = async (payload) => {
+      this.handleAudioStart(payload);
+    };
+
+    this.audioStopHandler = async (payload) => {
+      this.handleAudioStop(payload);
+    };
+
+    // Subscribe using stored references
+    eventBus.subscribe('audio.start', this.audioStartHandler);
+    eventBus.subscribe('audio.stop', this.audioStopHandler);
+  }
+
+  // ✅ MANDATORY: Implement cleanup method
+  async destroy(): Promise<void> {
+    // Unsubscribe all handlers
+    eventBus.unsubscribe('audio.start', this.audioStartHandler);
+    eventBus.unsubscribe('audio.stop', this.audioStopHandler);
+
+    // Other cleanup...
+  }
+
+  private handleAudioStart(payload: Record<string, any>): void {
+    // Handler logic
+  }
+
+  private handleAudioStop(payload: Record<string, any>): void {
+    // Handler logic
+  }
+}
+
+// Usage: Always call destroy() when done
+const service = new MyService();
+// ... use service ...
+await service.destroy(); // ✅ Cleanup
+```
+
+### ❌ Wrong Implementation (Memory Leak)
+
+```typescript
+class MyService {
+  constructor() {
+    // ❌ WRONG: Anonymous function - can't unsubscribe later!
+    eventBus.subscribe('audio.start', async (payload) => {
+      this.handleAudioStart(payload);
+    });
+
+    // ❌ WRONG: Inline arrow function - can't unsubscribe later!
+    eventBus.subscribe('audio.stop', async (payload) => {
+      console.log('Audio stopped');
+    });
+  }
+
+  // ❌ WRONG: No destroy() method = guaranteed memory leak!
+}
+```
+
+## Using SubscriptionManager Utility
+
+For easier cleanup, use `createSubscriptionManager()` from `utils/lifecycle.ts`:
+
+```typescript
+import { createSubscriptionManager, Destroyable } from './utils/lifecycle';
+
+class MyService implements Destroyable {
+  private subscriptions = createSubscriptionManager();
+
+  constructor() {
+    // ✅ Automatically tracked for cleanup
+    this.subscriptions.subscribe('audio.start', async (payload) => {
+      this.handleAudioStart(payload);
+    });
+
+    this.subscriptions.subscribe('audio.stop', async (payload) => {
+      this.handleAudioStop(payload);
+    });
+  }
+
+  // ✅ Single cleanup call handles all subscriptions
+  async destroy(): Promise<void> {
+    this.subscriptions.cleanup();
+    // Other cleanup...
+  }
+
+  private handleAudioStart(payload: Record<string, any>): void {
+    // Handler logic
+  }
+
+  private handleAudioStop(payload: Record<string, any>): void {
+    // Handler logic
+  }
+}
+```
+
+## Using DestroyableComponent Base Class
+
+Alternative: Extend `DestroyableComponent` for automatic lifecycle management:
+
+```typescript
+import { DestroyableComponent } from './utils/lifecycle';
+
+class MyService extends DestroyableComponent {
+  constructor() {
+    super(); // Initialize subscriptions manager
+
+    // ✅ Use inherited subscriptions manager
+    this.subscriptions.subscribe('audio.start', async (payload) => {
+      this.handleAudioStart(payload);
+    });
+  }
+
+  async destroy(): Promise<void> {
+    // ✅ Parent cleanup handles subscriptions
+    await super.destroy();
+
+    // Add your own cleanup here
+  }
+
+  private handleAudioStart(payload: Record<string, any>): void {
+    // Handler logic
+  }
+}
+```
+
+## When Cleanup is NOT Required
+
+**Exception:** Long-lived singleton services that exist for the entire application lifetime do NOT need cleanup:
+
+```typescript
+/**
+ * AudioManager - Singleton service
+ * 
+ * ⚠️ LIFECYCLE: This service lives for the entire app lifetime.
+ * EventBus subscriptions are intentionally not cleaned up as the
+ * service is never destroyed during normal operation.
+ */
+class AudioManager {
+  constructor() {
+    // ✅ OK: No cleanup needed for singletons
+    eventBus.subscribe('audio.start', async (payload) => {
+      // This service never gets destroyed
+    });
+  }
+
+  // ✅ No destroy() method needed for true singletons
+}
+```
+
+**Always document this decision clearly in the class JSDoc!**
+
+## Implementation Checklist
+
+When creating a component that uses EventBus:
+
+- [ ] Are handlers stored as class properties OR using SubscriptionManager?
+- [ ] Does the class implement `Destroyable` interface or have `destroy()` method?
+- [ ] Does `destroy()` call `unsubscribe()` for all handlers OR `subscriptions.cleanup()`?
+- [ ] Is the component properly destroyed when no longer needed?
+- [ ] If no cleanup: Is it documented as a long-lived singleton?
+
+## Code Review Checklist
+
+When reviewing code that uses EventBus:
+
+- [ ] Are all EventBus subscriptions properly cleaned up?
+- [ ] Are handlers stored (not anonymous) or using SubscriptionManager?
+- [ ] Does the class have a `destroy()` method?
+- [ ] Are there tests verifying cleanup behavior?
+- [ ] If no cleanup: Is the reason clearly documented?
+
+## Runtime Guards
+
+The EventBus includes runtime guards to help detect leaks:
+
+- **Development Warning**: When an event has ≥10 listeners, a warning is logged
+- **Hard Limit**: When an event reaches 50 listeners, an error is thrown
+- **Debug Report**: Use `eventBus.getDebugReport()` to inspect current listeners
+
+Example:
+
+```typescript
+// Check for potential leaks
+console.log(eventBus.getDebugReport());
+// Output:
+// EventBus Memory Report:
+//   audio.start: 2 listener(s)
+//   audio.stop: 1 listener(s)
+//   Total: 3 listener(s) across 2 event(s)
+```
+
+## References
+
+- **EventBus Implementation**: `backend/src/utils/event-bus.ts` (comprehensive JSDoc)
+- **Lifecycle Utilities**: `backend/src/utils/lifecycle.ts`
+- **Documentation**: `CLAUDE.md` (EventBus Memory Safety section)
+- **Tests**: `backend/src/__tests__/utils/lifecycle.test.ts`
+
+## Common Pitfalls
+
+1. **Anonymous Functions**: Can't be unsubscribed later
+2. **Forgetting destroy()**: Component stays in memory forever
+3. **Not calling destroy()**: Even if implemented, must be called
+4. **Large payloads**: Avoid passing large buffers in payloads (use references)
+5. **Nested subscriptions**: Don't subscribe inside handlers (causes exponential growth)
+
+---
+
+**Remember**: In a 24/7 system, even small leaks compound over time. Always implement proper cleanup!

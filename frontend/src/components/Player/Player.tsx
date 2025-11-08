@@ -1,11 +1,13 @@
-import { Play, Pause, Volume2, Radio } from 'lucide-react';
+import { Play, Pause, Volume2, Radio, Power, PowerOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { useAudioStream } from '@/hooks/useAudioStream';
+import { useStreamingControl } from '@/hooks/useStreamingControl';
+import { VinylVisualizer } from '@/components/VinylVisualizer/VinylVisualizer';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 
 interface PlayerProps {
   streamUrl?: string;
@@ -13,8 +15,6 @@ interface PlayerProps {
 }
 
 export function Player({ streamUrl = 'http://localhost:8000/stream', className }: PlayerProps) {
-  const [bufferSize, setBufferSize] = useState(400); // ms - aumentado para reduzir "picotes"
-
   // Detectar host automaticamente (localhost vs pi.local)
   const getStreamUrl = () => {
     if (streamUrl.includes('localhost')) {
@@ -38,13 +38,31 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
     togglePlayPause,
     setVolume,
     webAudioSupported,
+    state,
   } = useAudioStream({
     streamUrl: effectiveStreamUrl,
-    bufferSize,
+    bufferSize: 150,
     onError: (err) => {
       console.error('Audio stream error:', err);
     },
   });
+
+  // Hook para controlar streaming do backend
+  const {
+    isStreaming: backendStreaming,
+    isLoading: streamingLoading,
+    error: streamingError,
+    startStreaming,
+    stopStreaming,
+    refreshStatus,
+  } = useStreamingControl();
+
+  // Atualizar status do backend periodicamente
+  useEffect(() => {
+    refreshStatus();
+    const interval = setInterval(refreshStatus, 5000); // A cada 5s
+    return () => clearInterval(interval);
+  }, [refreshStatus]);
 
   // Determinar status visual do streaming
   const streamingStatus = playing && !error ? 'active' : 'inactive';
@@ -54,10 +72,15 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
     <Card className={cn('w-full', className)}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Radio className="w-5 h-5" />
-            Player de Áudio
-          </CardTitle>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Radio className="w-5 h-5" />
+              Live Vinyl Visualizer
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Real-time frequency visualization with rotating vinyl
+            </CardDescription>
+          </div>
           <Badge
             variant={isStreamingActive ? 'default' : 'secondary'}
             className={cn(
@@ -71,23 +94,77 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
                 isStreamingActive ? 'bg-green-500' : 'bg-gray-400'
               )}
             />
-            {isStreamingActive ? 'Streaming Ativo' : 'Inativo'}
+            {isStreamingActive ? 'ON AIR' : 'Inactive'}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Controles principais */}
+        {/* Vinyl Visualizer Canvas */}
+        <div className="flex flex-col items-center">
+          <VinylVisualizer analyser={state.analyser} isPlaying={playing} />
+        </div>
+
+        {/* Controles de Streaming do Backend */}
+        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border">
+          <div className="flex-1">
+            <p className="text-sm font-medium mb-1">Backend Streaming</p>
+            <p className="text-xs text-muted-foreground">
+              {backendStreaming ? 'FFmpeg capturando áudio' : 'Streaming parado'}
+            </p>
+          </div>
+          <Button
+            onClick={backendStreaming ? stopStreaming : startStreaming}
+            disabled={streamingLoading}
+            size="sm"
+            variant={backendStreaming ? 'destructive' : 'default'}
+            className="h-9 px-4"
+          >
+            {streamingLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                {backendStreaming ? 'Parando...' : 'Iniciando...'}
+              </>
+            ) : backendStreaming ? (
+              <>
+                <PowerOff className="w-4 h-4 mr-2" />
+                Parar
+              </>
+            ) : (
+              <>
+                <Power className="w-4 h-4 mr-2" />
+                Iniciar
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Erro de streaming do backend */}
+        {streamingError && (
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+            <p className="text-sm text-destructive font-medium">Erro no Backend</p>
+            <p className="text-xs text-destructive/80 mt-1">{streamingError}</p>
+          </div>
+        )}
+
+        {/* Controles de Playback (Frontend) */}
         <div className="flex items-center gap-4">
           <Button
             onClick={togglePlayPause}
-            disabled={buffering}
+            disabled={buffering || !backendStreaming}
             size="lg"
-            className="w-16 h-16 rounded-full"
+            variant={playing ? 'default' : 'outline'}
+            className="h-12 px-6 transition-transform hover:scale-105"
           >
             {playing ? (
-              <Pause className="w-6 h-6" />
+              <>
+                <Pause className="w-5 h-5 mr-2" />
+                Pause
+              </>
             ) : (
-              <Play className="w-6 h-6 ml-1" />
+              <>
+                <Play className="w-5 h-5 mr-2" />
+                Play
+              </>
             )}
           </Button>
 
@@ -101,56 +178,17 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
             </div>
             <Slider
               value={[volume * 100]}
-              onValueChange={([value]) => setVolume(value / 100)}
+              onValueChange={(values: number[]) => setVolume(values[0] / 100)}
               min={0}
               max={100}
               step={1}
               className="w-full"
             />
           </div>
-        </div>
 
-        {/* Indicadores de status */}
-        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-          <div>
-            <span className="text-muted-foreground">Latência:</span>
-            <span className="ml-2 font-medium">
-              {latency.toFixed(0)} ms
-            </span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Buffer:</span>
-            <span className="ml-2 font-medium">{bufferSize} ms</span>
-          </div>
-        </div>
-
-        {/* Controle de Buffer - sempre visível */}
-        <div className="pt-2 border-t">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="text-sm font-medium">Tamanho do Buffer</span>
-              <span className="text-xs text-muted-foreground ml-2">({bufferSize} ms)</span>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {bufferSize < 250 ? 'Baixa latência' : bufferSize < 400 ? 'Balanceado' : 'Mais estável'}
-            </span>
-          </div>
-          <Slider
-            value={[bufferSize]}
-            onValueChange={([value]) => setBufferSize(value)}
-            min={100}
-            max={800}
-            step={50}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>100ms (mínimo)</span>
-            <span>400ms (recomendado)</span>
-            <span>800ms (máximo)</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            💡 Aumente o buffer se o áudio estiver "picotado". Buffer maior = mais estável, mas maior latência.
-          </p>
+          <Badge variant="outline" className="px-3 py-1">
+            {latency.toFixed(0)}ms
+          </Badge>
         </div>
 
         {/* Mensagens de erro */}
@@ -169,7 +207,6 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
           </div>
         )}
 
-
         {/* Aviso Web Audio não suportado */}
         {!webAudioSupported && (
           <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3">
@@ -181,13 +218,6 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
             </p>
           </div>
         )}
-
-        {/* URL do stream (debug) */}
-        <div className="pt-2 border-t">
-          <p className="text-xs text-muted-foreground">
-            Stream: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{effectiveStreamUrl}</code>
-          </p>
-        </div>
       </CardContent>
     </Card>
   );

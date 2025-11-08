@@ -174,6 +174,100 @@ Tools for extending BMAD:
 - User approval required between major sections (unless #yolo mode)
 - Never delegate steps - execute directly
 
+## EventBus Memory Safety
+
+The Vinyl-OS backend uses an EventBus (pub/sub pattern) for internal component communication. **Critical memory leak prevention is required when using EventBus.**
+
+### The Problem
+
+EventBus handlers create JavaScript closures that capture the component's context (`this`). If a component is destroyed but forgets to unsubscribe, the handler keeps the **entire component in memory forever**, including all its data (buffers, config, etc). In a 24/7 always-on system like Vinyl-OS, this causes memory leaks that grow unbounded.
+
+### Required Pattern
+
+**Every component using EventBus MUST:**
+
+1. **Store handler as class property** (not anonymous function)
+2. **Implement destroy() method**
+3. **Call unsubscribe() in destroy()**
+4. **Call destroy() when component is no longer needed**
+
+### Correct Usage
+
+```typescript
+class MyService {
+  private handler: EventHandler;
+
+  constructor() {
+    // ✅ Store handler reference
+    this.handler = async (payload) => {
+      this.processEvent(payload);
+    };
+    
+    eventBus.subscribe('event.name', this.handler);
+  }
+
+  async destroy() {
+    // ✅ Unsubscribe in cleanup
+    eventBus.unsubscribe('event.name', this.handler);
+  }
+}
+```
+
+### Wrong Usage (Memory Leak)
+
+```typescript
+class MyService {
+  constructor() {
+    // ❌ Anonymous function - can't unsubscribe later!
+    eventBus.subscribe('event.name', async (payload) => {
+      this.processEvent(payload);
+    });
+  }
+  // ❌ No destroy method = memory leak!
+}
+```
+
+### SubscriptionManager Utility
+
+For easier cleanup, use `createSubscriptionManager()` from `backend/src/utils/lifecycle.ts`:
+
+```typescript
+import { createSubscriptionManager, Destroyable } from './utils/lifecycle';
+
+class MyService implements Destroyable {
+  private subscriptions = createSubscriptionManager();
+
+  constructor() {
+    // ✅ Automatically tracked for cleanup
+    this.subscriptions.subscribe('audio.start', async (p) => { ... });
+    this.subscriptions.subscribe('audio.stop', async (p) => { ... });
+  }
+
+  async destroy() {
+    // ✅ Single call cleans up ALL subscriptions
+    this.subscriptions.cleanup();
+  }
+}
+```
+
+### When Cleanup is NOT Needed
+
+Long-lived singleton services that live for the entire app lifetime (e.g., `audio-manager.ts`) do NOT need to unsubscribe, as they're never destroyed. Always document this decision in the class comment.
+
+### Code Review Checklist
+
+When reviewing code that uses EventBus:
+- [ ] Are handlers stored as class properties?
+- [ ] Does the class have a destroy() method?
+- [ ] Does destroy() call unsubscribe() or subscriptions.cleanup()?
+- [ ] If no cleanup: Is it documented as a long-lived singleton?
+- [ ] Are there tests for cleanup behavior?
+
+For more details, see:
+- `backend/src/utils/event-bus.ts` (comprehensive JSDoc)
+- `backend/src/utils/lifecycle.ts` (utilities)
+- `.cursor/rules/eventbus-safety.mdc` (reference via @eventbus-safety)
+
 ## Navigation Tips
 
 - Start with module READMEs: `bmad/{module}/README.md`

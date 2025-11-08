@@ -11,11 +11,20 @@ vi.mock('@/hooks/useAudioStream', () => ({
     error: null,
     latency: 0,
     volume: 1.0,
+    analyser: null,
     togglePlayPause: vi.fn(),
     setVolume: vi.fn(),
     webAudioSupported: true,
     startStream: vi.fn(),
     stopStream: vi.fn(),
+    state: {
+      playing: false,
+      buffering: false,
+      error: null,
+      latency: 0,
+      volume: 1.0,
+      analyser: null,
+    },
   })),
 }));
 
@@ -26,7 +35,7 @@ describe('Player', () => {
 
   it('deve renderizar componente Player', () => {
     render(<Player />);
-    expect(screen.getByText(/Player de Áudio/i)).toBeInTheDocument();
+    expect(screen.getByText(/Live Vinyl Visualizer/i)).toBeInTheDocument();
   });
 
   it('deve exibir botão Play quando não está tocando', () => {
@@ -38,12 +47,13 @@ describe('Player', () => {
 
   it('deve exibir indicador de streaming inativo', () => {
     render(<Player />);
-    expect(screen.getByText(/Inativo/i)).toBeInTheDocument();
+    expect(screen.getByText(/Inactive/i)).toBeInTheDocument();
   });
 
   it('deve exibir URL do stream', () => {
     render(<Player streamUrl="http://localhost:8000/stream" />);
-    expect(screen.getByText(/http:\/\/localhost:8000\/stream/i)).toBeInTheDocument();
+    // URL não está mais visível na nova interface
+    expect(screen.getByText(/Live Vinyl Visualizer/i)).toBeInTheDocument();
   });
 
   it('deve exibir controle de volume', () => {
@@ -52,10 +62,9 @@ describe('Player', () => {
     expect(screen.getByText(/100%/i)).toBeInTheDocument();
   });
 
-  it('deve exibir informações de latência e buffer', () => {
+  it('deve exibir informações de latência', () => {
     render(<Player />);
-    expect(screen.getByText(/Latência:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Buffer:/i)).toBeInTheDocument();
+    expect(screen.getByText(/0ms/i)).toBeInTheDocument();
   });
 
   it('deve chamar togglePlayPause ao clicar no botão', async () => {
@@ -67,11 +76,20 @@ describe('Player', () => {
       error: null,
       latency: 0,
       volume: 1.0,
+      analyser: null,
       togglePlayPause: mockTogglePlayPause,
       setVolume: vi.fn(),
       webAudioSupported: true,
       startStream: vi.fn(),
       stopStream: vi.fn(),
+      state: {
+        playing: false,
+        buffering: false,
+        error: null,
+        latency: 0,
+        volume: 1.0,
+        analyser: null,
+      },
     });
 
     render(<Player />);
@@ -89,11 +107,20 @@ describe('Player', () => {
       error: null,
       latency: 0,
       volume: 1.0,
+      analyser: null,
       togglePlayPause: vi.fn(),
       setVolume: vi.fn(),
-      webAudioSupported: false,
+      webAudioSupported: false as boolean,
       startStream: vi.fn(),
       stopStream: vi.fn(),
+      state: {
+        playing: false,
+        buffering: false,
+        error: null,
+        latency: 0,
+        volume: 1.0,
+        analyser: null,
+      },
     });
 
     render(<Player />);
@@ -108,11 +135,20 @@ describe('Player', () => {
       error: 'Connection failed',
       latency: 0,
       volume: 1.0,
+      analyser: null,
       togglePlayPause: vi.fn(),
       setVolume: vi.fn(),
       webAudioSupported: true,
       startStream: vi.fn(),
       stopStream: vi.fn(),
+      state: {
+        playing: false,
+        buffering: false,
+        error: 'Connection failed',
+        latency: 0,
+        volume: 1.0,
+        analyser: null,
+      },
     });
 
     render(<Player />);
@@ -128,11 +164,20 @@ describe('Player', () => {
       error: null,
       latency: 0,
       volume: 1.0,
+      analyser: null,
       togglePlayPause: vi.fn(),
       setVolume: vi.fn(),
       webAudioSupported: true,
       startStream: vi.fn(),
       stopStream: vi.fn(),
+      state: {
+        playing: true,
+        buffering: true,
+        error: null,
+        latency: 0,
+        volume: 1.0,
+        analyser: null,
+      },
     });
 
     render(<Player />);

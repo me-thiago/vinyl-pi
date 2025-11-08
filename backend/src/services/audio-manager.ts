@@ -72,6 +72,50 @@ export interface AudioCaptureStatus {
  *
  * Responsável por capturar áudio do dispositivo ALSA configurado
  * usando FFmpeg como child process, com detecção de erros e logging.
+ *
+ * ⚠️ LIFECYCLE NOTE: This is a long-lived singleton service that exists
+ * for the entire application lifetime. EventBus subscriptions (when added)
+ * are intentionally NOT cleaned up, as this service is never destroyed
+ * during normal operation.
+ *
+ * If you need to create components with shorter lifecycles that use EventBus,
+ * see utils/lifecycle.ts for proper cleanup patterns.
+ *
+ * Example of proper EventBus usage (for future integration):
+ * ```typescript
+ * // When adding EventBus subscriptions to AudioManager:
+ * import { eventBus, EventHandler } from '../utils/event-bus';
+ *
+ * class AudioManager extends EventEmitter {
+ *   // For singletons: No need to store handlers for cleanup
+ *   constructor() {
+ *     // ✅ OK for singletons: Direct subscription without cleanup
+ *     eventBus.subscribe('audio.start', async (payload) => {
+ *       this.handleAudioStart(payload);
+ *     });
+ *   }
+ *   // ✅ No destroy() method needed - singleton lives forever
+ * }
+ * ```
+ *
+ * For short-lived components, use this pattern instead:
+ * ```typescript
+ * import { createSubscriptionManager, Destroyable } from '../utils/lifecycle';
+ *
+ * class SessionManager implements Destroyable {
+ *   private subscriptions = createSubscriptionManager();
+ *
+ *   constructor() {
+ *     // ✅ Tracked for cleanup
+ *     this.subscriptions.subscribe('silence.detected', async (p) => {...});
+ *   }
+ *
+ *   async destroy() {
+ *     // ✅ Automatic cleanup of all subscriptions
+ *     this.subscriptions.cleanup();
+ *   }
+ * }
+ * ```
  */
 export class AudioManager extends EventEmitter {
   private ffmpegProcess: ChildProcess | null = null;
@@ -83,6 +127,10 @@ export class AudioManager extends EventEmitter {
   private currentError?: string;
   private levelDb?: number;
   private fifoPath: string = '/tmp/vinyl-audio.fifo';
+  private logRateLimiter = new Map<string, number>();
+  private LOG_RATE_LIMIT_MS = 5000; // Log mesmo erro max 1x/5s
+  private retryCount = 0;
+  private MAX_RETRIES = 3;
 
   /**
    * Cria uma instância do AudioManager
@@ -177,6 +225,7 @@ export class AudioManager extends EventEmitter {
       }
 
       let cleanupCalled = false;
+      const processRef = this.ffmpegProcess;
 
       const cleanup = () => {
         if (cleanupCalled) return;  // ✅ Idempotente - evita múltiplas execuções
@@ -189,26 +238,30 @@ export class AudioManager extends EventEmitter {
       };
 
       // Event handler: chamado quando processo terminar (SIGTERM ou SIGKILL)
-      this.ffmpegProcess.once('exit', cleanup);
+      processRef.once('exit', cleanup);
 
       // Enviar SIGTERM para parar graciosamente
-      this.ffmpegProcess.kill('SIGTERM');
+      processRef.kill('SIGTERM');
 
-      // Timeout: SIGKILL se processo não terminar em 5s
+      // Timeout: SIGKILL se processo não terminar em 2s (reduzido de 5s)
       setTimeout(() => {
-        if (!this.ffmpegProcess || cleanupCalled) return;
+        if (!processRef || cleanupCalled) return;
 
-        if (!this.ffmpegProcess.killed) {
+        if (!processRef.killed) {
           logger.warn('FFmpeg did not stop gracefully, sending SIGKILL');
-          this.ffmpegProcess.kill('SIGKILL');
+          processRef.kill('SIGKILL');
         }
 
-        // Aguardar mais 1s para evento 'exit' após SIGKILL
-        // Se evento não ocorrer, forçar cleanup (mas é idempotente)
-        setTimeout(() => {
+        // Aguardar mais 500ms para evento 'exit' após SIGKILL
+        // Se evento não ocorrer, forçar kill -9 do sistema
+        setTimeout(async () => {
+          if (cleanupCalled) return;
+          
+          logger.warn('FFmpeg did not respond to SIGKILL, force killing');
+          await this.forceKillProcess(processRef, 'FFmpeg main');
           cleanup();  // ✅ Safe: idempotente, não duplica se já foi chamado
-        }, 1000);
-      }, 5000);
+        }, 500);
+      }, 2000); // Timeout reduzido para 2s
     });
   }
 
@@ -365,19 +418,27 @@ export class AudioManager extends EventEmitter {
     // Parar processo MP3
     if (this.ffmpegMp3Process && !this.ffmpegMp3Process.killed) {
       logger.info('Stopping MP3 FFmpeg process');
-      this.ffmpegMp3Process.kill('SIGTERM');
+      const mp3ProcessRef = this.ffmpegMp3Process;
+      mp3ProcessRef.kill('SIGTERM');
 
-      // Aguardar processo terminar
+      // Aguardar processo terminar com timeout mais agressivo
       await new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => {
-          if (this.ffmpegMp3Process && !this.ffmpegMp3Process.killed) {
+        const timeout = setTimeout(async () => {
+          if (mp3ProcessRef && !mp3ProcessRef.killed) {
             logger.warn('MP3 FFmpeg did not stop gracefully, sending SIGKILL');
-            this.ffmpegMp3Process.kill('SIGKILL');
+            mp3ProcessRef.kill('SIGKILL');
+            
+            // Force kill se SIGKILL não funcionar
+            setTimeout(async () => {
+              await this.forceKillProcess(mp3ProcessRef, 'FFmpeg MP3');
+              resolve();
+            }, 500);
+          } else {
+            resolve();
           }
-          resolve();
-        }, 5000);
+        }, 2000); // Timeout reduzido para 2s
 
-        this.ffmpegMp3Process?.once('exit', () => {
+        mp3ProcessRef?.once('exit', () => {
           clearTimeout(timeout);
           resolve();
         });
@@ -617,6 +678,18 @@ export class AudioManager extends EventEmitter {
     // Monitorar stderr para logs
     this.ffmpegMp3Process.stderr?.on('data', (data) => {
       const output = data.toString();
+      
+      // Filtrar logs não-críticos
+      if (this.isNonCriticalLog(output)) {
+        return;
+      }
+
+      // Rate limit logs repetidos
+      const logKey = `mp3-stderr-${output.substring(0, 50)}`;
+      if (!this.shouldLog(logKey)) {
+        return;
+      }
+
       logger.info(`FFmpeg MP3 stderr: ${output}`);
 
       // Detectar erros
@@ -656,6 +729,17 @@ export class AudioManager extends EventEmitter {
     // Monitorar stderr para erros e metadata
     this.ffmpegProcess.stderr?.on('data', (data) => {
       const output = data.toString();
+
+      // Filtrar logs não-críticos
+      if (this.isNonCriticalLog(output)) {
+        return;
+      }
+
+      // Rate limit logs repetidos
+      const logKey = `stderr-${output.substring(0, 50)}`;
+      if (!this.shouldLog(logKey)) {
+        return;
+      }
 
       // Log COMPLETO do stderr para debug (verbose mode)
       logger.info(`FFmpeg stderr: ${output}`);
@@ -701,6 +785,13 @@ export class AudioManager extends EventEmitter {
           this.currentError = errorMsg;
           logger.error(errorMsg);
           this.emit('error', { code, message: errorMsg });
+          
+          // Tentar recovery automático se estava streaming
+          if (wasStreaming) {
+            this.handleUnexpectedExit(code).catch(err => {
+              logger.error(`Recovery handler failed: ${err}`);
+            });
+          }
         } else if (signal && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
           logger.warn(`FFmpeg terminated unexpectedly by signal ${signal}`);
         }
@@ -758,6 +849,40 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
+   * Trata saída inesperada do FFmpeg com retry automático
+   * @private
+   */
+  private async handleUnexpectedExit(code: number): Promise<void> {
+    if (this.retryCount >= this.MAX_RETRIES) {
+      logger.error('Max retries reached, giving up');
+      this.emit('recovery_failed', { 
+        retries: this.retryCount, 
+        lastError: this.currentError 
+      });
+      return;
+    }
+    
+    this.retryCount++;
+    const delay = Math.pow(2, this.retryCount - 1) * 1000; // 1s, 2s, 4s
+    
+    logger.warn(`FFmpeg crashed, retrying in ${delay}ms (attempt ${this.retryCount}/${this.MAX_RETRIES})`);
+    
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    try {
+      if (this.streamingConfig) {
+        await this.startStreaming(this.streamingConfig);
+        this.retryCount = 0; // Reset on success
+        logger.info('FFmpeg recovery successful');
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.error(`Retry failed: ${errorMsg}`);
+      await this.handleUnexpectedExit(code);
+    }
+  }
+
+  /**
    * Extrai nível de áudio do output do FFmpeg
    * @private
    */
@@ -771,6 +896,63 @@ export class AudioManager extends EventEmitter {
     //   this.levelDb = parseFloat(levelMatch[1]);
     //   this.emit('audio_level', { levelDb: this.levelDb });
     // }
+  }
+
+  /**
+   * Force kill de um processo usando kill -9 do sistema
+   * @private
+   */
+  private async forceKillProcess(
+    process: ChildProcess | null,
+    name: string
+  ): Promise<void> {
+    if (!process || !process.pid) return;
+    
+    const pid = process.pid;
+    
+    // Verificar se processo ainda existe
+    try {
+      process.kill(0); // Apenas testa se existe
+    } catch {
+      return; // Processo já morreu
+    }
+    
+    // Force kill com comando do sistema
+    try {
+      await execAsync(`kill -9 ${pid}`);
+      logger.info(`Force killed ${name} process (PID ${pid})`);
+    } catch (err) {
+      logger.warn(`Could not force kill ${name}: ${err}`);
+    }
+  }
+
+  /**
+   * Filtrar logs não-críticos do FFmpeg para reduzir volume
+   * @private
+   */
+  private isNonCriticalLog(output: string): boolean {
+    const nonCriticalPatterns = [
+      'non monotonically increasing dts',
+      'Application provided invalid',
+      'Past duration',
+      'DTS out of order',
+    ];
+    return nonCriticalPatterns.some(pattern => output.includes(pattern));
+  }
+
+  /**
+   * Verificar se deve logar baseado em rate limiting
+   * @private
+   */
+  private shouldLog(key: string): boolean {
+    const now = Date.now();
+    const lastLog = this.logRateLimiter.get(key) || 0;
+    
+    if (now - lastLog > this.LOG_RATE_LIMIT_MS) {
+      this.logRateLimiter.set(key, now);
+      return true;
+    }
+    return false;
   }
 
   /**

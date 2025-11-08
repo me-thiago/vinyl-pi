@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { PassThrough } from 'stream';
 import { AudioManager } from './services/audio-manager';
+import { HealthMonitor } from './services/health-monitor';
 import { createStatusRouter } from './routes/status';
 
 dotenv.config();
@@ -18,17 +19,27 @@ const wavClients = new Set<PassThrough>();
 
 function getOrCreateBroadcaster(source: NodeJS.ReadableStream): PassThrough {
   if (!wavBroadcaster) {
-    wavBroadcaster = new PassThrough();
+    wavBroadcaster = new PassThrough({ highWaterMark: 64 * 1024 }); // 64KB buffer limit
 
     // Ler do source e escrever para o broadcaster
     source.on('data', (chunk) => {
-      if (wavBroadcaster) {
-        wavBroadcaster.write(chunk);
+      // CRITICAL FIX: Só escrever se houver clientes conectados
+      if (wavClients.size === 0) {
+        // Sem clientes, descartar dados para evitar memory leak
+        return;
       }
+
       // Broadcast para todos os clientes ativos
       wavClients.forEach((client) => {
         try {
-          client.write(chunk);
+          // Verificar backpressure antes de escrever
+          if (!client.write(chunk)) {
+            // Cliente lento, pausar source temporariamente
+            source.pause();
+            client.once('drain', () => {
+              source.resume();
+            });
+          }
         } catch (err) {
           console.error('Error writing to client:', err);
           wavClients.delete(client);
@@ -87,6 +98,33 @@ audioManager.on('streaming_stopped', () => {
   console.log('Streaming stopped');
 });
 
+// Inicializar HealthMonitor
+const healthMonitor = new HealthMonitor(audioManager);
+
+// Event handlers para HealthMonitor
+healthMonitor.on('memory_high', (data) => {
+  console.warn('⚠️  High memory usage detected:', data);
+});
+
+healthMonitor.on('memory_leak_detected', (data) => {
+  console.error('🚨 Potential memory leak detected:', data);
+});
+
+healthMonitor.on('orphan_processes', (data) => {
+  console.warn('⚠️  Orphan FFmpeg processes detected:', data);
+});
+
+healthMonitor.on('streaming_recovered', (data) => {
+  console.log('✅ Streaming auto-recovered:', data);
+});
+
+healthMonitor.on('streaming_failed', (data) => {
+  console.error('🚨 Streaming failed to auto-restart:', data);
+});
+
+// Iniciar health monitoring
+healthMonitor.start();
+
 // Registrar routes
 app.use('/api', createStatusRouter(audioManager));
 
@@ -135,6 +173,10 @@ app.post('/streaming/start', async (req, res) => {
     };
 
     await audioManager.startStreaming(config);
+
+    // Configurar health monitor para auto-restart
+    healthMonitor.setStreamingConfig(config);
+
     res.json({ success: true, message: 'Streaming started', config: {
       host: config.icecastHost,
       port: config.icecastPort,
@@ -211,5 +253,37 @@ app.get('/stream.wav', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+// Graceful shutdown handlers
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n${signal} received, shutting down gracefully...`);
+  
+  try {
+    // Parar health monitor
+    await healthMonitor.stop();
+    
+    // Parar audio manager
+    await audioManager.cleanup();
+    
+    console.log('Cleanup completed, exiting...');
+    process.exit(0);
+  } catch (err) {
+    console.error('Error during shutdown:', err);
+    process.exit(1);
+  }
+};
+
+// Registrar handlers de shutdown
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handler para recovery failures
+audioManager.on('recovery_failed', (data) => {
+  console.error('🚨 FFmpeg recovery failed after max retries:', data);
+  console.error('Exiting process to allow PM2 restart...');
+  gracefulShutdown('RECOVERY_FAILED').then(() => {
+    process.exit(1);
+  });
 });
 
