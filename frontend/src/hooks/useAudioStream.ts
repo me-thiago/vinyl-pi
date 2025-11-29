@@ -247,8 +247,9 @@ export function useAudioStream({
       abortControllerRef.current = abortController;
 
       // Fetch stream WAV (baixa latência)
-      // TEMPORÁRIO: Usar backend direto (proxy Vite conflita com /stream Icecast)
-      const effectiveUrl = 'http://localhost:3001/stream.wav';
+      // Usa VITE_API_URL do .env ou fallback para localhost
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const effectiveUrl = `${apiUrl}/stream.wav`;
 
       let response: Response;
       try {

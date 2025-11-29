@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAudioStream } from '../useAudioStream';
 
 // Mock fetch
-global.fetch = vi.fn();
+(globalThis as any).fetch = vi.fn();
 
 describe('useAudioStream', () => {
   beforeEach(() => {
@@ -74,8 +74,8 @@ describe('useAudioStream', () => {
     const onError = vi.fn();
     const mockFetch = vi.fn().mockRejectedValue(new Error('Connection failed'));
 
-    global.fetch = mockFetch;
-
+    (globalThis as any).fetch = mockFetch;
+    
     const { result } = renderHook(() =>
       useAudioStream({
         streamUrl: 'http://localhost:8000/stream',

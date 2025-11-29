@@ -110,7 +110,7 @@ describe('Player', () => {
       analyser: null,
       togglePlayPause: vi.fn(),
       setVolume: vi.fn(),
-      webAudioSupported: false as boolean,
+      webAudioSupported: false as true,
       startStream: vi.fn(),
       stopStream: vi.fn(),
       state: {

@@ -36,10 +36,10 @@ module.exports = {
       name: 'vinyl-frontend',
       cwd: './frontend',
       script: 'npm',
-      args: 'run dev',
+      args: 'run preview:prod',
       watch: false,
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'production',
       },
       error_file: './logs/frontend-error.log',
       out_file: './logs/frontend-out.log',

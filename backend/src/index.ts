@@ -1,14 +1,23 @@
 import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import { PassThrough } from 'stream';
 import { AudioManager } from './services/audio-manager';
 import { HealthMonitor } from './services/health-monitor';
+import { AudioAnalyzer } from './services/audio-analyzer';
+import { EventDetector } from './services/event-detector';
 import { createStatusRouter } from './routes/status';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// CORS para permitir frontend em porta diferente (local e rede)
+app.use(cors({
+  origin: true, // Aceita qualquer origem (rede local)
+  credentials: true
+}));
 
 app.use(express.json());
 
@@ -17,15 +26,21 @@ app.use(express.json());
 let wavBroadcaster: PassThrough | null = null;
 const wavClients = new Set<PassThrough>();
 
-function getOrCreateBroadcaster(source: NodeJS.ReadableStream): PassThrough {
+function getOrCreateBroadcaster(source: NodeJS.ReadableStream, analyzer: AudioAnalyzer): PassThrough {
   if (!wavBroadcaster) {
     wavBroadcaster = new PassThrough({ highWaterMark: 64 * 1024 }); // 64KB buffer limit
 
     // Ler do source e escrever para o broadcaster
     source.on('data', (chunk) => {
-      // CRITICAL FIX: Só escrever se houver clientes conectados
+      // SEMPRE analisar chunks para detecção de silêncio (mesmo sem clientes)
+      // Isso garante que silence.detected funcione independente de listeners
+      if (Buffer.isBuffer(chunk)) {
+        analyzer.analyze(chunk);
+      }
+
+      // CRITICAL FIX: Só escrever para clientes se houver algum conectado
       if (wavClients.size === 0) {
-        // Sem clientes, descartar dados para evitar memory leak
+        // Sem clientes, não precisa broadcast (mas análise já foi feita acima)
         return;
       }
 
@@ -125,8 +140,33 @@ healthMonitor.on('streaming_failed', (data) => {
 // Iniciar health monitoring
 healthMonitor.start();
 
-// Registrar routes
-app.use('/api', createStatusRouter(audioManager));
+// Inicializar AudioAnalyzer para análise de níveis de áudio
+const audioAnalyzer = new AudioAnalyzer({
+  sampleRate: parseInt(process.env.AUDIO_SAMPLE_RATE || '48000'),
+  channels: parseInt(process.env.AUDIO_CHANNELS || '2'),
+  bufferSize: 2048,
+  publishIntervalMs: 100  // Publicar audio.level a cada 100ms
+});
+
+// Inicializar EventDetector para detecção de silêncio
+const eventDetector = new EventDetector({
+  threshold: parseInt(process.env.SILENCE_THRESHOLD || '-50'),
+  duration: parseInt(process.env.SILENCE_DURATION || '10')
+});
+
+// Iniciar AudioAnalyzer e EventDetector
+audioAnalyzer.start();
+eventDetector.start();
+
+console.log('🎛️  AudioAnalyzer started');
+console.log('🔍 EventDetector started (silence threshold: -50dB, duration: 10s)');
+
+// Registrar routes com todas as dependências
+app.use('/api', createStatusRouter({
+  audioManager,
+  audioAnalyzer,
+  eventDetector
+}));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Vinyl-OS Backend is running' });
@@ -228,7 +268,7 @@ app.get('/stream.wav', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   // Inicializar broadcaster se necessário
-  getOrCreateBroadcaster(wavStream);
+  getOrCreateBroadcaster(wavStream, audioAnalyzer);
 
   // Criar stream individual para este cliente
   const clientStream = new PassThrough();
@@ -260,6 +300,14 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received, shutting down gracefully...`);
   
   try {
+    // Parar event detector primeiro (para de escutar eventos)
+    await eventDetector.stop();
+    console.log('🔍 EventDetector stopped');
+    
+    // Parar audio analyzer
+    audioAnalyzer.stop();
+    console.log('🎛️  AudioAnalyzer stopped');
+    
     // Parar health monitor
     await healthMonitor.stop();
     

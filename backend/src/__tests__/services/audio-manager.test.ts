@@ -3,7 +3,11 @@ import { ChildProcess } from 'child_process';
 
 // Mock child_process
 jest.mock('child_process', () => ({
-  spawn: jest.fn()
+  spawn: jest.fn(),
+  exec: jest.fn((cmd, callback) => {
+    if (callback) callback(null, '', '');
+    return { on: jest.fn() };
+  })
 }));
 
 // Mock winston

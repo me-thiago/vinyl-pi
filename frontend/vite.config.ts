@@ -18,7 +18,7 @@ export default defineConfig({
         changeOrigin: true,
         ws: false,
         configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
+          proxy.on('proxyReq', (proxyReq, _req, _res) => {
             // Adicionar headers CORS se necessário
             proxyReq.setHeader('Accept', 'audio/mpeg, audio/*');
           });

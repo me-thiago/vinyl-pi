@@ -54,7 +54,7 @@ function App() {
 
         {/* Player Section */}
         <div className="mb-12">
-          <Player streamUrl="http://localhost:8000/stream" />
+          <Player streamUrl={import.meta.env.VITE_STREAM_URL || "http://localhost:8000/stream"} />
         </div>
 
         <Separator className="my-8" />

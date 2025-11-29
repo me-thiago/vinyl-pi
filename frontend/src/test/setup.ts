@@ -1,4 +1,4 @@
-import { expect, afterEach } from 'vitest';
+import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 // Mock Web Audio API
-global.AudioContext = class MockAudioContext {
+(globalThis as any).AudioContext = class MockAudioContext {
   state = 'running';
   currentTime = 0;
   sampleRate = 44100;
@@ -29,7 +29,7 @@ global.AudioContext = class MockAudioContext {
     };
   }
 
-  decodeAudioData(buffer: ArrayBuffer): Promise<AudioBuffer> {
+  decodeAudioData(_buffer: ArrayBuffer): Promise<AudioBuffer> {
     return Promise.resolve({
       duration: 0.1,
       sampleRate: 44100,
@@ -48,7 +48,7 @@ global.AudioContext = class MockAudioContext {
 } as any;
 
 // Mock ReadableStream
-global.ReadableStream = class MockReadableStream {
+(globalThis as any).ReadableStream = class MockReadableStream {
   getReader() {
     return {
       read: () => Promise.resolve({ done: true, value: undefined }),
@@ -58,7 +58,7 @@ global.ReadableStream = class MockReadableStream {
 } as any;
 
 // Mock ResizeObserver
-global.ResizeObserver = class MockResizeObserver {
+(globalThis as any).ResizeObserver = class MockResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}

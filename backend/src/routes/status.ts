@@ -1,8 +1,31 @@
 import { Router, Request, Response } from 'express';
 import { AudioManager } from '../services/audio-manager';
+import { AudioAnalyzer } from '../services/audio-analyzer';
+import { EventDetector } from '../services/event-detector';
 
-export function createStatusRouter(audioManager: AudioManager): Router {
+/**
+ * Dependências opcionais para status estendido
+ */
+export interface StatusRouterDependencies {
+  audioManager: AudioManager;
+  audioAnalyzer?: AudioAnalyzer;
+  eventDetector?: EventDetector;
+}
+
+export function createStatusRouter(deps: StatusRouterDependencies): Router;
+export function createStatusRouter(audioManager: AudioManager): Router;
+export function createStatusRouter(
+  depsOrManager: StatusRouterDependencies | AudioManager
+): Router {
   const router = Router();
+
+  // Normalizar para sempre usar objeto de dependências
+  const deps: StatusRouterDependencies = 
+    depsOrManager instanceof AudioManager 
+      ? { audioManager: depsOrManager }
+      : depsOrManager;
+
+  const { audioManager, audioAnalyzer, eventDetector } = deps;
 
   /**
    * GET /api/status
@@ -10,12 +33,17 @@ export function createStatusRouter(audioManager: AudioManager): Router {
    * Retorna status completo do sistema incluindo:
    * - Audio capture status
    * - Streaming status
+   * - Audio analysis (level, silence)
    * - Session info (futuro)
    */
   router.get('/status', (req: Request, res: Response) => {
     try {
       const audioStatus = audioManager.getStatus();
       const streamingStatus = audioManager.getStreamingStatus();
+
+      // Obter dados de análise se disponíveis
+      const levelDb = audioAnalyzer?.getCurrentLevelDb() ?? audioStatus.levelDb ?? null;
+      const silenceDetected = eventDetector?.getSilenceStatus() ?? false;
 
       res.json({
         session: null, // TODO: Implementar session tracking em stories futuras
@@ -26,14 +54,45 @@ export function createStatusRouter(audioManager: AudioManager): Router {
           mount_point: streamingStatus.mountPoint
         },
         audio: {
-          level_db: audioStatus.levelDb ?? null,
+          level_db: levelDb,
           clipping_detected: false, // TODO: Implementar em V1.9
-          silence_detected: false    // TODO: Implementar em V1.8
+          silence_detected: silenceDetected
         }
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       res.status(500).json({ error: 'Failed to get status', message: errorMsg });
+    }
+  });
+
+  /**
+   * GET /api/status/audio
+   *
+   * Retorna status detalhado de análise de áudio
+   */
+  router.get('/status/audio', (req: Request, res: Response) => {
+    try {
+      const audioStatus = audioManager.getStatus();
+      
+      // Dados do AudioAnalyzer
+      const analyzerData = audioAnalyzer ? {
+        levelDb: audioAnalyzer.getCurrentLevelDb(),
+        rms: audioAnalyzer.getCurrentRms(),
+        isActive: audioAnalyzer.isActive(),
+        config: audioAnalyzer.getConfig()
+      } : null;
+
+      // Dados do EventDetector
+      const detectorData = eventDetector ? eventDetector.getStatus() : null;
+
+      res.json({
+        capture: audioStatus,
+        analyzer: analyzerData,
+        detector: detectorData
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: 'Failed to get audio status', message: errorMsg });
     }
   });
 
