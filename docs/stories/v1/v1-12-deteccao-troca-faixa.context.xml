@@ -1,0 +1,140 @@
+<story-context id="v1-12-deteccao-troca-faixa" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>v1-12</storyId>
+    <title>Detecção de Troca de Faixa</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-12-deteccao-troca-faixa.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que o sistema detecte quando uma faixa termina e outra começa</iWant>
+    <soThat>possa ter eventos marcando trocas de faixa</soThat>
+    <tasks>
+      <task id="1">Estender EventDetector para incluir detecção de troca de faixa</task>
+      <task id="2">Implementar algoritmo de detecção: mudança abrupta de nível + silêncio curto</task>
+      <task id="3">Adicionar configuração de thresholds (nível, duração do silêncio)</task>
+      <task id="4">Emitir evento track.change.detected via EventBus</task>
+      <task id="5">Incluir metadata no payload (timestamp, levelDb, etc)</task>
+      <task id="6">Adicionar endpoint para ajustar thresholds dinamicamente</task>
+      <task id="7">Escrever testes unitários para detecção de troca de faixa</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Detecção baseada em mudança abrupta de nível + silêncio curto</criterion>
+    <criterion id="2">Thresholds ajustáveis (nível, duração do silêncio)</criterion>
+    <criterion id="3">Evento `track.change.detected` emitido via EventBus</criterion>
+    <criterion id="4">Precisão inicial pode ser menor que 80% (aceitável)</criterion>
+    <criterion id="5">Metadata inclui timestamp da detecção</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd-v3.md" section="5.1.3">Detecção de Troca de Faixa - algoritmo e thresholds</doc>
+      <doc path="docs/epics.md" section="V1.12">Story definition e acceptance criteria</doc>
+      <doc path="docs/stories/v1/v1-08-deteccao-silencio.md">Referência de implementação similar</doc>
+    </docs>
+    <code>
+      <file path="backend/src/services/event-detector.ts" purpose="Estender para incluir track change detection">
+        <note>Já detecta silence.detected e clipping.detected</note>
+        <note>Adicionar state machine para track change: detectar padrão silêncio curto + mudança de nível</note>
+        <note>Interfaces existentes: SilenceDetectionConfig, ClippingDetectionConfig</note>
+        <note>Adicionar: TrackChangeDetectionConfig</note>
+      </file>
+      <file path="backend/src/services/audio-analyzer.ts" purpose="Fonte de dados de áudio">
+        <note>AudioAnalysisData com levelDb, rms, energy</note>
+        <note>Publicado via 'audio.level' no EventBus a cada 100ms</note>
+      </file>
+      <file path="backend/src/utils/event-bus.ts" purpose="Publicar track.change.detected">
+        <note>EventType já inclui 'track.change.detected'</note>
+      </file>
+      <file path="backend/src/index.ts" purpose="EventDetector já inicializado">
+        <note>Apenas atualizar config se necessário</note>
+      </file>
+      <file path="backend/src/routes/status.ts" purpose="Referência para endpoint de configuração">
+        <note>Pode adicionar PUT /api/settings/track-change ou usar settings genérico</note>
+      </file>
+    </code>
+    <dependencies>
+      <dependency name="EventBus" installed="true">Para publicar eventos</dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="algorithm">
+      Algoritmo sugerido para detecção de troca de faixa:
+      1. Manter histórico de níveis de áudio (rolling window ~5s)
+      2. Detectar queda abrupta de nível (delta > TRACK_CHANGE_LEVEL_DROP, ex: 20dB)
+      3. Se queda detectada, iniciar timer
+      4. Se silêncio curto (TRACK_CHANGE_GAP_MIN a TRACK_CHANGE_GAP_MAX, ex: 0.5-3s)
+      5. Seguido de retorno do áudio acima do threshold
+      6. → Emitir track.change.detected
+    </constraint>
+    <constraint type="config">
+      Variáveis de ambiente sugeridas:
+      - TRACK_CHANGE_LEVEL_DROP: -20 (dB de queda para considerar gap)
+      - TRACK_CHANGE_GAP_MIN: 0.5 (segundos mínimo de silêncio)
+      - TRACK_CHANGE_GAP_MAX: 5.0 (segundos máximo de silêncio)
+      - TRACK_CHANGE_SENSITIVITY: 0.5 (0-1, ajusta thresholds)
+    </constraint>
+    <constraint type="precision">Precisão inicial menor que 80% é aceitável - V1.15 adicionará calibração UI</constraint>
+    <constraint type="debounce">Evitar múltiplas detecções para mesma troca (debounce 5s)</constraint>
+    <constraint type="memory">Manter histórico de níveis em circular buffer para evitar memory leak</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="eventbus">
+      <events>
+        <event name="audio.level" subscribe="true">Monitorar níveis para detectar padrão de troca</event>
+        <event name="track.change.detected" publish="true">Emitir quando troca detectada</event>
+      </events>
+      <payload name="TrackChangeDetectedPayload">
+        <![CDATA[
+{
+  timestamp: string,      // ISO timestamp
+  levelDb: number,        // Nível atual em dB
+  previousLevelDb: number, // Nível antes da queda
+  gapDuration: number,    // Duração do gap em segundos
+  confidence: number      // 0-1 confiança da detecção
+}
+        ]]>
+      </payload>
+    </interface>
+    <interface type="config">
+      <![CDATA[
+interface TrackChangeDetectionConfig {
+  levelDropThreshold: number;  // dB de queda para considerar gap (default: -20)
+  gapMinDuration: number;      // segundos mínimo de gap (default: 0.5)
+  gapMaxDuration: number;      // segundos máximo de gap (default: 5)
+  sensitivity: number;         // 0-1, ajusta thresholds dinamicamente
+  debounceTime: number;        // segundos para evitar múltiplas detecções (default: 5)
+}
+      ]]>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard>Jest para testes unitários</standard>
+      <standard>Fake timers para simular timing de gap</standard>
+      <standard>Mocking de EventBus para capturar eventos emitidos</standard>
+    </standards>
+    <locations>
+      <location>backend/src/__tests__/services/event-detector.test.ts</location>
+    </locations>
+    <ideas>
+      <idea>Testar detecção de gap curto (0.5-5s) entre níveis altos</idea>
+      <idea>Testar que silêncio muito curto (menor 0.5s) NÃO dispara evento</idea>
+      <idea>Testar que silêncio muito longo (maior 5s) NÃO dispara evento (é silence.detected)</idea>
+      <idea>Testar debounce - segunda troca em menos de 5s é ignorada</idea>
+      <idea>Testar payload contém timestamp e metadata corretos</idea>
+      <idea>Testar configuração dinâmica de thresholds</idea>
+      <idea>Testar diferentes sensibilidades (0.3, 0.5, 0.7)</idea>
+      <idea>Testar que não detecta quando áudio está em silêncio prolongado</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,184 @@
+<story-context id="v1-11-deteccao-sessao" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>v1-11</storyId>
+    <title>Detecção de Sessão (Start/End)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-11-deteccao-sessao.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que o sistema detecte quando começo e termino uma sessão de escuta</iWant>
+    <soThat>possa ter histórico organizado por sessões</soThat>
+    <tasks>
+      <task id="1">Criar service session-manager.ts para gerenciar estado de sessões</task>
+      <task id="2">Implementar lógica de início de sessão (primeiro áudio após idle)</task>
+      <task id="3">Implementar lógica de fim de sessão (silêncio prolongado - 30min config)</task>
+      <task id="4">Integrar session-manager ao EventBus (publish/subscribe)</task>
+      <task id="5">Persistir sessões na tabela sessions via Prisma</task>
+      <task id="6">Atualizar event-persistence para vincular eventos à sessão ativa</task>
+      <task id="7">Criar rota GET /api/sessions com filtros e paginação</task>
+      <task id="8">Atualizar GET /api/status para incluir sessão ativa</task>
+      <task id="9">Atualizar index.ts para inicializar SessionManager</task>
+      <task id="10">Escrever testes unitários para session-manager</task>
+      <task id="11">Escrever testes para rota /api/sessions</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Sessão inicia: primeira detecção de áudio após período idle</criterion>
+    <criterion id="2">Sessão termina: silêncio prolongado (30min configurável)</criterion>
+    <criterion id="3">Eventos `session.started` e `session.ended` emitidos via EventBus</criterion>
+    <criterion id="4">Sessão salva na tabela `sessions` via Prisma</criterion>
+    <criterion id="5">Contador de eventos por sessão atualizado</criterion>
+    <criterion id="6">API endpoint `GET /api/sessions` funcional</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd-v3.md" section="5.1.3">Detecção de Sessão - regras de início/fim</doc>
+      <doc path="docs/prd-v3.md" section="7.1">API Contracts - Sessions endpoints</doc>
+      <doc path="docs/architecture.md" section="Prisma Schema">Modelo Session já definido</doc>
+      <doc path="docs/epics.md" section="V1.11">Story definition e acceptance criteria</doc>
+    </docs>
+    <code>
+      <file path="backend/prisma/schema.prisma" purpose="Session model já existe">
+        <note>Model Session com startedAt, endedAt, durationSeconds, eventCount</note>
+        <note>Relação 1:N com AudioEvent já definida</note>
+        <note>Índice @@index([startedAt(sort: Desc)]) já existe</note>
+      </file>
+      <file path="backend/src/prisma/client.ts" purpose="Singleton Prisma Client">
+        <note>Importar: import prisma from '../prisma/client'</note>
+      </file>
+      <file path="backend/src/utils/event-bus.ts" purpose="EventBus para publish/subscribe">
+        <note>Eventos definidos: 'session.started', 'session.ended', 'silence.detected', 'silence.ended'</note>
+        <note>CRÍTICO: Seguir pattern com SubscriptionManager para cleanup</note>
+      </file>
+      <file path="backend/src/utils/lifecycle.ts" purpose="SubscriptionManager para memory leak prevention">
+        <note>Usar: import { createSubscriptionManager, Destroyable } from '../utils/lifecycle'</note>
+      </file>
+      <file path="backend/src/services/event-detector.ts" purpose="Referência de state machine e subscription pattern">
+        <note>Escutar: 'silence.detected', 'silence.ended' para lógica de sessão</note>
+        <note>Payloads: SilenceDetectedPayload com duration, SilenceEndedPayload</note>
+      </file>
+      <file path="backend/src/services/audio-analyzer.ts" purpose="Referência de como detectar atividade de áudio">
+        <note>AudioAnalysisData com levelDb para detectar primeiro áudio</note>
+      </file>
+      <file path="backend/src/index.ts" purpose="Entry point para integrar SessionManager">
+        <note>Seguir pattern: inicializar, start, gracefulShutdown</note>
+      </file>
+      <file path="backend/src/routes/status.ts" purpose="Atualizar para incluir session info">
+        <note>Campo session atualmente null - popular com sessão ativa</note>
+      </file>
+    </code>
+    <dependencies>
+      <dependency name="@prisma/client" installed="true">ORM para persistência</dependency>
+      <dependency name="express" installed="true">Router para API</dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="memory">Usar SubscriptionManager para evitar memory leaks</constraint>
+    <constraint type="performance">Sessão deve ser criada em memória e persistida async</constraint>
+    <constraint type="pattern">State machine para gerenciar estados: idle, active</constraint>
+    <constraint type="config">SESSION_TIMEOUT env var (default 30min = 1800s)</constraint>
+    <constraint type="language">Mensagens de erro em português BR</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="api">
+      <endpoint method="GET" path="/api/sessions">
+        <queryParams>
+          <param name="limit" type="number" default="20">Limite de resultados</param>
+          <param name="offset" type="number" default="0">Offset para paginação</param>
+          <param name="date_from" type="string" optional="true">Data início (ISO)</param>
+          <param name="date_to" type="string" optional="true">Data fim (ISO)</param>
+        </queryParams>
+        <response>
+          <![CDATA[
+{
+  sessions: [{
+    id: string,
+    startedAt: string,
+    endedAt: string | null,
+    durationSeconds: number,
+    eventCount: number
+  }],
+  total: number,
+  hasMore: boolean
+}
+          ]]>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/sessions/:id">
+        <response>
+          <![CDATA[
+{
+  id: string,
+  startedAt: string,
+  endedAt: string | null,
+  durationSeconds: number,
+  eventCount: number,
+  events: AudioEvent[]
+}
+          ]]>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/status">
+        <note>Atualizar campo session para incluir sessão ativa</note>
+        <response>
+          <![CDATA[
+{
+  session: {
+    id: string,
+    started_at: string,
+    duration: number,
+    event_count: number
+  } | null,
+  streaming: {...},
+  audio: {...}
+}
+          ]]>
+        </response>
+      </endpoint>
+    </interface>
+    <interface type="eventbus">
+      <events>
+        <event name="silence.detected" subscribe="true">Iniciar timer de timeout de sessão</event>
+        <event name="silence.ended" subscribe="true">Cancelar timer, possivelmente iniciar sessão</event>
+        <event name="audio.level" subscribe="true">Detectar primeiro áudio para iniciar sessão</event>
+        <event name="session.started" publish="true">Emitir quando sessão inicia</event>
+        <event name="session.ended" publish="true">Emitir quando sessão termina</event>
+      </events>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard>Jest para testes unitários</standard>
+      <standard>Mocking de Prisma Client para isolar testes</standard>
+      <standard>Mocking de EventBus para testar subscriptions</standard>
+      <standard>Fake timers (jest.useFakeTimers) para testar timeout de 30min</standard>
+      <standard>Supertest para testes de API routes</standard>
+    </standards>
+    <locations>
+      <location>backend/src/__tests__/services/session-manager.test.ts</location>
+      <location>backend/src/__tests__/routes/sessions.test.ts</location>
+    </locations>
+    <ideas>
+      <idea>Testar início de sessão após período idle</idea>
+      <idea>Testar que silêncio curto NÃO termina sessão</idea>
+      <idea>Testar que silêncio prolongado (30min) termina sessão</idea>
+      <idea>Testar evento session.started contém dados corretos</idea>
+      <idea>Testar evento session.ended contém duração correta</idea>
+      <idea>Testar que sessão é persistida no Prisma</idea>
+      <idea>Testar eventCount incrementado corretamente</idea>
+      <idea>Testar API filtros por data</idea>
+      <idea>Testar API /sessions/:id retorna eventos da sessão</idea>
+      <idea>Testar cleanup/destroy sem memory leak</idea>
+    </ideas>
+  </tests>
+</story-context>

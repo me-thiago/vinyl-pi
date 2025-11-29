@@ -1,0 +1,232 @@
+<story-context id="v1-13-dashboard-basico" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>v1-13</storyId>
+    <title>Dashboard Básico</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-13-dashboard-basico.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>ver o estado atual do sistema em um dashboard</iWant>
+    <soThat>possa monitorar status de streaming e sessão ativa</soThat>
+    <tasks>
+      <task id="1">Criar componente Dashboard com layout estruturado</task>
+      <task id="2">Implementar hook useStatus para buscar dados da API</task>
+      <task id="3">Criar seção de estado atual (streaming, sessão ativa, última atividade)</task>
+      <task id="4">Criar lista de últimos eventos detectados (últimos 10)</task>
+      <task id="5">Criar seção de quick stats (duração da sessão atual)</task>
+      <task id="6">Garantir layout responsivo básico</task>
+      <task id="7">Integrar Dashboard no App.tsx como página principal</task>
+      <task id="8">Escrever testes para componente Dashboard</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Página Dashboard criada com React</criterion>
+    <criterion id="2">Exibe estado atual: streaming on/off, sessão ativa, última atividade</criterion>
+    <criterion id="3">Últimos eventos detectados (lista simplificada, últimos 10)</criterion>
+    <criterion id="4">Quick stats: duração da sessão atual</criterion>
+    <criterion id="5">Layout responsivo básico</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd-v3.md" section="5.1.5">Interface Web - Dashboard specs</doc>
+      <doc path="docs/architecture.md" section="Frontend">Estrutura de componentes e pages</doc>
+      <doc path="docs/epics.md" section="V1.13">Story definition e acceptance criteria</doc>
+    </docs>
+    <code>
+      <file path="frontend/src/App.tsx" purpose="Integrar Dashboard - atualmente mostra landing page">
+        <note>Substituir conteúdo estático por componente Dashboard dinâmico</note>
+        <note>Manter Player existente como parte do Dashboard</note>
+        <note>Usar mesmos componentes shadcn/ui já importados</note>
+      </file>
+      <file path="frontend/src/components/Player/Player.tsx" purpose="Referência de padrão de componente">
+        <note>Usar mesmo pattern de hooks (useAudioStream, useStreamingControl)</note>
+        <note>Usar componentes shadcn/ui: Card, Badge, Button</note>
+      </file>
+      <file path="frontend/src/hooks/useStreamingControl.ts" purpose="Referência de hook que busca API">
+        <note>Pattern para criar useStatus e useEvents hooks</note>
+      </file>
+      <file path="frontend/src/components/ui/" purpose="Componentes shadcn/ui disponíveis">
+        <note>Disponíveis: button, card, badge, separator, slider, switch, dropdown-menu</note>
+        <note>Adicionar se necessário via: npx shadcn@latest add [component]</note>
+      </file>
+      <file path="frontend/src/lib/utils.ts" purpose="Utilitários (cn function)">
+        <note>import { cn } from '@/lib/utils'</note>
+      </file>
+    </code>
+    <backend>
+      <endpoint method="GET" path="/api/status" implemented="partial">
+        <note>Já retorna streaming, audio.level_db, audio.silence_detected</note>
+        <note>Após V1.11: retornará session ativa</note>
+      </endpoint>
+      <endpoint method="GET" path="/api/events" implemented="false">
+        <note>Será implementado em V1.10</note>
+        <note>Dashboard deve funcionar mesmo sem eventos (lista vazia)</note>
+      </endpoint>
+      <endpoint method="GET" path="/api/sessions" implemented="false">
+        <note>Será implementado em V1.11</note>
+        <note>Dashboard deve funcionar mesmo sem sessões</note>
+      </endpoint>
+    </backend>
+    <dependencies>
+      <dependency name="lucide-react" installed="true">Ícones</dependency>
+      <dependency name="date-fns" installed="true">Formatação de datas</dependency>
+      <dependency name="recharts" installed="true">Gráficos (opcional para stats)</dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="dependency">Dashboard depende de V1.6 (Player) e V1.11 (Sessões) - deve funcionar degradado se APIs não existirem</constraint>
+    <constraint type="graceful">Se /api/events retornar 404, mostrar "Nenhum evento ainda"</constraint>
+    <constraint type="graceful">Se /api/sessions retornar 404, mostrar "Nenhuma sessão ainda"</constraint>
+    <constraint type="responsive">Funcionar em mobile (min-width: 320px) e desktop</constraint>
+    <constraint type="performance">Polling de status a cada 5s (já implementado em Player)</constraint>
+    <constraint type="language">Textos em português BR</constraint>
+    <constraint type="pattern">Seguir padrões visuais do App.tsx atual (shadcn/ui + tweakcn theme)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="api">
+      <endpoint method="GET" path="/api/status">
+        <response>
+          <![CDATA[
+{
+  session: {
+    id: string,
+    started_at: string,
+    duration: number,
+    event_count: number
+  } | null,
+  streaming: {
+    active: boolean,
+    listeners: number,
+    bitrate: number,
+    mount_point: string
+  },
+  audio: {
+    level_db: number,
+    clipping_detected: boolean,
+    silence_detected: boolean
+  }
+}
+          ]]>
+        </response>
+      </endpoint>
+      <endpoint method="GET" path="/api/events?limit=10">
+        <response>
+          <![CDATA[
+{
+  events: [{
+    id: string,
+    eventType: string,
+    timestamp: string,
+    metadata: object | null
+  }],
+  total: number,
+  hasMore: boolean
+}
+          ]]>
+        </response>
+      </endpoint>
+    </interface>
+    <interface type="hooks">
+      <hook name="useStatus">
+        <![CDATA[
+interface UseStatusReturn {
+  status: SystemStatus | null;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+}
+        ]]>
+      </hook>
+      <hook name="useEvents">
+        <![CDATA[
+interface UseEventsReturn {
+  events: AudioEvent[];
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  loadMore: () => void;
+  refresh: () => void;
+}
+        ]]>
+      </hook>
+    </interface>
+  </interfaces>
+
+  <design>
+    <layout>
+      <![CDATA[
+┌─────────────────────────────────────────────────────┐
+│ Header (Vinyl-OS logo, version, theme toggle)       │
+├─────────────────────────────────────────────────────┤
+│ ┌─────────────────┐  ┌────────────────────────────┐ │
+│ │ Sistema Status  │  │ Sessão Atual               │ │
+│ │ • Streaming: ON │  │ • Duração: 45min           │ │
+│ │ • Nível: -25dB  │  │ • Eventos: 12              │ │
+│ │ • Silêncio: Não │  │ • Iniciada: 14:30          │ │
+│ └─────────────────┘  └────────────────────────────┘ │
+├─────────────────────────────────────────────────────┤
+│ Player Component (existente)                         │
+├─────────────────────────────────────────────────────┤
+│ Últimos Eventos                                      │
+│ ┌──────────────────────────────────────────────────┐│
+│ │ 🔇 silence.ended      | 15:45 | 12s de silêncio ││
+│ │ 🔇 silence.detected   | 15:44 | threshold: -50dB││
+│ │ 🎵 track.change       | 15:40 | gap: 2.1s       ││
+│ │ ⚠️ clipping.detected  | 15:38 | level: -0.5dB   ││
+│ │ ...                                              ││
+│ └──────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────┘
+      ]]>
+    </layout>
+    <components>
+      <component name="Dashboard">Componente principal que organiza layout</component>
+      <component name="SystemStatus">Card com status do sistema (streaming, audio)</component>
+      <component name="SessionInfo">Card com info da sessão ativa (ou placeholder)</component>
+      <component name="EventList">Lista de últimos eventos com ícones por tipo</component>
+      <component name="EventItem">Item individual de evento com timestamp formatado</component>
+    </components>
+    <icons>
+      <icon name="Volume2" event="audio.level">Nível de áudio</icon>
+      <icon name="VolumeX" event="silence.detected">Silêncio detectado</icon>
+      <icon name="Volume1" event="silence.ended">Silêncio terminado</icon>
+      <icon name="Music" event="track.change.detected">Troca de faixa</icon>
+      <icon name="AlertTriangle" event="clipping.detected">Clipping</icon>
+      <icon name="Play" event="session.started">Sessão iniciada</icon>
+      <icon name="Square" event="session.ended">Sessão terminada</icon>
+    </icons>
+  </design>
+
+  <tests>
+    <standards>
+      <standard>React Testing Library + Jest</standard>
+      <standard>Mocking de fetch/API calls</standard>
+      <standard>Testing de estados: loading, error, success, empty</standard>
+    </standards>
+    <locations>
+      <location>frontend/src/components/Dashboard/__tests__/Dashboard.test.tsx</location>
+      <location>frontend/src/hooks/__tests__/useStatus.test.ts</location>
+      <location>frontend/src/hooks/__tests__/useEvents.test.ts</location>
+    </locations>
+    <ideas>
+      <idea>Testar renderização com dados de sessão ativa</idea>
+      <idea>Testar renderização sem sessão (null)</idea>
+      <idea>Testar lista de eventos vazia</idea>
+      <idea>Testar lista de eventos com dados</idea>
+      <idea>Testar formatação de timestamps (date-fns)</idea>
+      <idea>Testar ícones corretos por tipo de evento</idea>
+      <idea>Testar estado de loading</idea>
+      <idea>Testar estado de erro (API offline)</idea>
+      <idea>Testar responsividade (viewport sizes)</idea>
+      <idea>Testar polling de status (setInterval)</idea>
+    </ideas>
+  </tests>
+</story-context>

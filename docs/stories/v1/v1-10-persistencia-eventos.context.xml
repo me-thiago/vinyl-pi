@@ -1,0 +1,143 @@
+<story-context id="v1-10-persistencia-eventos" v="1.0">
+  <metadata>
+    <epicId>v1</epicId>
+    <storyId>v1-10</storyId>
+    <title>Persistência de Eventos</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-10-persistencia-eventos.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que todos os eventos detectados sejam salvos no banco de dados</iWant>
+    <soThat>possa consultar histórico posteriormente</soThat>
+    <tasks>
+      <task id="1">Criar service event-persistence.ts para persistir eventos via Prisma</task>
+      <task id="2">Integrar event-persistence ao EventBus (subscriber)</task>
+      <task id="3">Criar rota GET /api/events com filtros e paginação</task>
+      <task id="4">Atualizar index.ts para inicializar e cleanup do EventPersistence</task>
+      <task id="5">Escrever testes unitários para event-persistence</task>
+      <task id="6">Escrever testes para rota /api/events</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Eventos salvos na tabela `audio_events` via Prisma</criterion>
+    <criterion id="2">Relacionamento com sessões (session_id quando aplicável)</criterion>
+    <criterion id="3">Metadata armazenada como JSON</criterion>
+    <criterion id="4">Índices criados para queries eficientes</criterion>
+    <criterion id="5">API endpoint `GET /api/events` funcional</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd-v3.md" section="5.1.6">Persistência de Dados - Define estrutura de audio_events</doc>
+      <doc path="docs/prd-v3.md" section="7.1">API Contracts - Events endpoints</doc>
+      <doc path="docs/architecture.md" section="Prisma Schema">Modelo AudioEvent já definido</doc>
+      <doc path="docs/epics.md" section="V1.10">Story definition e acceptance criteria</doc>
+    </docs>
+    <code>
+      <file path="backend/prisma/schema.prisma" purpose="AudioEvent model já existe - usar para persistência">
+        <note>Model AudioEvent com sessionId, eventType, timestamp, metadata (Json) já definido</note>
+        <note>Índices @@index([sessionId, timestamp]) e @@index([eventType, timestamp]) já existem</note>
+      </file>
+      <file path="backend/src/prisma/client.ts" purpose="Singleton Prisma Client para usar">
+        <note>Importar: import prisma from '../prisma/client'</note>
+      </file>
+      <file path="backend/src/utils/event-bus.ts" purpose="EventBus para subscription de eventos">
+        <note>Singleton: import { eventBus } from '../utils/event-bus'</note>
+        <note>Eventos relevantes: 'silence.detected', 'silence.ended', 'clipping.detected'</note>
+        <note>CRÍTICO: Seguir pattern com SubscriptionManager para cleanup</note>
+      </file>
+      <file path="backend/src/utils/lifecycle.ts" purpose="SubscriptionManager para memory leak prevention">
+        <note>Usar: import { createSubscriptionManager, Destroyable } from '../utils/lifecycle'</note>
+      </file>
+      <file path="backend/src/services/event-detector.ts" purpose="Referência de como escutar eventos">
+        <note>Pattern: this.subscriptions.subscribe('audio.level', this.handleAudioLevel.bind(this))</note>
+        <note>Payloads: SilenceDetectedPayload, SilenceEndedPayload, ClippingDetectedPayload</note>
+      </file>
+      <file path="backend/src/index.ts" purpose="Entry point para integrar novo service">
+        <note>Seguir pattern: inicializar, start, gracefulShutdown com destroy()</note>
+      </file>
+      <file path="backend/src/routes/status.ts" purpose="Referência para criar nova rota /api/events">
+        <note>Pattern: export function createEventsRouter(...): Router</note>
+      </file>
+    </code>
+    <dependencies>
+      <dependency name="@prisma/client" installed="true">ORM para persistência</dependency>
+      <dependency name="express" installed="true">Router para API</dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="memory">Usar SubscriptionManager para evitar memory leaks (ver CLAUDE.md EventBus Memory Safety)</constraint>
+    <constraint type="performance">Não bloquear EventBus - persistência deve ser async fire-and-forget</constraint>
+    <constraint type="pattern">Seguir padrões de event-detector.ts para subscription</constraint>
+    <constraint type="pattern">Seguir padrões de status.ts para criação de rotas</constraint>
+    <constraint type="language">Mensagens de erro em português BR</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="api">
+      <endpoint method="GET" path="/api/events">
+        <queryParams>
+          <param name="session_id" type="string" optional="true">Filtrar por sessão</param>
+          <param name="event_type" type="string" optional="true">Filtrar por tipo de evento</param>
+          <param name="limit" type="number" default="100">Limite de resultados</param>
+          <param name="offset" type="number" default="0">Offset para paginação</param>
+          <param name="date_from" type="string" optional="true">Data início (ISO)</param>
+          <param name="date_to" type="string" optional="true">Data fim (ISO)</param>
+        </queryParams>
+        <response>
+          <![CDATA[
+{
+  events: [{
+    id: string,
+    sessionId: string | null,
+    eventType: string,
+    timestamp: string,
+    metadata: object | null
+  }],
+  total: number,
+  hasMore: boolean
+}
+          ]]>
+        </response>
+      </endpoint>
+    </interface>
+    <interface type="eventbus">
+      <events>
+        <event name="silence.detected" subscribe="true">Persistir quando silêncio detectado</event>
+        <event name="silence.ended" subscribe="true">Persistir quando silêncio termina</event>
+        <event name="clipping.detected" subscribe="true">Persistir quando clipping detectado</event>
+        <event name="session.started" subscribe="true">Persistir e vincular futuros eventos</event>
+        <event name="session.ended" subscribe="true">Persistir e fechar sessão atual</event>
+        <event name="track.change.detected" subscribe="true">Persistir quando troca de faixa</event>
+      </events>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard>Jest para testes unitários</standard>
+      <standard>Mocking de Prisma Client para isolar testes</standard>
+      <standard>Mocking de EventBus para testar subscriptions</standard>
+      <standard>Supertest para testes de API routes</standard>
+    </standards>
+    <locations>
+      <location>backend/src/__tests__/services/event-persistence.test.ts</location>
+      <location>backend/src/__tests__/routes/events.test.ts</location>
+    </locations>
+    <ideas>
+      <idea>Testar persistência de cada tipo de evento</idea>
+      <idea>Testar que metadata é salva corretamente como JSON</idea>
+      <idea>Testar relacionamento com session_id (null quando sem sessão)</idea>
+      <idea>Testar filtros da API (event_type, session_id, date range)</idea>
+      <idea>Testar paginação (limit, offset, hasMore)</idea>
+      <idea>Testar cleanup/destroy sem memory leak</idea>
+      <idea>Testar que falha no Prisma não quebra EventBus</idea>
+    </ideas>
+  </tests>
+</story-context>
