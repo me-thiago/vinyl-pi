@@ -35,7 +35,8 @@
     <username>source</username>
     <password>hackme</password>
     <max-listeners>10</max-listeners>
-    <dump-file>/tmp/dump-stream.mp3</dump-file>
+    <!-- dump-file DESABILITADO para evitar uso excessivo de RAM (tmpfs) -->
+    <!-- <dump-file>/tmp/dump-stream.mp3</dump-file> -->
     <burst-size>16384</burst-size>
     <stream-name>Vinyl Stream</stream-name>
     <stream-description>Live from turntable</stream-description>
