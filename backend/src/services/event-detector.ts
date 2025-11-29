@@ -1,5 +1,5 @@
 import winston from 'winston';
-import { eventBus, EventHandler } from '../utils/event-bus';
+import { eventBus } from '../utils/event-bus';
 import { createSubscriptionManager } from '../utils/lifecycle';
 import { AudioAnalysisData } from './audio-analyzer';
 
@@ -27,6 +27,13 @@ export interface SilenceDetectionConfig {
 }
 
 /**
+ * Configuração de detecção de clipping
+ */
+export interface ClippingDetectionConfig {
+  threshold: number;      // Threshold em dB (default: -1)
+}
+
+/**
  * Payload do evento silence.detected
  */
 export interface SilenceDetectedPayload {
@@ -46,38 +53,63 @@ export interface SilenceEndedPayload {
 }
 
 /**
+ * Payload do evento clipping.detected
+ */
+export interface ClippingDetectedPayload {
+  timestamp: string;      // ISO timestamp
+  levelDb: number;        // Nível de áudio atual em dB
+  threshold: number;      // Threshold configurado
+  count: number;          // Contagem total de eventos de clipping desde start
+}
+
+/**
+ * Configuração combinada do EventDetector
+ */
+export interface EventDetectorConfig {
+  silence: SilenceDetectionConfig;
+  clipping: ClippingDetectionConfig;
+}
+
+/**
  * EventDetector - Detecta eventos de áudio baseado em níveis
- * 
+ *
  * Responsabilidades:
  * - Escuta eventos 'audio.level' do EventBus
  * - Detecta silêncio (nível abaixo do threshold por duração configurada)
- * - Emite eventos 'silence.detected' e 'silence.ended'
- * - Fornece status atual via getSilenceStatus()
- * 
+ * - Detecta clipping (nível acima do threshold de clipping)
+ * - Emite eventos 'silence.detected', 'silence.ended', 'clipping.detected'
+ * - Fornece status atual via getSilenceStatus() e getClippingCount()
+ *
  * Configuração:
- * - threshold: -50dB (default) - abaixo disso é considerado silêncio
- * - duration: 10s (default) - tempo para confirmar silêncio
- * 
+ * - silence.threshold: -50dB (default) - abaixo disso é considerado silêncio
+ * - silence.duration: 10s (default) - tempo para confirmar silêncio
+ * - clipping.threshold: -1dB (default) - acima disso é considerado clipping
+ *
  * Uso:
  * ```typescript
- * const detector = new EventDetector({ threshold: -50, duration: 10 });
+ * const detector = new EventDetector({
+ *   silence: { threshold: -50, duration: 10 },
+ *   clipping: { threshold: -1 }
+ * });
  * detector.start();
- * 
+ *
  * // EventDetector automaticamente escuta 'audio.level' do EventBus
- * // e emite 'silence.detected' quando apropriado
- * 
+ * // e emite eventos quando apropriado
+ *
  * // Verificar status
  * const isSilent = detector.getSilenceStatus();
- * 
+ * const clippingCount = detector.getClippingCount();
+ *
  * // Cleanup
  * await detector.destroy();
  * ```
  */
 export class EventDetector {
-  private config: SilenceDetectionConfig;
+  private silenceConfig: SilenceDetectionConfig;
+  private clippingConfig: ClippingDetectionConfig;
   private subscriptions = createSubscriptionManager();
   private isRunning: boolean = false;
-  
+
   // Estado de detecção de silêncio
   private isSilent: boolean = false;
   private silenceStartTime: number | null = null;
@@ -85,14 +117,37 @@ export class EventDetector {
   private silenceEmitted: boolean = false;
   private lastSilenceDuration: number = 0;
 
-  constructor(config?: Partial<SilenceDetectionConfig>) {
-    this.config = {
-      threshold: config?.threshold ?? -50,
-      duration: config?.duration ?? 10
-    };
+  // Estado de detecção de clipping
+  private clippingCount: number = 0;
+  private lastClippingTime: number | null = null;
 
-    logger.info(`EventDetector initialized: threshold=${this.config.threshold}dB, ` +
-                `duration=${this.config.duration}s`);
+  constructor(config?: Partial<SilenceDetectionConfig> | { silence?: Partial<SilenceDetectionConfig>; clipping?: Partial<ClippingDetectionConfig> }) {
+    // Suportar ambos os formatos de config para backward compatibility
+    if (config && ('silence' in config || 'clipping' in config)) {
+      // Novo formato com silence/clipping
+      const typedConfig = config as { silence?: Partial<SilenceDetectionConfig>; clipping?: Partial<ClippingDetectionConfig> };
+      this.silenceConfig = {
+        threshold: typedConfig.silence?.threshold ?? -50,
+        duration: typedConfig.silence?.duration ?? 10
+      };
+      this.clippingConfig = {
+        threshold: typedConfig.clipping?.threshold ?? -1
+      };
+    } else {
+      // Formato legado (apenas silence config)
+      const legacyConfig = config as Partial<SilenceDetectionConfig> | undefined;
+      this.silenceConfig = {
+        threshold: legacyConfig?.threshold ?? -50,
+        duration: legacyConfig?.duration ?? 10
+      };
+      this.clippingConfig = {
+        threshold: -1
+      };
+    }
+
+    logger.info(`EventDetector initialized: silence.threshold=${this.silenceConfig.threshold}dB, ` +
+                `silence.duration=${this.silenceConfig.duration}s, ` +
+                `clipping.threshold=${this.clippingConfig.threshold}dB`);
   }
 
   /**
@@ -150,8 +205,11 @@ export class EventDetector {
 
     this.lastLevelDb = levelDb;
 
+    // Detectar clipping (nível acima do threshold de clipping)
+    await this.checkClipping(levelDb, now);
+
     // Verificar se está abaixo do threshold (silêncio)
-    const isBelowThreshold = levelDb < this.config.threshold;
+    const isBelowThreshold = levelDb < this.silenceConfig.threshold;
 
     if (isBelowThreshold) {
       // Áudio está em silêncio
@@ -165,7 +223,7 @@ export class EventDetector {
       const silenceDuration = (now - this.silenceStartTime) / 1000;
 
       // Se duração atingiu o threshold e ainda não emitimos o evento
-      if (silenceDuration >= this.config.duration && !this.silenceEmitted) {
+      if (silenceDuration >= this.silenceConfig.duration && !this.silenceEmitted) {
         this.isSilent = true;
         this.silenceEmitted = true;
         this.lastSilenceDuration = silenceDuration;
@@ -176,7 +234,7 @@ export class EventDetector {
       // Áudio retornou (acima do threshold)
       if (this.silenceStartTime) {
         const silenceDuration = (now - this.silenceStartTime) / 1000;
-        
+
         // Se estávamos em silêncio confirmado, emitir fim
         if (this.silenceEmitted) {
           await this.emitSilenceEnded(levelDb, silenceDuration);
@@ -194,6 +252,40 @@ export class EventDetector {
   }
 
   /**
+   * Verifica e emite evento de clipping se nível exceder threshold
+   */
+  private async checkClipping(levelDb: number, now: number): Promise<void> {
+    if (levelDb > this.clippingConfig.threshold) {
+      this.clippingCount++;
+      this.lastClippingTime = now;
+
+      await this.emitClippingDetected(levelDb);
+    }
+  }
+
+  /**
+   * Emite evento clipping.detected
+   */
+  private async emitClippingDetected(levelDb: number): Promise<void> {
+    const payload: ClippingDetectedPayload = {
+      timestamp: new Date().toISOString(),
+      levelDb,
+      threshold: this.clippingConfig.threshold,
+      count: this.clippingCount
+    };
+
+    logger.warn(`Clipping detected: level=${levelDb.toFixed(1)}dB, ` +
+                `threshold=${this.clippingConfig.threshold}dB, count=${this.clippingCount}`);
+
+    try {
+      await eventBus.publish('clipping.detected', payload);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to publish clipping.detected: ${errorMsg}`);
+    }
+  }
+
+  /**
    * Emite evento silence.detected
    */
   private async emitSilenceDetected(levelDb: number, duration: number): Promise<void> {
@@ -201,11 +293,11 @@ export class EventDetector {
       timestamp: new Date().toISOString(),
       levelDb,
       duration,
-      threshold: this.config.threshold
+      threshold: this.silenceConfig.threshold
     };
 
     logger.info(`Silence detected: level=${levelDb.toFixed(1)}dB, ` +
-                `duration=${duration.toFixed(1)}s, threshold=${this.config.threshold}dB`);
+                `duration=${duration.toFixed(1)}s, threshold=${this.silenceConfig.threshold}dB`);
 
     try {
       await eventBus.publish('silence.detected', payload);
@@ -245,6 +337,8 @@ export class EventDetector {
     this.lastLevelDb = -100;
     this.silenceEmitted = false;
     this.lastSilenceDuration = 0;
+    this.clippingCount = 0;
+    this.lastClippingTime = null;
   }
 
   /**
@@ -262,26 +356,26 @@ export class EventDetector {
   }
 
   /**
-   * Retorna a configuração atual
+   * Retorna a configuração de silêncio atual
    */
   getConfig(): SilenceDetectionConfig {
-    return { ...this.config };
+    return { ...this.silenceConfig };
   }
 
   /**
-   * Atualiza a configuração de threshold
+   * Atualiza a configuração de threshold de silêncio
    */
   setThreshold(threshold: number): void {
-    this.config.threshold = threshold;
-    logger.info(`Threshold updated to ${threshold}dB`);
+    this.silenceConfig.threshold = threshold;
+    logger.info(`Silence threshold updated to ${threshold}dB`);
   }
 
   /**
-   * Atualiza a configuração de duração
+   * Atualiza a configuração de duração de silêncio
    */
   setDuration(duration: number): void {
-    this.config.duration = duration;
-    logger.info(`Duration updated to ${duration}s`);
+    this.silenceConfig.duration = duration;
+    logger.info(`Silence duration updated to ${duration}s`);
   }
 
   /**
@@ -292,19 +386,45 @@ export class EventDetector {
   }
 
   /**
+   * Retorna a contagem de eventos de clipping desde o start
+   */
+  getClippingCount(): number {
+    return this.clippingCount;
+  }
+
+  /**
+   * Retorna a configuração de clipping atual
+   */
+  getClippingConfig(): ClippingDetectionConfig {
+    return { ...this.clippingConfig };
+  }
+
+  /**
+   * Atualiza o threshold de clipping
+   */
+  setClippingThreshold(threshold: number): void {
+    this.clippingConfig.threshold = threshold;
+    logger.info(`Clipping threshold updated to ${threshold}dB`);
+  }
+
+  /**
    * Retorna informações de status completas
    */
   getStatus(): {
     isRunning: boolean;
     isSilent: boolean;
     lastLevelDb: number;
+    clippingCount: number;
     config: SilenceDetectionConfig;
+    clippingConfig: ClippingDetectionConfig;
   } {
     return {
       isRunning: this.isRunning,
       isSilent: this.isSilent,
       lastLevelDb: this.lastLevelDb,
-      config: { ...this.config }
+      clippingCount: this.clippingCount,
+      config: { ...this.silenceConfig },
+      clippingConfig: { ...this.clippingConfig }
     };
   }
 }

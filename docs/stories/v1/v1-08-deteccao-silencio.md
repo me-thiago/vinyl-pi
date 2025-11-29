@@ -1,7 +1,7 @@
 # Story V1.8: Detecção de Silêncio
 
 **Epic:** V1 - Foundation Core (MVP)  
-**Status:** review
+**Status:** done
 
 **User Story:**
 Como usuário,  

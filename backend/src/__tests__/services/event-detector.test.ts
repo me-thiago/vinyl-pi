@@ -1,4 +1,4 @@
-import { EventDetector, SilenceDetectionConfig } from '../../services/event-detector';
+import { EventDetector, SilenceDetectionConfig, ClippingDetectionConfig } from '../../services/event-detector';
 import { eventBus } from '../../utils/event-bus';
 
 // Mock do EventBus
@@ -52,18 +52,33 @@ describe('EventDetector', () => {
     it('should create with default config', () => {
       const defaultDetector = new EventDetector();
       const config = defaultDetector.getConfig();
-      
+      const clippingConfig = defaultDetector.getClippingConfig();
+
       expect(config.threshold).toBe(-50);
       expect(config.duration).toBe(10);
-      
+      expect(clippingConfig.threshold).toBe(-1);
+
       defaultDetector.stop();
     });
 
-    it('should create with custom config', () => {
+    it('should create with custom config (legacy format)', () => {
       const config = detector.getConfig();
-      
+
       expect(config.threshold).toBe(-50);
       expect(config.duration).toBe(1);
+    });
+
+    it('should create with new config format', () => {
+      const newDetector = new EventDetector({
+        silence: { threshold: -40, duration: 5 },
+        clipping: { threshold: -2 }
+      });
+
+      expect(newDetector.getConfig().threshold).toBe(-40);
+      expect(newDetector.getConfig().duration).toBe(5);
+      expect(newDetector.getClippingConfig().threshold).toBe(-2);
+
+      newDetector.stop();
     });
 
     it('should not be active initially', () => {
@@ -72,6 +87,10 @@ describe('EventDetector', () => {
 
     it('should not be in silence state initially', () => {
       expect(detector.getSilenceStatus()).toBe(false);
+    });
+
+    it('should have zero clipping count initially', () => {
+      expect(detector.getClippingCount()).toBe(0);
     });
   });
 
@@ -101,13 +120,24 @@ describe('EventDetector', () => {
 
     it('should reset state on stop', async () => {
       detector.start();
-      
+
       // Simulate silence detection
       await eventBus.publish('audio.level', { levelDb: -60, timestamp: Date.now() });
-      
+
       await detector.stop();
-      
+
       expect(detector.getSilenceStatus()).toBe(false);
+    });
+
+    it('should reset clipping count on stop', async () => {
+      detector.start();
+
+      // Trigger clipping
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+      expect(detector.getClippingCount()).toBe(1);
+
+      await detector.stop();
+      expect(detector.getClippingCount()).toBe(0);
     });
   });
 
@@ -245,26 +275,40 @@ describe('EventDetector', () => {
   describe('Status Reporting', () => {
     it('should return complete status', () => {
       detector.start();
-      
+
       const status = detector.getStatus();
-      
+
       expect(status).toEqual({
         isRunning: true,
         isSilent: false,
         lastLevelDb: -100,
+        clippingCount: 0,
         config: {
           threshold: -50,
           duration: 1
+        },
+        clippingConfig: {
+          threshold: -1
         }
       });
     });
 
     it('should update lastLevelDb after receiving events', async () => {
       detector.start();
-      
+
       await eventBus.publish('audio.level', { levelDb: -35, timestamp: Date.now() });
-      
+
       expect(detector.getLastLevelDb()).toBe(-35);
+    });
+
+    it('should include clipping count in status', async () => {
+      detector.start();
+
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+      await eventBus.publish('audio.level', { levelDb: -0.3, timestamp: Date.now() });
+
+      const status = detector.getStatus();
+      expect(status.clippingCount).toBe(2);
     });
   });
 
@@ -327,10 +371,153 @@ describe('EventDetector', () => {
     it('should implement destroy() as alias for stop()', async () => {
       detector.start();
       expect(detector.isActive()).toBe(true);
-      
+
       await detector.destroy();
-      
+
       expect(detector.isActive()).toBe(false);
+    });
+  });
+
+  describe('Clipping Detection', () => {
+    beforeEach(() => {
+      detector.start();
+    });
+
+    it('should detect clipping when level exceeds threshold', async () => {
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(1);
+      expect(mockPublish).toHaveBeenCalledWith(
+        'clipping.detected',
+        expect.objectContaining({
+          timestamp: expect.any(String),
+          levelDb: -0.5,
+          threshold: -1,
+          count: 1
+        })
+      );
+    });
+
+    it('should not detect clipping when level is below threshold', async () => {
+      await eventBus.publish('audio.level', { levelDb: -5, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(0);
+      expect(mockPublish).not.toHaveBeenCalledWith(
+        'clipping.detected',
+        expect.anything()
+      );
+    });
+
+    it('should count multiple clipping events', async () => {
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+      await eventBus.publish('audio.level', { levelDb: -0.3, timestamp: Date.now() });
+      await eventBus.publish('audio.level', { levelDb: -0.1, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(3);
+    });
+
+    it('should include correct count in each clipping event', async () => {
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+      await eventBus.publish('audio.level', { levelDb: -0.3, timestamp: Date.now() });
+
+      const clippingCalls = mockPublish.mock.calls.filter(
+        call => call[0] === 'clipping.detected'
+      );
+
+      expect(clippingCalls[0][1].count).toBe(1);
+      expect(clippingCalls[1][1].count).toBe(2);
+    });
+
+    it('should handle threshold at exactly -1dB', async () => {
+      // -1dB is exactly at threshold, should NOT be considered clipping
+      await eventBus.publish('audio.level', { levelDb: -1, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(0);
+    });
+
+    it('should detect clipping at -0.9dB (just above threshold)', async () => {
+      await eventBus.publish('audio.level', { levelDb: -0.9, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(1);
+    });
+
+    it('should detect clipping at 0dB (max level)', async () => {
+      await eventBus.publish('audio.level', { levelDb: 0, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(1);
+      expect(mockPublish).toHaveBeenCalledWith(
+        'clipping.detected',
+        expect.objectContaining({
+          levelDb: 0,
+          threshold: -1
+        })
+      );
+    });
+  });
+
+  describe('Clipping Configuration', () => {
+    beforeEach(() => {
+      detector.start();
+    });
+
+    it('should update clipping threshold', () => {
+      detector.setClippingThreshold(-2);
+      expect(detector.getClippingConfig().threshold).toBe(-2);
+    });
+
+    it('should use new threshold for detection', async () => {
+      // Set stricter threshold
+      detector.setClippingThreshold(-3);
+
+      // -2dB is now below threshold, should trigger clipping
+      await eventBus.publish('audio.level', { levelDb: -2, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(1);
+    });
+
+    it('should not detect with stricter threshold when level is below', async () => {
+      // Set stricter threshold
+      detector.setClippingThreshold(-0.5);
+
+      // -0.8dB is now below threshold, should NOT trigger clipping
+      await eventBus.publish('audio.level', { levelDb: -0.8, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(0);
+    });
+  });
+
+  describe('Combined Silence and Clipping', () => {
+    beforeEach(() => {
+      detector.start();
+    });
+
+    it('should detect both silence and clipping independently', async () => {
+      // First trigger clipping
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+      expect(detector.getClippingCount()).toBe(1);
+
+      // Then trigger silence
+      for (let i = 0; i < 15; i++) {
+        await eventBus.publish('audio.level', { levelDb: -60, timestamp: Date.now() });
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      expect(detector.getSilenceStatus()).toBe(true);
+      expect(detector.getClippingCount()).toBe(1); // Count preserved
+    });
+
+    it('should handle rapid transitions between normal, silence, and clipping', async () => {
+      // Clipping
+      await eventBus.publish('audio.level', { levelDb: -0.5, timestamp: Date.now() });
+      // Normal
+      await eventBus.publish('audio.level', { levelDb: -20, timestamp: Date.now() });
+      // More clipping
+      await eventBus.publish('audio.level', { levelDb: -0.3, timestamp: Date.now() });
+      // Very quiet (but not silence yet)
+      await eventBus.publish('audio.level', { levelDb: -60, timestamp: Date.now() });
+
+      expect(detector.getClippingCount()).toBe(2);
+      expect(detector.getSilenceStatus()).toBe(false); // Not silent yet (duration not met)
     });
   });
 });

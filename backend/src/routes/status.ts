@@ -45,6 +45,9 @@ export function createStatusRouter(
       const levelDb = audioAnalyzer?.getCurrentLevelDb() ?? audioStatus.levelDb ?? null;
       const silenceDetected = eventDetector?.getSilenceStatus() ?? false;
 
+      // Obter status de clipping se disponível
+      const clippingCount = eventDetector?.getClippingCount() ?? 0;
+
       res.json({
         session: null, // TODO: Implementar session tracking em stories futuras
         streaming: {
@@ -55,7 +58,8 @@ export function createStatusRouter(
         },
         audio: {
           level_db: levelDb,
-          clipping_detected: false, // TODO: Implementar em V1.9
+          clipping_detected: clippingCount > 0,
+          clipping_count: clippingCount,
           silence_detected: silenceDetected
         }
       });
