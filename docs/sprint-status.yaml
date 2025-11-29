@@ -46,7 +46,7 @@ development_status:
   v1-6-frontend-player-basico: done
   v1-7-eventbus-core: done
   v1-8-deteccao-silencio: done
-  v1-9-deteccao-clipping: review
+  v1-9-deteccao-clipping: done
   v1-10-persistencia-eventos: drafted
   v1-11-deteccao-sessao: drafted
   v1-12-deteccao-troca-faixa: drafted

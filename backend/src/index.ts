@@ -148,10 +148,16 @@ const audioAnalyzer = new AudioAnalyzer({
   publishIntervalMs: 100  // Publicar audio.level a cada 100ms
 });
 
-// Inicializar EventDetector para detecção de silêncio
+// Inicializar EventDetector para detecção de silêncio e clipping
 const eventDetector = new EventDetector({
-  threshold: parseInt(process.env.SILENCE_THRESHOLD || '-50'),
-  duration: parseInt(process.env.SILENCE_DURATION || '10')
+  silence: {
+    threshold: parseInt(process.env.SILENCE_THRESHOLD || '-50'),
+    duration: parseInt(process.env.SILENCE_DURATION || '10')
+  },
+  clipping: {
+    threshold: parseInt(process.env.CLIPPING_THRESHOLD || '-1'),
+    cooldown: parseInt(process.env.CLIPPING_COOLDOWN || '1000')
+  }
 });
 
 // Iniciar AudioAnalyzer e EventDetector
@@ -159,7 +165,7 @@ audioAnalyzer.start();
 eventDetector.start();
 
 console.log('🎛️  AudioAnalyzer started');
-console.log('🔍 EventDetector started (silence threshold: -50dB, duration: 10s)');
+console.log(`🔍 EventDetector started (silence: ${process.env.SILENCE_THRESHOLD || '-50'}dB/${process.env.SILENCE_DURATION || '10'}s, clipping: ${process.env.CLIPPING_THRESHOLD || '-1'}dB)`);
 
 // Registrar routes com todas as dependências
 app.use('/api', createStatusRouter({

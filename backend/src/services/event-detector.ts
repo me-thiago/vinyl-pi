@@ -31,6 +31,7 @@ export interface SilenceDetectionConfig {
  */
 export interface ClippingDetectionConfig {
   threshold: number;      // Threshold em dB (default: -1)
+  cooldown: number;       // Cooldown em ms entre eventos (default: 1000)
 }
 
 /**
@@ -121,6 +122,11 @@ export class EventDetector {
   private clippingCount: number = 0;
   private lastClippingTime: number | null = null;
 
+  // Estado de monitoramento de picos
+  private peakLevelDb: number = -100;
+  private peakLogInterval: NodeJS.Timeout | null = null;
+  private readonly PEAK_LOG_INTERVAL_MS = 5000; // Log de pico a cada 5 segundos
+
   constructor(config?: Partial<SilenceDetectionConfig> | { silence?: Partial<SilenceDetectionConfig>; clipping?: Partial<ClippingDetectionConfig> }) {
     // Suportar ambos os formatos de config para backward compatibility
     if (config && ('silence' in config || 'clipping' in config)) {
@@ -131,7 +137,8 @@ export class EventDetector {
         duration: typedConfig.silence?.duration ?? 10
       };
       this.clippingConfig = {
-        threshold: typedConfig.clipping?.threshold ?? -1
+        threshold: typedConfig.clipping?.threshold ?? -1,
+        cooldown: typedConfig.clipping?.cooldown ?? 1000
       };
     } else {
       // Formato legado (apenas silence config)
@@ -141,7 +148,8 @@ export class EventDetector {
         duration: legacyConfig?.duration ?? 10
       };
       this.clippingConfig = {
-        threshold: -1
+        threshold: -1,
+        cooldown: 1000
       };
     }
 
@@ -166,7 +174,32 @@ export class EventDetector {
     this.isRunning = true;
     this.resetState();
 
+    // Iniciar log periódico de picos
+    this.startPeakLogging();
+
     logger.info('EventDetector started');
+  }
+
+  /**
+   * Inicia o log periódico de picos de áudio
+   */
+  private startPeakLogging(): void {
+    this.peakLogInterval = setInterval(() => {
+      if (this.peakLevelDb > -100) {
+        logger.info(`Peak level: ${this.peakLevelDb.toFixed(1)}dB (last ${this.PEAK_LOG_INTERVAL_MS / 1000}s)`);
+        this.peakLevelDb = -100; // Reset para próximo intervalo
+      }
+    }, this.PEAK_LOG_INTERVAL_MS);
+  }
+
+  /**
+   * Para o log periódico de picos
+   */
+  private stopPeakLogging(): void {
+    if (this.peakLogInterval) {
+      clearInterval(this.peakLogInterval);
+      this.peakLogInterval = null;
+    }
   }
 
   /**
@@ -180,6 +213,7 @@ export class EventDetector {
 
     this.isRunning = false;
     this.subscriptions.cleanup();
+    this.stopPeakLogging();
     this.resetState();
 
     logger.info('EventDetector stopped');
@@ -204,6 +238,11 @@ export class EventDetector {
     const now = Date.now();
 
     this.lastLevelDb = levelDb;
+
+    // Atualizar pico para log periódico
+    if (levelDb > this.peakLevelDb) {
+      this.peakLevelDb = levelDb;
+    }
 
     // Detectar clipping (nível acima do threshold de clipping)
     await this.checkClipping(levelDb, now);
@@ -253,13 +292,18 @@ export class EventDetector {
 
   /**
    * Verifica e emite evento de clipping se nível exceder threshold
+   * Aplica cooldown para evitar enxurrada de eventos
    */
   private async checkClipping(levelDb: number, now: number): Promise<void> {
     if (levelDb > this.clippingConfig.threshold) {
       this.clippingCount++;
-      this.lastClippingTime = now;
 
-      await this.emitClippingDetected(levelDb);
+      // Aplicar cooldown - só emitir se passou tempo suficiente desde último evento
+      const timeSinceLastClipping = this.lastClippingTime ? now - this.lastClippingTime : Infinity;
+      if (timeSinceLastClipping >= this.clippingConfig.cooldown) {
+        this.lastClippingTime = now;
+        await this.emitClippingDetected(levelDb);
+      }
     }
   }
 
@@ -428,9 +472,3 @@ export class EventDetector {
     };
   }
 }
-
-/**
- * Singleton instance para uso global
- */
-export const eventDetector = new EventDetector();
-

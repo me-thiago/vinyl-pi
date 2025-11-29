@@ -43,6 +43,8 @@ export function useAudioStream({
   const useWebAudioRef = useRef<boolean>(true); // Tenta Web Audio primeiro
   const chunkBufferRef = useRef<Uint8Array[]>([]); // Buffer para acumular chunks WAV antes de decodificar
   const chunkBufferSizeRef = useRef<number>(0); // Tamanho total do buffer em bytes
+  const isRebufferingRef = useRef<boolean>(false); // Estado de rebuffering quando latência fica muito baixa
+  const pendingBuffersRef = useRef<AudioBuffer[]>([]); // Buffers acumulados durante rebuffering
 
   // Verificar suporte Web Audio API
   const checkWebAudioSupport = useCallback(() => {
@@ -124,13 +126,24 @@ export function useAudioStream({
           offset += bufferedChunk.byteLength;
         }
 
-        // Limpar buffer
-        chunkBufferRef.current = [];
-        chunkBufferSizeRef.current = 0;
-
         // Converter raw PCM para AudioBuffer
         // PCM s16le: 2 bytes por sample, 2 canais (stereo)
-        const int16Data = new Int16Array(concatenated.buffer);
+        // Garantir que o tamanho é múltiplo de 4 (2 bytes * 2 canais)
+        const alignedSize = Math.floor(concatenated.byteLength / 4) * 4;
+        if (alignedSize === 0) return;
+
+        // Preservar bytes não-alinhados para o próximo ciclo
+        const remainder = concatenated.byteLength - alignedSize;
+        if (remainder > 0) {
+          chunkBufferRef.current = [concatenated.slice(alignedSize)];
+          chunkBufferSizeRef.current = remainder;
+        } else {
+          chunkBufferRef.current = [];
+          chunkBufferSizeRef.current = 0;
+        }
+
+        const alignedBuffer = concatenated.slice(0, alignedSize);
+        const int16Data = new Int16Array(alignedBuffer.buffer, alignedBuffer.byteOffset, alignedSize / 2);
         const numSamples = Math.floor(int16Data.length / 2); // 2 channels
         const sampleRate = 48000; // Config do AudioManager
 
@@ -150,32 +163,66 @@ export function useAudioStream({
 
         bufferQueueRef.current.push(audioBuffer);
 
-        // Agendar reprodução
+        const currentTime = context.currentTime;
+        const queuedLatency = (nextStartTimeRef.current - currentTime) * 1000;
+        const actualLatency = Math.max(0, queuedLatency);
+
+        // Rebuffering: quando latência cai muito, acumular antes de tocar
+        const REBUFFER_THRESHOLD = 50; // ms - entrar em rebuffering
+        const REBUFFER_TARGET = 200; // ms - sair do rebuffering
+
+        if (!isRebufferingRef.current && actualLatency < REBUFFER_THRESHOLD) {
+          // Entrar em modo rebuffering
+          isRebufferingRef.current = true;
+          pendingBuffersRef.current = [audioBuffer];
+          setState((prev) => ({ ...prev, buffering: true, latency: actualLatency }));
+          console.log('Rebuffering: latência baixa detectada, acumulando buffer...');
+          return;
+        }
+
+        if (isRebufferingRef.current) {
+          // Acumular buffers durante rebuffering
+          pendingBuffersRef.current.push(audioBuffer);
+          const pendingDuration = pendingBuffersRef.current.reduce((sum, buf) => sum + buf.duration, 0) * 1000;
+
+          if (pendingDuration >= REBUFFER_TARGET) {
+            // Sair do rebuffering - agendar todos os buffers acumulados
+            console.log(`Rebuffering completo: ${pendingDuration.toFixed(0)}ms acumulados`);
+            let scheduleTime = context.currentTime + 0.05; // Pequeno delay inicial
+
+            for (const buf of pendingBuffersRef.current) {
+              const source = context.createBufferSource();
+              source.buffer = buf;
+              source.connect(gainNodeRef.current!);
+              source.start(scheduleTime);
+              scheduleTime += buf.duration;
+            }
+
+            nextStartTimeRef.current = scheduleTime;
+            pendingBuffersRef.current = [];
+            isRebufferingRef.current = false;
+            setState((prev) => ({ ...prev, buffering: false, latency: (scheduleTime - context.currentTime) * 1000 }));
+          }
+          return;
+        }
+
+        // Fluxo normal: agendar reprodução imediata
         const source = context.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(gainNodeRef.current!);
 
-        const currentTime = context.currentTime;
         const startTime = Math.max(currentTime, nextStartTimeRef.current);
         source.start(startTime);
         nextStartTimeRef.current = startTime + audioBuffer.duration;
-
-        // Monitorar latência
-        const queuedLatency = (startTime - currentTime) * 1000;
-        const actualLatency = Math.max(0, queuedLatency);
 
         setState((prev) => ({
           ...prev,
           latency: actualLatency,
         }));
 
-        // Ajuste dinâmico de buffer
+        // Limitar tamanho da fila de referência
         const totalDuration = bufferQueueRef.current.reduce((sum, buf) => sum + buf.duration, 0);
         const targetDuration = bufferSize / 1000;
-
-        if (actualLatency < 30 && totalDuration < targetDuration * 0.5) {
-          console.warn('Buffer underrun risk detected, current latency:', actualLatency);
-        }
 
         if (totalDuration > targetDuration * 2) {
           bufferQueueRef.current = bufferQueueRef.current.slice(-3);
@@ -238,6 +285,8 @@ export function useAudioStream({
       
       // Resetar estado e tentativas de reconexão
       bufferQueueRef.current = [];
+      pendingBuffersRef.current = [];
+      isRebufferingRef.current = false;
       nextStartTimeRef.current = context.currentTime + 0.1; // Pequeno delay inicial
       isPlayingRef.current = true;
       reconnectAttemptsRef.current = 0; // Resetar tentativas ao iniciar novo stream
@@ -367,6 +416,8 @@ export function useAudioStream({
 
     // Limpar buffer
     bufferQueueRef.current = [];
+    pendingBuffersRef.current = [];
+    isRebufferingRef.current = false;
 
     setState((prev) => ({
       ...prev,
