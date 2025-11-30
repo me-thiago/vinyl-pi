@@ -1,6 +1,7 @@
 # Story V1.18: Configurações Básicas
 
 **Epic:** V1 - Foundation Core (MVP)
+**Status:** Approved
 
 **User Story:**
 Como usuário,  
@@ -26,3 +27,9 @@ para que o sistema funcione com meu hardware específico.
 - [PRD v3.0](../prd-v3.md) - Seção 7.1 (API Contracts - Settings)
 - [Epics](../epics.md) - Epic V1
 
+---
+
+## Dev Agent Record
+
+### Context Reference
+- [Story Context XML](v1-18-configuracoes-basicas.context.xml) - Generated 2025-11-30

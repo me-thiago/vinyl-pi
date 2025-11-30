@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import { PassThrough } from 'stream';
 import { AudioManager } from './services/audio-manager';
 import { HealthMonitor } from './services/health-monitor';
@@ -8,13 +9,19 @@ import { AudioAnalyzer } from './services/audio-analyzer';
 import { EventDetector } from './services/event-detector';
 import { EventPersistence } from './services/event-persistence';
 import { SessionManager } from './services/session-manager';
+import { SocketManager } from './services/socket-manager';
 import { createStatusRouter } from './routes/status';
 import { createEventsRouter } from './routes/events';
 import { createSessionsRouter } from './routes/sessions';
+import { createSettingsRouter } from './routes/settings';
+import { SettingsService } from './services/settings-service';
+import prisma from './prisma/client';
+import { eventBus } from './utils/event-bus';
 
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // CORS para permitir frontend em porta diferente (local e rede)
@@ -152,29 +159,58 @@ const audioAnalyzer = new AudioAnalyzer({
   publishIntervalMs: 100  // Publicar audio.level a cada 100ms
 });
 
-// Inicializar EventDetector para detecção de silêncio e clipping
+// Inicializar SettingsService para configurações dinâmicas
+const settingsService = new SettingsService(prisma);
+
+// Inicializar EventDetector e SessionManager com valores temporários
+// Serão atualizados após o SettingsService carregar
 const eventDetector = new EventDetector({
   silence: {
     threshold: parseInt(process.env.SILENCE_THRESHOLD || '-50'),
     duration: parseInt(process.env.SILENCE_DURATION || '10')
   },
   clipping: {
-    threshold: parseInt(process.env.CLIPPING_THRESHOLD || '-1'),
+    threshold: parseInt(process.env.CLIPPING_THRESHOLD || '-3'),
     cooldown: parseInt(process.env.CLIPPING_COOLDOWN || '1000')
   }
 });
 
-// Inicializar SessionManager para gerenciar sessões de escuta
 const sessionManager = new SessionManager({
   sessionTimeout: parseInt(process.env.SESSION_TIMEOUT || '1800'),
   audioThreshold: parseInt(process.env.SILENCE_THRESHOLD || '-50')
 });
 
 // Inicializar EventPersistence para persistir eventos no banco
-// Passa referência do SessionManager para vincular eventos à sessão ativa
 const eventPersistence = new EventPersistence();
 
-// Iniciar AudioAnalyzer, EventDetector, SessionManager e EventPersistence
+// Função para aplicar settings aos detectores
+function applySettings(settings: Record<string, number | string | boolean>): void {
+  const silenceThreshold = settings['silence.threshold'] as number;
+  const silenceDuration = settings['silence.duration'] as number;
+  const clippingThreshold = settings['clipping.threshold'] as number;
+  const clippingCooldown = settings['clipping.cooldown'] as number;
+  const sessionTimeout = settings['session.timeout'] as number;
+
+  // Atualizar EventDetector
+  eventDetector.updateConfig({
+    silenceThreshold,
+    silenceDuration,
+    clippingThreshold,
+    clippingCooldown
+  });
+
+  // Atualizar SessionManager
+  sessionManager.setSessionTimeout(sessionTimeout);
+  sessionManager.setAudioThreshold(silenceThreshold);
+}
+
+// Listener para mudanças de settings em tempo real
+eventBus.subscribe('settings.changed' as any, async (payload) => {
+  console.log('⚙️  Settings changed, applying...');
+  applySettings(payload.settings);
+});
+
+// Iniciar serviços
 audioAnalyzer.start();
 eventDetector.start();
 sessionManager.start();
@@ -183,10 +219,30 @@ eventPersistence.start();
 // Conectar EventPersistence ao SessionManager
 eventPersistence.setSessionManager(sessionManager);
 
+// Inicializar SettingsService e aplicar configurações
+settingsService.initialize().then(async () => {
+  const allSettings = await settingsService.getAll();
+  const settings: Record<string, number | string | boolean> = {};
+  allSettings.forEach(s => { settings[s.key] = s.value; });
+  applySettings(settings);
+
+  console.log('⚙️  Settings loaded and applied');
+}).catch(err => {
+  console.error('⚙️  Failed to initialize settings:', err);
+});
+
 console.log('🎛️  AudioAnalyzer started');
-console.log(`🔍 EventDetector started (silence: ${process.env.SILENCE_THRESHOLD || '-50'}dB/${process.env.SILENCE_DURATION || '10'}s, clipping: ${process.env.CLIPPING_THRESHOLD || '-1'}dB)`);
-console.log(`📍 SessionManager started (timeout: ${process.env.SESSION_TIMEOUT || '1800'}s)`);
+console.log('🔍 EventDetector started');
+console.log('📍 SessionManager started');
 console.log('💾 EventPersistence started');
+
+// Inicializar SocketManager para WebSocket real-time updates
+const socketManager = new SocketManager(httpServer, {
+  audioManager,
+  audioAnalyzer,
+  eventDetector,
+  sessionManager
+});
 
 // Registrar routes com todas as dependências
 app.use('/api', createStatusRouter({
@@ -202,6 +258,10 @@ app.use('/api', createEventsRouter({
 
 app.use('/api', createSessionsRouter({
   sessionManager
+}));
+
+app.use('/api', createSettingsRouter({
+  settingsService
 }));
 
 app.get('/health', (req, res) => {
@@ -327,8 +387,9 @@ app.get('/stream.wav', (req, res) => {
   clientStream.on('error', cleanup);
 });
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`🔌 WebSocket server ready`);
 });
 
 // Graceful shutdown handlers
@@ -336,7 +397,10 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received, shutting down gracefully...`);
 
   try {
-    // Parar event persistence primeiro (para de persistir eventos)
+    // Parar socket manager primeiro (fecha conexões WebSocket)
+    await socketManager.destroy();
+
+    // Parar event persistence (para de persistir eventos)
     await eventPersistence.destroy();
     console.log('💾 EventPersistence stopped');
 
@@ -351,13 +415,13 @@ const gracefulShutdown = async (signal: string) => {
     // Parar audio analyzer
     audioAnalyzer.stop();
     console.log('🎛️  AudioAnalyzer stopped');
-    
+
     // Parar health monitor
     await healthMonitor.stop();
-    
+
     // Parar audio manager
     await audioManager.cleanup();
-    
+
     console.log('Cleanup completed, exiting...');
     process.exit(0);
   } catch (err) {

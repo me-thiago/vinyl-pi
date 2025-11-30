@@ -9,7 +9,9 @@ import {
   VolumeX,
   Disc3,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,29 +24,10 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { useSocket } from '@/hooks/useSocket'
+import type { StatusPayload, EventPayload } from '@/hooks/useSocket'
 
-// Tipos para as APIs
-interface StatusResponse {
-  session: {
-    id: string
-    started_at: string
-    duration: number
-    event_count: number
-  } | null
-  streaming: {
-    active: boolean
-    listeners?: number
-    bitrate: string
-    mount_point: string
-  }
-  audio: {
-    level_db: number | null
-    clipping_detected: boolean
-    clipping_count: number
-    silence_detected: boolean
-  }
-}
-
+// Tipos para as APIs (fallback)
 interface EventItem {
   id: string
   sessionId: string | null
@@ -112,45 +95,83 @@ function getEventBadgeVariant(type: string): 'default' | 'secondary' | 'destruct
   return 'outline'
 }
 
+// Máximo de eventos a manter na lista
+const MAX_EVENTS = 10
+
 export default function Dashboard() {
-  const [status, setStatus] = useState<StatusResponse | null>(null)
   const [events, setEvents] = useState<EventItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
-  // Buscar dados das APIs
-  const fetchData = useCallback(async () => {
-    try {
-      setError(null)
-
-      const [statusRes, eventsRes] = await Promise.all([
-        fetch(`${API_BASE}/status`),
-        fetch(`${API_BASE}/events?limit=10`)
-      ])
-
-      if (!statusRes.ok) throw new Error('Falha ao buscar status')
-      if (!eventsRes.ok) throw new Error('Falha ao buscar eventos')
-
-      const statusData: StatusResponse = await statusRes.json()
-      const eventsData: EventsResponse = await eventsRes.json()
-
-      setStatus(statusData)
-      setEvents(eventsData.events)
+  // Usar WebSocket para atualizações em tempo real
+  const {
+    isConnected,
+    status,
+    lastEvent,
+    reconnect
+  } = useSocket({
+    onStatus: () => {
       setLastUpdate(new Date())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
-    } finally {
       setLoading(false)
+      setError(null)
+    },
+    onEvent: (event: EventPayload) => {
+      // Adicionar novo evento no início da lista
+      setEvents(prev => {
+        const newEvent: EventItem = {
+          id: event.id,
+          sessionId: event.sessionId,
+          eventType: event.eventType,
+          timestamp: event.timestamp,
+          metadata: event.metadata
+        }
+        // Manter apenas os últimos MAX_EVENTS
+        return [newEvent, ...prev].slice(0, MAX_EVENTS)
+      })
+    }
+  })
+
+  // Buscar eventos iniciais via API (uma vez)
+  const fetchInitialEvents = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/events?limit=${MAX_EVENTS}`)
+      if (!response.ok) throw new Error('Falha ao buscar eventos')
+      const data: EventsResponse = await response.json()
+      setEvents(data.events)
+    } catch (err) {
+      console.error('Erro ao buscar eventos iniciais:', err)
     }
   }, [])
 
-  // Buscar dados inicialmente e a cada 5 segundos
+  // Buscar eventos iniciais no mount
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
-  }, [fetchData])
+    fetchInitialEvents()
+  }, [fetchInitialEvents])
+
+  // Fallback: se WebSocket desconectar, usar polling
+  useEffect(() => {
+    if (!isConnected) {
+      const fetchStatus = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/status`)
+          if (response.ok) {
+            setLastUpdate(new Date())
+            setLoading(false)
+          }
+        } catch {
+          setError('Conexão perdida')
+        }
+      }
+
+      // Polling a cada 5s como fallback
+      const interval = setInterval(fetchStatus, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [isConnected])
+
+  // Usar status do WebSocket ou null
+  const currentStatus: StatusPayload | null = status
 
   return (
     <div className="min-h-screen bg-background">
@@ -172,16 +193,29 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Indicador de conexão WebSocket */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={fetchData}
+              onClick={reconnect}
+              title={isConnected ? 'Conectado via WebSocket' : 'Desconectado - clique para reconectar'}
+            >
+              {isConnected ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-destructive" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={fetchInitialEvents}
               disabled={loading}
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Badge variant="outline" className="hidden sm:flex">
-              Atualizado {formatRelativeTime(lastUpdate.toISOString())}
+            <Badge variant={isConnected ? 'outline' : 'secondary'} className="hidden sm:flex">
+              {isConnected ? 'Ao vivo' : formatRelativeTime(lastUpdate.toISOString())}
             </Badge>
             <ThemeToggle />
           </div>
@@ -215,17 +249,17 @@ export default function Dashboard() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${
-                  status?.streaming.active
+                  currentStatus?.streaming.active
                     ? 'bg-green-500 animate-pulse'
                     : 'bg-muted'
                 }`} />
                 <span className="text-2xl font-bold">
-                  {status?.streaming.active ? 'ON' : 'OFF'}
+                  {currentStatus?.streaming.active ? 'ON' : 'OFF'}
                 </span>
               </div>
-              {status?.streaming.active && (
+              {currentStatus?.streaming.active && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {status.streaming.bitrate} • {status.streaming.mount_point}
+                  {currentStatus.streaming.bitrate} kbps • {currentStatus.streaming.mount_point}
                 </p>
               )}
             </CardContent>
@@ -242,17 +276,17 @@ export default function Dashboard() {
             <CardContent>
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${
-                  status?.session
+                  currentStatus?.session
                     ? 'bg-green-500 animate-pulse'
                     : 'bg-muted'
                 }`} />
                 <span className="text-2xl font-bold">
-                  {status?.session ? 'Ativa' : 'Inativa'}
+                  {currentStatus?.session ? 'Ativa' : 'Inativa'}
                 </span>
               </div>
-              {status?.session && (
+              {currentStatus?.session && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {status.session.event_count} eventos
+                  {currentStatus.session.event_count} eventos
                 </p>
               )}
             </CardContent>
@@ -268,14 +302,14 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <span className="text-2xl font-bold font-mono">
-                {status?.session
-                  ? formatDuration(status.session.duration)
+                {currentStatus?.session
+                  ? formatDuration(currentStatus.session.duration)
                   : '--:--'
                 }
               </span>
-              {status?.session && (
+              {currentStatus?.session && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Iniciada {formatRelativeTime(status.session.started_at)}
+                  Iniciada {formatRelativeTime(currentStatus.session.started_at)}
                 </p>
               )}
             </CardContent>
@@ -285,7 +319,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                {status?.audio.silence_detected
+                {currentStatus?.audio.silence_detected
                   ? <VolumeX className="w-4 h-4" />
                   : <Volume2 className="w-4 h-4" />
                 }
@@ -294,25 +328,25 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                {status?.audio.clipping_detected && (
+                {currentStatus?.audio.clipping_detected && (
                   <Badge variant="destructive" className="text-xs">
                     Clipping
                   </Badge>
                 )}
-                {status?.audio.silence_detected && (
+                {currentStatus?.audio.silence_detected && (
                   <Badge variant="secondary" className="text-xs">
                     Silêncio
                   </Badge>
                 )}
-                {!status?.audio.clipping_detected && !status?.audio.silence_detected && (
+                {!currentStatus?.audio.clipping_detected && !currentStatus?.audio.silence_detected && (
                   <Badge variant="outline" className="text-xs">
                     Normal
                   </Badge>
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Nível: {status?.audio.level_db?.toFixed(1) ?? '--'} dB
-                {status?.audio.clipping_count ? ` • ${status.audio.clipping_count} clips` : ''}
+                Nível: {currentStatus?.audio.level_db?.toFixed(1) ?? '--'} dB
+                {currentStatus?.audio.clipping_count ? ` • ${currentStatus.audio.clipping_count} clips` : ''}
               </p>
             </CardContent>
           </Card>
@@ -326,9 +360,14 @@ export default function Dashboard() {
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
               Últimos Eventos
+              {lastEvent && (
+                <Badge variant="outline" className="ml-2 animate-pulse">
+                  Novo
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
-              Os 10 eventos mais recentes detectados pelo sistema
+              Os {MAX_EVENTS} eventos mais recentes detectados pelo sistema
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -340,10 +379,12 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {events.map((event) => (
+                {events.map((event, index) => (
                   <div
                     key={event.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    className={`flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors ${
+                      index === 0 && lastEvent?.id === event.id ? 'ring-2 ring-primary/50' : ''
+                    }`}
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant={getEventBadgeVariant(event.eventType)}>
@@ -375,7 +416,7 @@ export default function Dashboard() {
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
           <p>
-            Vinyl-OS Dashboard • Atualização automática a cada 5s
+            Vinyl-OS Dashboard • {isConnected ? 'Atualizações em tempo real via WebSocket' : 'Reconectando...'}
           </p>
         </div>
       </footer>

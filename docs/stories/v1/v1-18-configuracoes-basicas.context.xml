@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML - V1.18: Configurações Básicas
+  Generated: 2025-11-30
+
+  This file provides authoritative context for the Dev Agent to implement V1.18.
+  Trust this context over model priors.
+-->
+<story-context story="V1.18" title="Configurações Básicas">
+
+  <summary>
+    Criar página Settings para configurar dispositivo de áudio, thresholds de detecção,
+    e preferências de UI (tema claro/escuro), com persistência no banco de dados.
+  </summary>
+
+  <acceptance-criteria>
+    <ac id="AC1">Página Settings criada em rota /settings</ac>
+    <ac id="AC2">Dropdown de dispositivos de áudio detectados</ac>
+    <ac id="AC3">Configuração de thresholds (já disponível em Diagnostics, também aqui)</ac>
+    <ac id="AC4">Tema claro/escuro (toggle)</ac>
+    <ac id="AC5">Mudanças salvas via API PUT /api/settings</ac>
+    <ac id="AC6">Configurações persistidas na tabela settings</ac>
+  </acceptance-criteria>
+
+  <dependencies>
+    <dependency story="V1.17" status="pending">Histórico de Sessões - navegação completa</dependency>
+    <dependency story="V1.15" status="pending">UI de Diagnóstico - thresholds já configuráveis lá</dependency>
+    <dependency story="V1.13" status="done">Dashboard - padrão de página</dependency>
+  </dependencies>
+
+  <existing-infrastructure>
+    <backend>
+      <file path="backend/prisma/schema.prisma" purpose="Model Setting já existe">
+        <model>
+          Setting {
+            key: String @id
+            value: String
+            type: String @default("string") // "string", "number", "boolean", "json"
+            updatedAt: DateTime
+          }
+        </model>
+      </file>
+
+      <file path="backend/src/index.ts" purpose="Configuração de audio device">
+        <current-config>
+          device: process.env.AUDIO_DEVICE || 'plughw:1,0'
+          sampleRate: AUDIO_SAMPLE_RATE || 48000
+          channels: AUDIO_CHANNELS || 2
+          bitDepth: AUDIO_BIT_DEPTH || 16
+        </current-config>
+        <note>Mudar device requer restart do AudioManager</note>
+      </file>
+
+      <file path="backend/src/services/audio-manager.ts" purpose="Gerencia captura de áudio">
+        <note>Pode listar dispositivos via arecord -l</note>
+        <note>Restart necessário para trocar dispositivo</note>
+      </file>
+    </backend>
+
+    <frontend>
+      <file path="frontend/src/components/theme-toggle.tsx" purpose="Toggle de tema já existe">
+        <note>Usa ThemeProvider com localStorage (vinyl-os-theme)</note>
+        <note>Pode ser integrado na página Settings</note>
+      </file>
+
+      <file path="frontend/src/components/theme-provider.tsx" purpose="Context de tema">
+        <note>setTheme('light' | 'dark' | 'system')</note>
+      </file>
+    </frontend>
+  </existing-infrastructure>
+
+  <implementation-guidance>
+    <backend-tasks>
+      <task id="B1">Criar rota GET /api/settings para listar todas as configurações</task>
+      <task id="B2">Criar rota PUT /api/settings para atualizar configurações</task>
+      <task id="B3">Criar rota GET /api/audio/devices para listar dispositivos disponíveis</task>
+      <task id="B4">Criar rota POST /api/audio/device para trocar dispositivo (com restart)</task>
+      <task id="B5">Carregar settings do DB no startup e aplicar</task>
+      <task id="B6">Criar routes/settings.ts para organizar endpoints</task>
+    </backend-tasks>
+
+    <frontend-tasks>
+      <task id="F1">Criar página Settings.tsx em frontend/src/pages/</task>
+      <task id="F2">Adicionar rota /settings no main.tsx</task>
+      <task id="F3">Implementar seção de dispositivo de áudio com dropdown</task>
+      <task id="F4">Implementar seção de thresholds (reutilizar de Diagnostics ou linkar)</task>
+      <task id="F5">Implementar seção de tema com radio buttons ou toggle</task>
+      <task id="F6">Adicionar link para Settings no header</task>
+      <task id="F7">Mostrar feedback quando settings são salvos</task>
+    </frontend-tasks>
+
+    <api-endpoints>
+      <endpoint method="GET" path="/api/settings">
+        Response: {
+          settings: [
+            { key: "audio.device", value: "plughw:1,0", type: "string" },
+            { key: "silence.threshold", value: "-50", type: "number" },
+            { key: "ui.theme", value: "dark", type: "string" },
+            ...
+          ]
+        }
+      </endpoint>
+      <endpoint method="PUT" path="/api/settings">
+        Body: { key: string, value: string }
+        Response: { success: true, setting: {...} }
+        Side-effect: Persiste no DB e aplica se possível
+      </endpoint>
+      <endpoint method="GET" path="/api/audio/devices">
+        Response: {
+          devices: [
+            { id: "plughw:0,0", name: "Built-in Audio" },
+            { id: "plughw:1,0", name: "USB Audio Device" },
+            ...
+          ],
+          current: "plughw:1,0"
+        }
+        Implementation: Parse output de 'arecord -l'
+      </endpoint>
+      <endpoint method="POST" path="/api/audio/device">
+        Body: { device: "plughw:1,0" }
+        Response: { success: true, message: "Device changed, restarting..." }
+        Side-effect: Salva no DB, para AudioManager, atualiza config, reinicia
+      </endpoint>
+    </api-endpoints>
+
+    <settings-keys>
+      <category name="audio">
+        <setting key="audio.device" type="string" default="plughw:1,0">Dispositivo de captura</setting>
+        <setting key="audio.sampleRate" type="number" default="48000">Sample rate</setting>
+        <setting key="audio.channels" type="number" default="2">Canais</setting>
+      </category>
+      <category name="detection">
+        <setting key="silence.threshold" type="number" default="-50">Threshold de silêncio (dB)</setting>
+        <setting key="silence.duration" type="number" default="10">Duração de silêncio (s)</setting>
+        <setting key="clipping.threshold" type="number" default="-1">Threshold de clipping (dB)</setting>
+        <setting key="session.timeout" type="number" default="1800">Timeout de sessão (s)</setting>
+      </category>
+      <category name="ui">
+        <setting key="ui.theme" type="string" default="dark">Tema (light/dark/system)</setting>
+        <setting key="ui.autoScroll" type="boolean" default="true">Auto-scroll de eventos</setting>
+      </category>
+    </settings-keys>
+
+    <page-design>
+      <sections>
+        <section name="Audio Device">
+          - Dropdown com dispositivos detectados
+          - Botão "Aplicar" (requer restart do stream)
+          - Warning: "Mudar dispositivo irá reiniciar a captura de áudio"
+          - Status: dispositivo atual
+        </section>
+        <section name="Detection Thresholds">
+          - Sliders para cada threshold (ou link para Diagnostics)
+          - Valores atuais exibidos
+          - Aplicação imediata (como em Diagnostics)
+        </section>
+        <section name="Appearance">
+          - Radio group: Light / Dark / System
+          - Preview do tema selecionado
+          - Sincronizar com ThemeProvider
+        </section>
+        <section name="System Info">
+          - Versão do Vinyl-OS
+          - Uptime do backend
+          - Espaço em disco (para gravações futuras)
+        </section>
+      </sections>
+    </page-design>
+
+    <theme-integration>
+      <approach>
+        - Ler tema atual do ThemeProvider (useTheme hook)
+        - Exibir radio buttons para light/dark/system
+        - Ao mudar, chamar setTheme() do context
+        - Também salvar via PUT /api/settings para persistir preferência
+        - No startup, frontend lê de localStorage (já implementado)
+      </approach>
+    </theme-integration>
+  </implementation-guidance>
+
+  <device-detection>
+    <command>arecord -l</command>
+    <example-output>
+      **** List of CAPTURE Hardware Devices ****
+      card 0: Headphones [bcm2835 Headphones], device 0: bcm2835 Headphones [bcm2835 Headphones]
+      card 1: Device [USB Audio Device], device 0: USB Audio [USB Audio]
+    </example-output>
+    <parsing>
+      Regex: /card (\d+):.*\[(.*?)\].*device (\d+)/
+      Format: plughw:{card},{device}
+    </parsing>
+  </device-detection>
+
+  <testing-notes>
+    <note>Verificar que lista de dispositivos é detectada corretamente</note>
+    <note>Testar troca de dispositivo (com restart do streaming)</note>
+    <note>Verificar persistência: reiniciar backend e confirmar settings</note>
+    <note>Testar troca de tema e verificar que persiste</note>
+    <note>Verificar que thresholds alterados aqui também refletem em Diagnostics</note>
+  </testing-notes>
+
+  <patterns-to-follow>
+    <pattern>Usar useTheme do theme-provider para tema</pattern>
+    <pattern>Confirmar antes de trocar dispositivo (pode interromper stream)</pattern>
+    <pattern>Mostrar toast/notification quando settings são salvos</pattern>
+    <pattern>Debounce em sliders de threshold</pattern>
+  </patterns-to-follow>
+
+</story-context>

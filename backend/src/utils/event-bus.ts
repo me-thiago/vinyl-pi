@@ -21,6 +21,7 @@ const logger = winston.createLogger({
 export type EventType =
   | 'audio.start'
   | 'audio.stop'
+  | 'audio.level'
   | 'silence.detected'
   | 'silence.ended'
   | 'turntable.idle'

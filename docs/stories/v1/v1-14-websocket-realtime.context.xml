@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML - V1.14: WebSocket Real-Time Updates
+  Generated: 2025-11-30
+
+  This file provides authoritative context for the Dev Agent to implement V1.14.
+  Trust this context over model priors.
+-->
+<story-context story="V1.14" title="WebSocket Real-Time Updates">
+
+  <summary>
+    Implementar Socket.io no backend e frontend para atualizações em tempo real,
+    substituindo o polling de 5s atual no Dashboard por eventos push.
+  </summary>
+
+  <acceptance-criteria>
+    <ac id="AC1">Socket.io configurado no backend e frontend</ac>
+    <ac id="AC2">Cliente pode subscrever canais: status, events, session</ac>
+    <ac id="AC3">Status update a cada 5s: streaming, listeners, sessão ativa, nível de áudio</ac>
+    <ac id="AC4">Eventos emitidos em tempo real quando detectados</ac>
+    <ac id="AC5">Reconexão automática em caso de desconexão</ac>
+  </acceptance-criteria>
+
+  <dependencies>
+    <dependency story="V1.13" status="done">Dashboard Básico - já possui polling, será convertido para WebSocket</dependency>
+    <dependency story="V1.10" status="done">EventPersistence - eventos já são persistidos</dependency>
+    <dependency story="V1.11" status="done">SessionManager - sessões já são gerenciadas</dependency>
+  </dependencies>
+
+  <existing-infrastructure>
+    <backend>
+      <file path="backend/src/index.ts" purpose="Entry point - adicionar Socket.io server aqui">
+        <note>Express app já configurado na porta 3001</note>
+        <note>CORS já habilitado para aceitar qualquer origem</note>
+        <note>audioManager, eventDetector, sessionManager já inicializados</note>
+      </file>
+
+      <file path="backend/src/utils/event-bus.ts" purpose="Pub/sub interno - conectar ao Socket.io">
+        <events>
+          <event name="audio.start">Áudio iniciado</event>
+          <event name="audio.stop">Áudio parado</event>
+          <event name="silence.detected">Silêncio detectado (threshold + duration)</event>
+          <event name="silence.ended">Silêncio encerrado</event>
+          <event name="clipping.detected">Clipping detectado</event>
+          <event name="session.started">Sessão iniciada</event>
+          <event name="session.ended">Sessão encerrada</event>
+          <event name="track.change.detected">Troca de faixa (futuro)</event>
+        </events>
+        <note>Subscrever ao EventBus e emitir via Socket.io para clientes</note>
+      </file>
+
+      <file path="backend/src/routes/status.ts" purpose="Referência - dados do status atual">
+        <response-format>
+          {
+            session: { id, started_at, duration, event_count } | null,
+            streaming: { active, listeners, bitrate, mount_point },
+            audio: { level_db, clipping_detected, clipping_count, silence_detected }
+          }
+        </response-format>
+      </file>
+
+      <file path="backend/src/services/audio-analyzer.ts" purpose="Fonte de audio.level a cada 100ms">
+        <note>Publicar level_db via Socket.io para VU meter em tempo real</note>
+      </file>
+
+      <file path="backend/package.json" purpose="Dependências">
+        <note>socket.io já está instalado (v4.8.1)</note>
+      </file>
+    </backend>
+
+    <frontend>
+      <file path="frontend/src/pages/Dashboard.tsx" purpose="Consumidor - converter polling para WebSocket">
+        <current-approach>
+          - fetchData() chamado a cada 5s via setInterval
+          - Busca /api/status e /api/events?limit=10
+        </current-approach>
+        <target-approach>
+          - Conectar ao Socket.io no mount
+          - Subscrever aos canais: status, events, session
+          - Atualizar state quando receber eventos
+          - Manter polling como fallback (opcional)
+        </target-approach>
+      </file>
+
+      <file path="frontend/package.json" purpose="Dependências">
+        <note>socket.io-client já está instalado (v4.8.1)</note>
+      </file>
+
+      <file path="frontend/src/hooks/useStreamingControl.ts" purpose="Padrão de API - referência">
+        <note>API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'</note>
+      </file>
+    </frontend>
+  </existing-infrastructure>
+
+  <implementation-guidance>
+    <backend-tasks>
+      <task id="B1">Criar SocketManager service em backend/src/services/socket-manager.ts</task>
+      <task id="B2">Inicializar Socket.io server no index.ts compartilhando o HTTP server</task>
+      <task id="B3">Subscrever ao EventBus e emitir eventos para clientes conectados</task>
+      <task id="B4">Emitir status update a cada 5s para todos os clientes</task>
+      <task id="B5">Implementar rooms/namespaces: status, events, session</task>
+      <task id="B6">Adicionar graceful shutdown para Socket.io</task>
+    </backend-tasks>
+
+    <frontend-tasks>
+      <task id="F1">Criar hook useSocket em frontend/src/hooks/useSocket.ts</task>
+      <task id="F2">Implementar conexão com reconexão automática</task>
+      <task id="F3">Atualizar Dashboard.tsx para usar WebSocket em vez de polling</task>
+      <task id="F4">Manter polling como fallback se WebSocket não conectar</task>
+    </frontend-tasks>
+
+    <socket-events>
+      <event name="status:update" direction="server->client">
+        Payload: StatusResponse (mesmo formato da API /api/status)
+        Frequência: a cada 5s
+      </event>
+      <event name="event:new" direction="server->client">
+        Payload: { id, eventType, timestamp, metadata, sessionId }
+        Trigger: quando qualquer evento é detectado pelo EventBus
+      </event>
+      <event name="session:started" direction="server->client">
+        Payload: { id, startedAt }
+      </event>
+      <event name="session:ended" direction="server->client">
+        Payload: { id, endedAt, durationSeconds, eventCount }
+      </event>
+      <event name="audio:level" direction="server->client">
+        Payload: { levelDb, timestamp }
+        Frequência: a cada 100ms (para VU meter - usar em V1.15)
+      </event>
+    </socket-events>
+  </implementation-guidance>
+
+  <testing-notes>
+    <note>Testar reconexão: desconectar WiFi e reconectar</note>
+    <note>Testar múltiplos clientes conectados simultaneamente</note>
+    <note>Verificar que eventos aparecem instantaneamente no Dashboard</note>
+    <note>Confirmar que polling ainda funciona como fallback</note>
+  </testing-notes>
+
+  <patterns-to-follow>
+    <pattern>Usar SubscriptionManager para cleanup de EventBus handlers</pattern>
+    <pattern>Implementar Destroyable interface para graceful shutdown</pattern>
+    <pattern>Usar variáveis de ambiente para configuração (SOCKET_CORS_ORIGIN, etc)</pattern>
+  </patterns-to-follow>
+
+</story-context>

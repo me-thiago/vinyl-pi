@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML - V1.15: UI de Diagnóstico (VU Meter e Thresholds)
+  Generated: 2025-11-30
+
+  This file provides authoritative context for the Dev Agent to implement V1.15.
+  Trust this context over model priors.
+-->
+<story-context story="V1.15" title="UI de Diagnóstico (VU Meter e Thresholds)">
+
+  <summary>
+    Criar página de diagnóstico com VU meter em tempo real e controles
+    para ajustar thresholds de detecção (silêncio, clipping, sessão).
+  </summary>
+
+  <acceptance-criteria>
+    <ac id="AC1">Página Diagnostics criada em rota /diagnostics</ac>
+    <ac id="AC2">VU meter em tempo real mostrando nível de áudio (dB)</ac>
+    <ac id="AC3">Configuração de thresholds:
+      - Silence threshold (dB)
+      - Silence duration (segundos)
+      - Track change sensitivity (0-1)
+      - Session timeout (minutos)</ac>
+    <ac id="AC4">Botões de teste manual (trigger de eventos para teste)</ac>
+    <ac id="AC5">Mudanças salvas via API e aplicadas imediatamente</ac>
+  </acceptance-criteria>
+
+  <dependencies>
+    <dependency story="V1.14" status="pending">WebSocket Real-Time Updates - necessário para VU meter em tempo real</dependency>
+    <dependency story="V1.13" status="done">Dashboard Básico - padrão de página e componentes</dependency>
+    <dependency story="V1.9" status="done">Detecção de Clipping - threshold configurável</dependency>
+    <dependency story="V1.8" status="done">Detecção de Silêncio - threshold e duration configuráveis</dependency>
+  </dependencies>
+
+  <existing-infrastructure>
+    <backend>
+      <file path="backend/src/services/event-detector.ts" purpose="Configuração de thresholds">
+        <current-config>
+          silence: { threshold: -50dB, duration: 10s }
+          clipping: { threshold: -1dB, cooldown: 1000ms }
+        </current-config>
+        <methods>
+          - setSilenceThreshold(threshold: number)
+          - setSilenceDuration(duration: number)
+          - setClippingThreshold(threshold: number)
+          - getConfig(): { silence, clipping }
+          - getStatus(): { silenceDetected, clippingCount, ... }
+        </methods>
+        <note>Adicionar métodos set* se não existirem</note>
+      </file>
+
+      <file path="backend/src/services/session-manager.ts" purpose="Configuração de sessão">
+        <current-config>
+          sessionTimeout: 1800s (30min)
+          audioThreshold: -50dB
+        </current-config>
+        <note>Adicionar setSessionTimeout(seconds) se não existir</note>
+      </file>
+
+      <file path="backend/src/services/audio-analyzer.ts" purpose="Fonte de audio.level">
+        <note>Publica audio.level no EventBus a cada 100ms</note>
+        <note>Socket.io (V1.14) deve emitir audio:level para VU meter</note>
+      </file>
+
+      <file path="backend/prisma/schema.prisma" purpose="Model Setting já existe">
+        <model>
+          Setting {
+            key: String @id
+            value: String
+            type: String @default("string")
+            updatedAt: DateTime
+          }
+        </model>
+      </file>
+    </backend>
+
+    <frontend>
+      <file path="frontend/src/pages/Dashboard.tsx" purpose="Referência de estrutura">
+        <patterns>
+          - Header com navegação e ThemeToggle
+          - Grid de Cards para status
+          - Uso de shadcn/ui components
+          - API_HOST + /api pattern
+        </patterns>
+      </file>
+
+      <file path="frontend/src/components/ui/slider.tsx" purpose="Componente para ajustar thresholds">
+        <note>shadcn Slider já disponível</note>
+      </file>
+
+      <file path="frontend/src/components/ui/switch.tsx" purpose="Toggles">
+        <note>shadcn Switch já disponível</note>
+      </file>
+    </frontend>
+  </existing-infrastructure>
+
+  <implementation-guidance>
+    <backend-tasks>
+      <task id="B1">Criar rota GET /api/config para retornar configurações atuais</task>
+      <task id="B2">Criar rota PUT /api/config para atualizar configurações</task>
+      <task id="B3">Persistir configurações na tabela Setting</task>
+      <task id="B4">Carregar configurações do DB no startup (antes de iniciar detectores)</task>
+      <task id="B5">Criar rota POST /api/test/event para disparar eventos de teste</task>
+      <task id="B6">Emitir audio:level via Socket.io a cada 100ms (se V1.14 implementado)</task>
+    </backend-tasks>
+
+    <frontend-tasks>
+      <task id="F1">Criar página Diagnostics.tsx em frontend/src/pages/</task>
+      <task id="F2">Adicionar rota /diagnostics no main.tsx</task>
+      <task id="F3">Implementar VU meter visual usando audio:level do WebSocket</task>
+      <task id="F4">Criar formulário para editar thresholds com Sliders</task>
+      <task id="F5">Adicionar botões de teste que disparam eventos via API</task>
+      <task id="F6">Adicionar link para Diagnostics no header (ao lado do Dashboard)</task>
+    </frontend-tasks>
+
+    <api-endpoints>
+      <endpoint method="GET" path="/api/config">
+        Response: {
+          silence: { threshold: number, duration: number },
+          clipping: { threshold: number, cooldown: number },
+          session: { timeout: number, audioThreshold: number },
+          trackChange: { sensitivity: number } // futuro
+        }
+      </endpoint>
+      <endpoint method="PUT" path="/api/config">
+        Body: { [key]: value } - partial update
+        Response: { success: true, config: {...} }
+        Side-effect: Atualiza detectores em tempo real
+      </endpoint>
+      <endpoint method="POST" path="/api/test/event">
+        Body: { eventType: string, metadata?: object }
+        Response: { success: true, event: {...} }
+        Purpose: Disparar evento de teste para validar sistema
+      </endpoint>
+    </api-endpoints>
+
+    <vu-meter-design>
+      <component>
+        - Barra vertical ou horizontal mostrando nível em dB
+        - Escala: -90dB a 0dB
+        - Cores: Verde (-90 a -20), Amarelo (-20 a -6), Vermelho (-6 a 0)
+        - Linha de threshold de silêncio visível
+        - Linha de threshold de clipping visível
+        - Peak hold (opcional): mostrar pico máximo por 2s
+      </component>
+      <update-rate>100ms via WebSocket audio:level</update-rate>
+      <fallback>Se WebSocket não disponível, mostrar último valor via API</fallback>
+    </vu-meter-design>
+  </implementation-guidance>
+
+  <ui-components>
+    <component name="VuMeter">
+      Props: { level: number, silenceThreshold: number, clippingThreshold: number }
+      Visual: Barra vertical com gradiente de cores e marcadores de threshold
+    </component>
+    <component name="ThresholdSlider">
+      Props: { label, value, min, max, step, unit, onChange }
+      Uses: shadcn Slider + labels
+    </component>
+    <component name="TestEventButton">
+      Props: { eventType, label }
+      Action: POST /api/test/event
+    </component>
+  </ui-components>
+
+  <testing-notes>
+    <note>Verificar que VU meter atualiza em tempo real (sem lag visível)</note>
+    <note>Testar ajuste de threshold e confirmar que detecção muda imediatamente</note>
+    <note>Testar botões de evento e verificar que aparecem no Dashboard</note>
+    <note>Verificar persistência: reiniciar backend e confirmar que config foi salva</note>
+  </testing-notes>
+
+  <patterns-to-follow>
+    <pattern>Usar mesma estrutura de página do Dashboard (header, main, footer)</pattern>
+    <pattern>Debounce nos sliders para não fazer PUT a cada movimento</pattern>
+    <pattern>Mostrar feedback visual quando config é salva (toast ou badge)</pattern>
+  </patterns-to-follow>
+
+</story-context>

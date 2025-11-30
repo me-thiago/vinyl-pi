@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML - V1.17: Histórico de Sessões
+  Generated: 2025-11-30
+
+  This file provides authoritative context for the Dev Agent to implement V1.17.
+  Trust this context over model priors.
+-->
+<story-context story="V1.17" title="Histórico de Sessões">
+
+  <summary>
+    Criar página Sessions para listar todas as sessões de escuta anteriores
+    com filtros, paginação e link para detalhes de cada sessão.
+  </summary>
+
+  <acceptance-criteria>
+    <ac id="AC1">Página Sessions criada em rota /sessions</ac>
+    <ac id="AC2">Lista de sessões com: início, fim, duração, contador de eventos</ac>
+    <ac id="AC3">Filtros por data (date_from, date_to)</ac>
+    <ac id="AC4">Paginação (limit/offset)</ac>
+    <ac id="AC5">Link para detalhes de sessão (mostrar eventos da sessão)</ac>
+  </acceptance-criteria>
+
+  <dependencies>
+    <dependency story="V1.14" status="pending">WebSocket - para atualização em tempo real da sessão ativa</dependency>
+    <dependency story="V1.11" status="done">SessionManager - gerenciamento de sessões implementado</dependency>
+    <dependency story="V1.10" status="done">EventPersistence - eventos vinculados a sessões</dependency>
+    <dependency story="V1.13" status="done">Dashboard - padrão de página e componentes</dependency>
+  </dependencies>
+
+  <existing-infrastructure>
+    <backend>
+      <file path="backend/src/routes/sessions.ts" purpose="API de sessões já implementada">
+        <endpoints>
+          <endpoint method="GET" path="/api/sessions">
+            Query: limit (default 20, max 100), offset, date_from, date_to
+            Response: { sessions: [...], total, hasMore }
+          </endpoint>
+          <endpoint method="GET" path="/api/sessions/active">
+            Response: { active: boolean, session: {...} | null }
+          </endpoint>
+          <endpoint method="GET" path="/api/sessions/:id">
+            Response: { id, startedAt, endedAt, durationSeconds, eventCount, events: [...] }
+          </endpoint>
+        </endpoints>
+      </file>
+
+      <file path="backend/prisma/schema.prisma" purpose="Model Session">
+        <model>
+          Session {
+            id: String @id @default(uuid())
+            startedAt: DateTime @default(now())
+            endedAt: DateTime?
+            durationSeconds: Int @default(0)
+            eventCount: Int @default(0)
+            audioEvents: AudioEvent[]
+          }
+        </model>
+      </file>
+    </backend>
+
+    <frontend>
+      <file path="frontend/src/pages/Dashboard.tsx" purpose="Referência de estrutura">
+        <patterns>
+          - Card para status de sessão ativa
+          - formatDuration(seconds) helper
+          - formatRelativeTime(isoString) helper
+          - API pattern com API_HOST + /api
+        </patterns>
+      </file>
+
+      <file path="frontend/src/main.tsx" purpose="Router configuration">
+        <note>Adicionar rota /sessions e /sessions/:id</note>
+      </file>
+    </frontend>
+  </existing-infrastructure>
+
+  <implementation-guidance>
+    <frontend-tasks>
+      <task id="F1">Criar página Sessions.tsx em frontend/src/pages/</task>
+      <task id="F2">Criar página SessionDetail.tsx para detalhes de uma sessão</task>
+      <task id="F3">Adicionar rotas /sessions e /sessions/:id no main.tsx</task>
+      <task id="F4">Implementar lista de sessões com paginação</task>
+      <task id="F5">Adicionar filtros de data com date inputs</task>
+      <task id="F6">Destacar sessão ativa (se existir) no topo da lista</task>
+      <task id="F7">Adicionar link para Sessions no header (navigation)</task>
+    </frontend-tasks>
+
+    <page-sessions-design>
+      <layout>
+        - Header: título + link voltar + ThemeToggle
+        - Filtros: date_from, date_to inputs + botão aplicar
+        - Sessão ativa (se houver): Card destacado com status ao vivo
+        - Lista de sessões: Cards ou Table com colunas
+        - Paginação: botões Anterior/Próximo ou infinite scroll
+      </layout>
+      <session-card>
+        - Data/hora de início (formatada)
+        - Duração (formatDuration)
+        - Status: "Ativa" ou "Encerrada"
+        - Contador de eventos (badge)
+        - Botão/Link "Ver detalhes" → /sessions/:id
+      </session-card>
+    </page-sessions-design>
+
+    <page-session-detail-design>
+      <layout>
+        - Header: "Sessão {id}" + link voltar
+        - Card de resumo:
+          - Início: date/time formatado
+          - Fim: date/time formatado ou "Em andamento"
+          - Duração: formatDuration
+          - Total de eventos: number
+        - Timeline de eventos:
+          - Lista cronológica dos eventos da sessão
+          - Usar mesmos componentes de EventLog (V1.16)
+          - Ordenação: mais antigo primeiro (asc) para timeline
+      </layout>
+    </page-session-detail-design>
+
+    <navigation>
+      <links>
+        - Header: Dashboard | Sessions | Diagnostics
+        - Dashboard card de sessão → link para /sessions (histórico)
+        - Sessions list → link para /sessions/:id (detalhes)
+        - SessionDetail → link voltar para /sessions
+      </links>
+    </navigation>
+
+    <date-filter-implementation>
+      <component>
+        - Dois inputs type="date" para date_from e date_to
+        - Botão "Filtrar" que recarrega lista com parâmetros
+        - Botão "Limpar" para remover filtros
+        - Mostrar período filtrado na UI
+      </component>
+      <note>Converter dates para ISO string antes de enviar à API</note>
+    </date-filter-implementation>
+
+    <pagination-implementation>
+      <approach>Offset-based (API já suporta)</approach>
+      <ui>
+        - Mostrar "Página X de Y" ou "Mostrando 1-20 de 150"
+        - Botões Anterior/Próximo
+        - hasMore da API indica se há mais páginas
+      </ui>
+      <alternative>Infinite scroll com intersection observer</alternative>
+    </pagination-implementation>
+  </implementation-guidance>
+
+  <api-types>
+    <type name="SessionListItem">
+      {
+        id: string
+        startedAt: string (ISO)
+        endedAt: string | null
+        durationSeconds: number
+        eventCount: number
+      }
+    </type>
+    <type name="SessionDetail">
+      {
+        ...SessionListItem,
+        events: EventItem[]
+      }
+    </type>
+  </api-types>
+
+  <testing-notes>
+    <note>Verificar lista com muitas sessões (pagination funciona)</note>
+    <note>Testar filtros de data (date_from e date_to)</note>
+    <note>Verificar que sessão ativa aparece destacada</note>
+    <note>Testar navegação para detalhes e volta</note>
+    <note>Verificar que eventos da sessão aparecem em ordem cronológica</note>
+  </testing-notes>
+
+  <patterns-to-follow>
+    <pattern>Usar React Router useParams para session ID</pattern>
+    <pattern>Usar React Router useSearchParams para filtros de data</pattern>
+    <pattern>Compartilhar hooks de API entre páginas</pattern>
+    <pattern>Reutilizar event-helpers.ts de V1.16</pattern>
+  </patterns-to-follow>
+
+</story-context>

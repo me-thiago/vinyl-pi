@@ -452,6 +452,37 @@ export class EventDetector {
   }
 
   /**
+   * Atualiza o cooldown de clipping
+   */
+  setClippingCooldown(cooldown: number): void {
+    this.clippingConfig.cooldown = cooldown;
+    logger.info(`Clipping cooldown updated to ${cooldown}ms`);
+  }
+
+  /**
+   * Atualiza múltiplas configurações de uma vez
+   */
+  updateConfig(config: {
+    silenceThreshold?: number;
+    silenceDuration?: number;
+    clippingThreshold?: number;
+    clippingCooldown?: number;
+  }): void {
+    if (config.silenceThreshold !== undefined) {
+      this.setThreshold(config.silenceThreshold);
+    }
+    if (config.silenceDuration !== undefined) {
+      this.setDuration(config.silenceDuration);
+    }
+    if (config.clippingThreshold !== undefined) {
+      this.setClippingThreshold(config.clippingThreshold);
+    }
+    if (config.clippingCooldown !== undefined) {
+      this.setClippingCooldown(config.clippingCooldown);
+    }
+  }
+
+  /**
    * Retorna informações de status completas
    */
   getStatus(): {

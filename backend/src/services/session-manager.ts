@@ -372,6 +372,27 @@ export class SessionManager implements Destroyable {
   }
 
   /**
+   * Atualiza o timeout de sessão
+   */
+  setSessionTimeout(timeout: number): void {
+    this.config.sessionTimeout = timeout;
+    logger.info(`Session timeout updated to ${timeout}s`);
+
+    // Se tiver um timer ativo, reiniciar com o novo timeout
+    if (this.timeoutTimer && this.state === 'active') {
+      this.startTimeoutTimer();
+    }
+  }
+
+  /**
+   * Atualiza o threshold de áudio
+   */
+  setAudioThreshold(threshold: number): void {
+    this.config.audioThreshold = threshold;
+    logger.info(`Audio threshold updated to ${threshold}dB`);
+  }
+
+  /**
    * Retorna status completo para debug/API
    */
   getStatus(): {

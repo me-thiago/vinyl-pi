@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML - V1.16: Log de Eventos na UI
+  Generated: 2025-11-30
+
+  This file provides authoritative context for the Dev Agent to implement V1.16.
+  Trust this context over model priors.
+-->
+<story-context story="V1.16" title="Log de Eventos na UI">
+
+  <summary>
+    Adicionar seção de log scrollable na página Diagnostics mostrando os últimos
+    100 eventos com cores por tipo, auto-scroll opcional, e atualização em tempo real.
+  </summary>
+
+  <acceptance-criteria>
+    <ac id="AC1">Seção de log de eventos na página Diagnostics</ac>
+    <ac id="AC2">Lista scrollable mostrando últimos 100 eventos</ac>
+    <ac id="AC3">Cada evento mostra: tipo, timestamp, metadata (quando aplicável)</ac>
+    <ac id="AC4">Cores diferentes por tipo de evento</ac>
+    <ac id="AC5">Auto-scroll para eventos mais recentes (opcional toggle)</ac>
+  </acceptance-criteria>
+
+  <dependencies>
+    <dependency story="V1.15" status="pending">UI de Diagnóstico - página onde o log será adicionado</dependency>
+    <dependency story="V1.14" status="pending">WebSocket - eventos em tempo real</dependency>
+    <dependency story="V1.10" status="done">EventPersistence - API /api/events já implementada</dependency>
+  </dependencies>
+
+  <existing-infrastructure>
+    <backend>
+      <file path="backend/src/routes/events.ts" purpose="API de eventos já implementada">
+        <endpoint method="GET" path="/api/events">
+          Query params: session_id, event_type, limit, offset, date_from, date_to
+          Response: { events: [...], total: number, hasMore: boolean }
+        </endpoint>
+        <note>Aumentar limit default para 100 para este caso de uso</note>
+      </file>
+
+      <file path="backend/src/utils/event-bus.ts" purpose="Eventos em tempo real">
+        <events>
+          silence.detected, silence.ended, clipping.detected,
+          session.started, session.ended, track.change.detected,
+          audio.start, audio.stop
+        </events>
+        <note>V1.14 conecta EventBus ao Socket.io</note>
+      </file>
+    </backend>
+
+    <frontend>
+      <file path="frontend/src/pages/Dashboard.tsx" purpose="Referência - já exibe lista de eventos">
+        <existing-code>
+          - translateEventType(type): traduz tipos para PT-BR
+          - getEventBadgeVariant(type): retorna variante de cor
+          - formatRelativeTime(timestamp): formata timestamp relativo
+          - Lista de 10 eventos com badges coloridos
+        </existing-code>
+        <note>Extrair essas funções para utils/event-helpers.ts para reutilizar</note>
+      </file>
+
+      <file path="frontend/src/pages/Diagnostics.tsx" purpose="Página onde o log será adicionado">
+        <note>Criada em V1.15 - adicionar seção de log aqui</note>
+      </file>
+    </frontend>
+  </existing-infrastructure>
+
+  <implementation-guidance>
+    <refactoring-tasks>
+      <task id="R1">Extrair helpers de evento do Dashboard para frontend/src/utils/event-helpers.ts:
+        - translateEventType(type: string): string
+        - getEventBadgeVariant(type: string): BadgeVariant
+        - formatRelativeTime(isoString: string): string
+        - formatDuration(seconds: number): string
+      </task>
+      <task id="R2">Atualizar Dashboard.tsx para importar de event-helpers.ts</task>
+    </refactoring-tasks>
+
+    <frontend-tasks>
+      <task id="F1">Criar componente EventLog em frontend/src/components/EventLog.tsx</task>
+      <task id="F2">Implementar lista scrollable com max-height e overflow-y-auto</task>
+      <task id="F3">Buscar últimos 100 eventos via API no mount</task>
+      <task id="F4">Subscrever ao Socket.io event:new para novos eventos em tempo real</task>
+      <task id="F5">Implementar auto-scroll toggle (default: on)</task>
+      <task id="F6">Adicionar filtro por tipo de evento (opcional)</task>
+      <task id="F7">Integrar EventLog na página Diagnostics</task>
+    </frontend-tasks>
+
+    <component-design>
+      <component name="EventLog">
+        <props>
+          limit: number (default: 100)
+          autoScroll: boolean (default: true)
+          eventTypes?: string[] (filtro opcional)
+        </props>
+        <state>
+          events: EventItem[]
+          autoScrollEnabled: boolean
+        </state>
+        <behavior>
+          - Carrega eventos iniciais via GET /api/events?limit=100
+          - Escuta Socket.io event:new e prepend ao array
+          - Mantém máximo de 100 eventos (remove mais antigos)
+          - Scroll automático quando autoScrollEnabled e novo evento chega
+          - useRef para container de scroll
+        </behavior>
+      </component>
+    </component-design>
+
+    <event-colors>
+      <color type="silence.detected" variant="secondary" class="bg-yellow-500/10 border-yellow-500/20">Amarelo</color>
+      <color type="silence.ended" variant="secondary" class="bg-yellow-500/10 border-yellow-500/20">Amarelo</color>
+      <color type="clipping.detected" variant="destructive" class="bg-red-500/10 border-red-500/20">Vermelho</color>
+      <color type="session.started" variant="default" class="bg-green-500/10 border-green-500/20">Verde</color>
+      <color type="session.ended" variant="default" class="bg-blue-500/10 border-blue-500/20">Azul</color>
+      <color type="track.change.detected" variant="outline" class="bg-purple-500/10 border-purple-500/20">Roxo</color>
+      <color type="audio.start" variant="outline" class="bg-gray-500/10 border-gray-500/20">Cinza</color>
+      <color type="audio.stop" variant="outline" class="bg-gray-500/10 border-gray-500/20">Cinza</color>
+    </event-colors>
+  </implementation-guidance>
+
+  <ui-layout>
+    <layout>
+      Card com:
+      - CardHeader: "Log de Eventos" + toggle auto-scroll + filtro dropdown
+      - CardContent: div scrollable com height fixo (400px ou 50vh)
+        - Lista de EventLogItem components
+        - Cada item: badge tipo + timestamp + metadata expandível
+    </layout>
+    <scroll-behavior>
+      - Container com overflow-y-auto e max-h-[400px]
+      - Quando autoScroll: scrollTo bottom on new event
+      - Pause autoScroll quando usuário faz scroll manual para cima
+      - Resume autoScroll quando usuário clica no toggle ou scroll to bottom
+    </scroll-behavior>
+  </ui-layout>
+
+  <testing-notes>
+    <note>Verificar que novos eventos aparecem instantaneamente (via WebSocket)</note>
+    <note>Testar scroll manual - autoScroll deve pausar</note>
+    <note>Verificar que lista não cresce além de 100 eventos</note>
+    <note>Testar cores por tipo de evento</note>
+    <note>Verificar que metadata é exibida corretamente (levelDb, duration, etc)</note>
+  </testing-notes>
+
+  <patterns-to-follow>
+    <pattern>Reutilizar helpers de Dashboard (após refactoring)</pattern>
+    <pattern>Usar useRef para controlar scroll programático</pattern>
+    <pattern>Debounce no scroll listener para detectar scroll manual</pattern>
+    <pattern>Memoizar EventLogItem para performance</pattern>
+  </patterns-to-follow>
+
+</story-context>
