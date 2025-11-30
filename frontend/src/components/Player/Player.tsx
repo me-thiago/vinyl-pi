@@ -7,7 +7,11 @@ import { useAudioStream } from '@/hooks/useAudioStream';
 import { useStreamingControl } from '@/hooks/useStreamingControl';
 import { VinylVisualizer } from '@/components/VinylVisualizer/VinylVisualizer';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
+// API config
+const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
+const API_BASE = `${API_HOST}/api`;
 
 interface PlayerProps {
   streamUrl?: string;
@@ -15,6 +19,27 @@ interface PlayerProps {
 }
 
 export function Player({ streamUrl = 'http://localhost:8000/stream', className }: PlayerProps) {
+  const [bufferMs, setBufferMs] = useState(150); // Default, will be updated from settings
+
+  // Fetch buffer setting from API
+  useEffect(() => {
+    const fetchBufferSetting = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/settings`);
+        if (response.ok) {
+          const data = await response.json();
+          const bufferSetting = data.settings?.find((s: { key: string }) => s.key === 'player.buffer_ms');
+          if (bufferSetting?.value) {
+            setBufferMs(bufferSetting.value);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch buffer setting, using default:', err);
+      }
+    };
+    fetchBufferSetting();
+  }, []);
+
   // Detectar host automaticamente (localhost vs pi.local)
   const getStreamUrl = () => {
     if (streamUrl.includes('localhost')) {
@@ -41,7 +66,7 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
     state,
   } = useAudioStream({
     streamUrl: effectiveStreamUrl,
-    bufferSize: 150,
+    bufferSize: bufferMs,
     onError: (err) => {
       console.error('Audio stream error:', err);
     },

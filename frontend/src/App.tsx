@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { Music, Radio, Activity, Database, Disc3, LayoutDashboard, Settings, Calendar } from "lucide-react"
+import { Music, Radio, Activity, Database, Disc3, LayoutDashboard, Settings, Calendar, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -45,6 +45,12 @@ function App() {
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Diagnóstico</span>
+              </Button>
+            </Link>
+            <Link to="/settings">
+              <Button variant="outline" size="sm" className="gap-2">
+                <SlidersHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">Configurações</span>
               </Button>
             </Link>
             <Badge variant="secondary">Development</Badge>

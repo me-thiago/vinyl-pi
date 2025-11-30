@@ -68,6 +68,26 @@ export const SETTINGS_DEFINITIONS: SettingDefinition[] = [
     min: 60,
     max: 7200,
     unit: 's'
+  },
+  {
+    key: 'player.buffer_ms',
+    defaultValue: 150,
+    type: 'number',
+    label: 'Player Buffer',
+    description: 'Buffer do player local antes de iniciar reprodução',
+    min: 100,
+    max: 300,
+    unit: 'ms'
+  },
+  {
+    key: 'stream.bitrate',
+    defaultValue: 128,
+    type: 'number',
+    label: 'MP3 Bitrate',
+    description: 'Bitrate do stream MP3 para Icecast',
+    min: 128,
+    max: 256,
+    unit: 'kbps'
   }
 ];
 

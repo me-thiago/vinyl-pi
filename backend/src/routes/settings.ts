@@ -108,5 +108,24 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
     }
   });
 
+  /**
+   * GET /api/system/info
+   * Retorna informações do sistema (read-only)
+   */
+  router.get('/system/info', async (_req: Request, res: Response) => {
+    try {
+      res.json({
+        device: process.env.AUDIO_DEVICE || 'plughw:0,0',
+        sampleRate: parseInt(process.env.AUDIO_SAMPLE_RATE || '44100'),
+        version: 'v1.18',
+        icecastUrl: `http://${process.env.ICECAST_HOST || 'localhost'}:${process.env.ICECAST_PORT || '8000'}${process.env.ICECAST_MOUNT_POINT || '/stream'}`
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('Error fetching system info:', errorMsg);
+      res.status(500).json({ error: errorMsg });
+    }
+  });
+
   return router;
 }

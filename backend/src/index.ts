@@ -296,17 +296,22 @@ app.post('/audio/stop', async (req, res) => {
   }
 });
 
+// Helper para criar config de streaming
+function getStreamingConfig() {
+  return {
+    icecastHost: process.env.ICECAST_HOST || 'localhost',
+    icecastPort: parseInt(process.env.ICECAST_PORT || '8000'),
+    icecastPassword: process.env.ICECAST_SOURCE_PASSWORD || 'hackme',
+    mountPoint: process.env.ICECAST_MOUNT_POINT || '/stream',
+    bitrate: settingsService.getNumber('stream.bitrate'),
+    fallbackSilence: true
+  };
+}
+
 // Endpoint para iniciar streaming
 app.post('/streaming/start', async (req, res) => {
   try {
-    const config = {
-      icecastHost: process.env.ICECAST_HOST || 'localhost',
-      icecastPort: parseInt(process.env.ICECAST_PORT || '8000'),
-      icecastPassword: process.env.ICECAST_SOURCE_PASSWORD || 'hackme',
-      mountPoint: process.env.ICECAST_MOUNT_POINT || '/stream',
-      bitrate: 128,
-      fallbackSilence: true
-    };
+    const config = getStreamingConfig();
 
     await audioManager.startStreaming(config);
 
@@ -330,6 +335,44 @@ app.post('/streaming/stop', async (req, res) => {
   try {
     await audioManager.stopStreaming();
     res.json({ success: true, message: 'Streaming stopped' });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
+// Endpoint para reiniciar streaming (aplica novo bitrate)
+app.post('/streaming/restart', async (req, res) => {
+  try {
+    const status = audioManager.getStreamingStatus();
+
+    if (!status.active) {
+      res.status(400).json({ success: false, error: 'Streaming is not active' });
+      return;
+    }
+
+    // Parar e reiniciar com novo config
+    await audioManager.stopStreaming();
+
+    // Pequena pausa para cleanup
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const config = getStreamingConfig();
+    await audioManager.startStreaming(config);
+
+    // Atualizar health monitor
+    healthMonitor.setStreamingConfig(config);
+
+    res.json({
+      success: true,
+      message: 'Streaming restarted with new configuration',
+      config: {
+        host: config.icecastHost,
+        port: config.icecastPort,
+        mountPoint: config.mountPoint,
+        bitrate: config.bitrate
+      }
+    });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     res.status(500).json({ success: false, error: errorMsg });

@@ -208,12 +208,13 @@ echo "Vinyl-OS Services:"
 
 VINYL_TOTAL=0
 
-# Backend
-BACKEND_PID=$(pgrep -f "ts-node.*index.ts" | head -1 || true)
+# Backend (pode ser ts-node ou node dist/index.js)
+BACKEND_PID=$(pgrep -f "node.*dist/index.js" | head -1 || pgrep -f "ts-node.*index.ts" | head -1 || true)
 if [ -n "$BACKEND_PID" ]; then
     BACKEND_MEM=$(ps -o rss= -p "$BACKEND_PID" 2>/dev/null | awk '{print int($1/1024)}' || echo "0")
     BACKEND_CPU=$(ps -o %cpu= -p "$BACKEND_PID" 2>/dev/null | xargs || echo "0")
-    echo -e "  ${GREEN}✓${RESET} Backend (ts-node):    ${BACKEND_MEM} MB | CPU: ${BACKEND_CPU}%"
+    BACKEND_UPTIME=$(ps -o etime= -p "$BACKEND_PID" 2>/dev/null | xargs || echo "?")
+    echo -e "  ${GREEN}✓${RESET} Backend:               ${BACKEND_MEM} MB | CPU: ${BACKEND_CPU}% | Uptime: ${BACKEND_UPTIME}"
     VINYL_TOTAL=$((VINYL_TOTAL + BACKEND_MEM))
 else
     echo -e "  ${RED}✗${RESET} Backend:               ${RED}NOT RUNNING${RESET}"
@@ -223,7 +224,8 @@ fi
 FFMPEG_COUNT=$(pgrep ffmpeg | wc -l || echo "0")
 if [ "$FFMPEG_COUNT" -gt 0 ]; then
     FFMPEG_MEM=$(pgrep ffmpeg | xargs ps -o rss= -p 2>/dev/null | awk '{sum+=$1} END {print int(sum/1024)}' || echo "0")
-    echo -e "  ${GREEN}✓${RESET} FFmpeg (${FFMPEG_COUNT} processes): ${FFMPEG_MEM} MB"
+    FFMPEG_UPTIME=$(pgrep ffmpeg | head -1 | xargs ps -o etime= -p 2>/dev/null | xargs || echo "?")
+    echo -e "  ${GREEN}✓${RESET} FFmpeg (${FFMPEG_COUNT} procs):     ${FFMPEG_MEM} MB | Uptime: ${FFMPEG_UPTIME}"
     VINYL_TOTAL=$((VINYL_TOTAL + FFMPEG_MEM))
 else
     echo -e "  ${RED}✗${RESET} FFmpeg:                ${RED}NOT RUNNING${RESET}"
@@ -233,7 +235,8 @@ fi
 ICECAST_PID=$(pgrep -f icecast2 | head -1 || true)
 if [ -n "$ICECAST_PID" ]; then
     ICECAST_MEM=$(ps -o rss= -p "$ICECAST_PID" 2>/dev/null | awk '{print int($1/1024)}' || echo "0")
-    echo -e "  ${GREEN}✓${RESET} Icecast:               ${ICECAST_MEM} MB"
+    ICECAST_UPTIME=$(ps -o etime= -p "$ICECAST_PID" 2>/dev/null | xargs || echo "?")
+    echo -e "  ${GREEN}✓${RESET} Icecast:               ${ICECAST_MEM} MB | Uptime: ${ICECAST_UPTIME}"
     VINYL_TOTAL=$((VINYL_TOTAL + ICECAST_MEM))
 else
     echo -e "  ${RED}✗${RESET} Icecast:               ${RED}NOT RUNNING${RESET}"
@@ -251,6 +254,40 @@ fi
 
 echo ""
 echo -e "${BOLD}Total Vinyl-OS Memory:   ${CYAN}${VINYL_TOTAL} MB${RESET}"
+
+# FIFO status
+echo ""
+echo "Audio Pipeline:"
+if [ -p /tmp/vinyl-audio.fifo ]; then
+    FIFO_SIZE=$(ls -la /tmp/vinyl-audio.fifo 2>/dev/null | awk '{print $5}' || echo "0")
+    echo -e "  ${GREEN}✓${RESET} FIFO exists:           /tmp/vinyl-audio.fifo"
+else
+    echo -e "  ${YELLOW}◐${RESET} FIFO:                  Not created (streaming not started?)"
+fi
+
+# API Health check
+echo ""
+echo "API Health:"
+if [ -n "$BACKEND_PID" ]; then
+    HEALTH_RESP=$(curl -s --max-time 2 http://localhost:3001/health 2>/dev/null || echo "")
+    if [ -n "$HEALTH_RESP" ]; then
+        echo -e "  ${GREEN}✓${RESET} /health:               OK"
+    else
+        echo -e "  ${RED}✗${RESET} /health:               ${RED}NOT RESPONDING${RESET}"
+    fi
+
+    STREAM_STATUS=$(curl -s --max-time 2 http://localhost:3001/streaming/status 2>/dev/null || echo "")
+    if [ -n "$STREAM_STATUS" ]; then
+        IS_ACTIVE=$(echo "$STREAM_STATUS" | jq -r '.active // false' 2>/dev/null || echo "false")
+        if [ "$IS_ACTIVE" = "true" ]; then
+            echo -e "  ${GREEN}✓${RESET} /streaming/status:     ACTIVE"
+        else
+            echo -e "  ${YELLOW}◐${RESET} /streaming/status:     Inactive"
+        fi
+    fi
+else
+    echo -e "  ${YELLOW}◐${RESET} Cannot check - backend not running"
+fi
 
 ###############################################################################
 # 6. TOP MEMORY CONSUMERS
@@ -307,19 +344,36 @@ else
 fi
 
 ###############################################################################
-# 9. STREAMING HEALTH
+# 9. RECENT ERRORS (PM2 Logs)
+###############################################################################
+print_section "📋 Recent Errors (last 5)"
+
+if command -v pm2 &> /dev/null; then
+    RECENT_ERRORS=$(pm2 logs vinyl-backend --lines 50 --nostream --err 2>/dev/null | grep -i "error\|fail\|crash" | tail -5 || true)
+    if [ -n "$RECENT_ERRORS" ]; then
+        echo -e "${YELLOW}Recent backend errors:${RESET}"
+        echo "$RECENT_ERRORS" | sed 's/^/  /'
+    else
+        echo -e "${GREEN}✓ No recent errors in backend logs${RESET}"
+    fi
+else
+    echo "PM2 not available"
+fi
+
+###############################################################################
+# 10. STREAMING HEALTH
 ###############################################################################
 print_section "📡 Streaming Health"
 
 # Verificar stream Icecast
 if command -v curl &> /dev/null && [ -n "$ICECAST_PID" ]; then
     STREAM_STATUS=$(curl -s http://localhost:8000/status-json.xsl 2>/dev/null || true)
-    
+
     if [ -n "$STREAM_STATUS" ]; then
         STREAM_START=$(echo "$STREAM_STATUS" | jq -r '.icestats.server_start // "Unknown"' 2>/dev/null || echo "Unknown")
         echo -e "${GREEN}✓ Icecast is responding${RESET}"
         echo "  Server start:  $STREAM_START"
-        
+
         # Verificar se há source ativa
         HAS_SOURCE=$(echo "$STREAM_STATUS" | jq '.icestats.source // empty' 2>/dev/null || true)
         if [ -n "$HAS_SOURCE" ]; then
@@ -338,8 +392,18 @@ else
     echo -e "${YELLOW}Cannot check stream status${RESET}"
 fi
 
+# Network connections
+echo ""
+echo "Network Connections:"
+ICECAST_CONNS=$(ss -tn 2>/dev/null | grep ":8000" | wc -l || echo "0")
+BACKEND_CONNS=$(ss -tn 2>/dev/null | grep ":3001" | wc -l || echo "0")
+FRONTEND_CONNS=$(ss -tn 2>/dev/null | grep ":5173" | wc -l || echo "0")
+echo "  Icecast (:8000):     ${ICECAST_CONNS} connections"
+echo "  Backend (:3001):     ${BACKEND_CONNS} connections"
+echo "  Frontend (:5173):    ${FRONTEND_CONNS} connections"
+
 ###############################################################################
-# 10. RECOMENDAÇÕES
+# 11. RECOMENDAÇÕES
 ###############################################################################
 print_section "💡 Recommendations"
 

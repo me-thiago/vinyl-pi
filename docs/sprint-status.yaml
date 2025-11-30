@@ -50,12 +50,12 @@ development_status:
   v1-10-persistencia-eventos: done
   v1-11-deteccao-sessao: done
   v1-12-deteccao-troca-faixa: deferred
-  v1-13-dashboard-basico: drafted
-  v1-14-websocket-realtime: drafted
-  v1-15-ui-diagnostico: drafted
-  v1-16-log-eventos-ui: drafted
-  v1-17-historico-sessoes: drafted
-  v1-18-configuracoes-basicas: drafted
+  v1-13-dashboard-basico: done
+  v1-14-websocket-realtime: done
+  v1-15-ui-diagnostico: done
+  v1-16-log-eventos-ui: done
+  v1-17-historico-sessoes: done
+  v1-18-configuracoes-basicas: done
   v1-19-error-handling: drafted
   v1-20-pm2-config: drafted
   v1-21-install-script: drafted
