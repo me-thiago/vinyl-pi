@@ -5,6 +5,8 @@ import './index.css'
 import App from './App.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import Diagnostics from './pages/Diagnostics.tsx'
+import Sessions from './pages/Sessions.tsx'
+import SessionDetail from './pages/SessionDetail.tsx'
 import { ThemeProvider } from './components/theme-provider'
 
 createRoot(document.getElementById('root')!).render(
@@ -15,6 +17,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/diagnostics" element={<Diagnostics />} />
+          <Route path="/sessions" element={<Sessions />} />
+          <Route path="/sessions/:id" element={<SessionDetail />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

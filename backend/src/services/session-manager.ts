@@ -254,7 +254,14 @@ export class SessionManager implements Destroyable {
     }
 
     const sessionId = this.currentSessionId;
-    const endTime = new Date();
+    const now = new Date();
+
+    // Se encerrou por timeout, o momento real de fim foi quando o silêncio começou
+    // (agora - sessionTimeout), não quando o timeout disparou
+    const endTime = reason === 'timeout'
+      ? new Date(now.getTime() - this.config.sessionTimeout * 1000)
+      : now;
+
     const durationSeconds = Math.floor((endTime.getTime() - this.sessionStartTime.getTime()) / 1000);
 
     try {
