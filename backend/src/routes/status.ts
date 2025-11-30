@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { AudioManager } from '../services/audio-manager';
 import { AudioAnalyzer } from '../services/audio-analyzer';
 import { EventDetector } from '../services/event-detector';
+import { SessionManager } from '../services/session-manager';
 
 /**
  * Dependências opcionais para status estendido
@@ -10,6 +11,7 @@ export interface StatusRouterDependencies {
   audioManager: AudioManager;
   audioAnalyzer?: AudioAnalyzer;
   eventDetector?: EventDetector;
+  sessionManager?: SessionManager;
 }
 
 export function createStatusRouter(deps: StatusRouterDependencies): Router;
@@ -25,7 +27,7 @@ export function createStatusRouter(
       ? { audioManager: depsOrManager }
       : depsOrManager;
 
-  const { audioManager, audioAnalyzer, eventDetector } = deps;
+  const { audioManager, audioAnalyzer, eventDetector, sessionManager } = deps;
 
   /**
    * GET /api/status
@@ -48,8 +50,17 @@ export function createStatusRouter(
       // Obter status de clipping se disponível
       const clippingCount = eventDetector?.getClippingCount() ?? 0;
 
+      // Obter sessão ativa se disponível
+      const activeSession = sessionManager?.getActiveSession();
+      const sessionData = activeSession ? {
+        id: activeSession.id,
+        started_at: activeSession.startedAt.toISOString(),
+        duration: activeSession.durationSeconds,
+        event_count: activeSession.eventCount
+      } : null;
+
       res.json({
-        session: null, // TODO: Implementar session tracking em stories futuras
+        session: sessionData,
         streaming: {
           active: streamingStatus.active,
           listeners: streamingStatus.listeners ?? undefined,

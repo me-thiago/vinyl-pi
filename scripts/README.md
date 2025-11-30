@@ -233,3 +233,4 @@ Se encontrar bugs ou tiver sugestões:
 
 Parte do projeto Vinyl-OS - Uso interno
 
+

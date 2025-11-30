@@ -6,7 +6,11 @@ import { AudioManager } from './services/audio-manager';
 import { HealthMonitor } from './services/health-monitor';
 import { AudioAnalyzer } from './services/audio-analyzer';
 import { EventDetector } from './services/event-detector';
+import { EventPersistence } from './services/event-persistence';
+import { SessionManager } from './services/session-manager';
 import { createStatusRouter } from './routes/status';
+import { createEventsRouter } from './routes/events';
+import { createSessionsRouter } from './routes/sessions';
 
 dotenv.config();
 
@@ -160,18 +164,44 @@ const eventDetector = new EventDetector({
   }
 });
 
-// Iniciar AudioAnalyzer e EventDetector
+// Inicializar SessionManager para gerenciar sessões de escuta
+const sessionManager = new SessionManager({
+  sessionTimeout: parseInt(process.env.SESSION_TIMEOUT || '1800'),
+  audioThreshold: parseInt(process.env.SILENCE_THRESHOLD || '-50')
+});
+
+// Inicializar EventPersistence para persistir eventos no banco
+// Passa referência do SessionManager para vincular eventos à sessão ativa
+const eventPersistence = new EventPersistence();
+
+// Iniciar AudioAnalyzer, EventDetector, SessionManager e EventPersistence
 audioAnalyzer.start();
 eventDetector.start();
+sessionManager.start();
+eventPersistence.start();
+
+// Conectar EventPersistence ao SessionManager
+eventPersistence.setSessionManager(sessionManager);
 
 console.log('🎛️  AudioAnalyzer started');
 console.log(`🔍 EventDetector started (silence: ${process.env.SILENCE_THRESHOLD || '-50'}dB/${process.env.SILENCE_DURATION || '10'}s, clipping: ${process.env.CLIPPING_THRESHOLD || '-1'}dB)`);
+console.log(`📍 SessionManager started (timeout: ${process.env.SESSION_TIMEOUT || '1800'}s)`);
+console.log('💾 EventPersistence started');
 
 // Registrar routes com todas as dependências
 app.use('/api', createStatusRouter({
   audioManager,
   audioAnalyzer,
-  eventDetector
+  eventDetector,
+  sessionManager
+}));
+
+app.use('/api', createEventsRouter({
+  eventPersistence
+}));
+
+app.use('/api', createSessionsRouter({
+  sessionManager
 }));
 
 app.get('/health', (req, res) => {
@@ -304,12 +334,20 @@ app.listen(PORT, () => {
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received, shutting down gracefully...`);
-  
+
   try {
-    // Parar event detector primeiro (para de escutar eventos)
+    // Parar event persistence primeiro (para de persistir eventos)
+    await eventPersistence.destroy();
+    console.log('💾 EventPersistence stopped');
+
+    // Parar session manager (encerra sessão ativa se houver)
+    await sessionManager.destroy();
+    console.log('📍 SessionManager stopped');
+
+    // Parar event detector (para de escutar eventos)
     await eventDetector.stop();
     console.log('🔍 EventDetector stopped');
-    
+
     // Parar audio analyzer
     audioAnalyzer.stop();
     console.log('🎛️  AudioAnalyzer stopped');

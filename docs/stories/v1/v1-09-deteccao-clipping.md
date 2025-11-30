@@ -1,7 +1,7 @@
 # Story V1.9: Detecção de Clipping
 
 **Epic:** V1 - Foundation Core (MVP)
-**Status:** review
+**Status:** done
 
 **User Story:**
 Como usuário,
@@ -108,3 +108,32 @@ Estendido o EventDetector para detectar clipping (saturação de áudio):
 - Colocar/retirar agulha do disco deve gerar picos que disparam clipping
 - Verificar se o contador incrementa corretamente durante operação real
 - Validar que a API /api/status reflete os eventos de clipping em tempo real
+
+### Implementation Notes (2025-11-29)
+
+**Melhorias implementadas durante testes em produção:**
+
+1. **Cooldown de clipping adicionado:**
+   - Sem cooldown, eventos de clipping seriam emitidos ~10x/segundo durante picos contínuos
+   - Adicionado `CLIPPING_COOLDOWN` (default: 1000ms) para limitar eventos
+   - Contador interno continua incrementando, mas eventos são emitidos com rate limiting
+
+2. **Configuração via .env:**
+   - `CLIPPING_THRESHOLD=-3` (dB) - detecta áudio perigosamente alto antes de distorcer
+   - `CLIPPING_COOLDOWN=1000` (ms) - máximo 1 evento por segundo
+   - `SILENCE_THRESHOLD=-50` e `SILENCE_DURATION=10` também configuráveis
+
+3. **Log de picos periódico:**
+   - Adicionado log de pico máximo a cada 5 segundos para monitoramento
+   - Útil para calibrar threshold sem triggerar clipping constantemente
+   - Formato: `Peak level: -21.5dB (last 5s)`
+
+4. **Remoção de singleton duplicado:**
+   - Removido `export const eventDetector = new EventDetector()` do final do arquivo
+   - Estava causando dupla inicialização com configs diferentes
+
+**Achados durante testes:**
+- Níveis típicos de vinil: -20dB a -35dB (bem longe de clipping real)
+- Threshold de -3dB é adequado para detectar clipping digital real
+- Clipping analógico (no pré-amp) não é detectável por software
+- Som de "clipping" no frontend era na verdade buffer underrun (corrigido separadamente)

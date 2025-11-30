@@ -47,9 +47,9 @@ development_status:
   v1-7-eventbus-core: done
   v1-8-deteccao-silencio: done
   v1-9-deteccao-clipping: done
-  v1-10-persistencia-eventos: drafted
-  v1-11-deteccao-sessao: drafted
-  v1-12-deteccao-troca-faixa: drafted
+  v1-10-persistencia-eventos: done
+  v1-11-deteccao-sessao: done
+  v1-12-deteccao-troca-faixa: deferred
   v1-13-dashboard-basico: drafted
   v1-14-websocket-realtime: drafted
   v1-15-ui-diagnostico: drafted
