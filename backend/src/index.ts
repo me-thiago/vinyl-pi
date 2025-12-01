@@ -17,6 +17,10 @@ import { createSettingsRouter } from './routes/settings';
 import { SettingsService } from './services/settings-service';
 import prisma from './prisma/client';
 import { eventBus } from './utils/event-bus';
+import { createLogger } from './utils/logger';
+import { errorHandler, notFoundHandler } from './middleware/error-handler';
+
+const logger = createLogger('Server');
 
 dotenv.config();
 
@@ -67,21 +71,21 @@ function getOrCreateBroadcaster(source: NodeJS.ReadableStream, analyzer: AudioAn
             });
           }
         } catch (err) {
-          console.error('Error writing to client:', err);
+          logger.error('Erro ao escrever para cliente', { error: err });
           wavClients.delete(client);
         }
       });
     });
 
     source.on('end', () => {
-      console.log('WAV source ended');
+      logger.info('Stream WAV finalizado');
       wavBroadcaster = null;
       wavClients.forEach(c => c.end());
       wavClients.clear();
     });
 
     source.on('error', (err) => {
-      console.error('WAV source error:', err);
+      logger.error('Erro no stream WAV', { error: err });
       wavBroadcaster = null;
       wavClients.forEach(c => c.destroy(err));
       wavClients.clear();
@@ -101,27 +105,27 @@ const audioManager = new AudioManager({
 
 // Event handlers para AudioManager
 audioManager.on('started', () => {
-  console.log('Audio capture started');
+  logger.info('Captura de áudio iniciada');
 });
 
 audioManager.on('stopped', () => {
-  console.log('Audio capture stopped');
+  logger.info('Captura de áudio parada');
 });
 
 audioManager.on('error', (error) => {
-  console.error('Audio capture error:', error);
+  logger.error('Erro na captura de áudio', { error });
 });
 
 audioManager.on('device_disconnected', (info) => {
-  console.error('Audio device disconnected:', info);
+  logger.error('Dispositivo de áudio desconectado', { info });
 });
 
 audioManager.on('streaming_started', (info) => {
-  console.log('Streaming started:', info);
+  logger.info('Streaming iniciado', { info });
 });
 
 audioManager.on('streaming_stopped', () => {
-  console.log('Streaming stopped');
+  logger.info('Streaming parado');
 });
 
 // Inicializar HealthMonitor
@@ -129,23 +133,23 @@ const healthMonitor = new HealthMonitor(audioManager);
 
 // Event handlers para HealthMonitor
 healthMonitor.on('memory_high', (data) => {
-  console.warn('⚠️  High memory usage detected:', data);
+  logger.warn('Uso alto de memória detectado', { data });
 });
 
 healthMonitor.on('memory_leak_detected', (data) => {
-  console.error('🚨 Potential memory leak detected:', data);
+  logger.error('Possível vazamento de memória detectado', { data });
 });
 
 healthMonitor.on('orphan_processes', (data) => {
-  console.warn('⚠️  Orphan FFmpeg processes detected:', data);
+  logger.warn('Processos FFmpeg órfãos detectados', { data });
 });
 
 healthMonitor.on('streaming_recovered', (data) => {
-  console.log('✅ Streaming auto-recovered:', data);
+  logger.info('Streaming recuperado automaticamente', { data });
 });
 
 healthMonitor.on('streaming_failed', (data) => {
-  console.error('🚨 Streaming failed to auto-restart:', data);
+  logger.error('Falha ao reiniciar streaming automaticamente', { data });
 });
 
 // Iniciar health monitoring
@@ -206,7 +210,7 @@ function applySettings(settings: Record<string, number | string | boolean>): voi
 
 // Listener para mudanças de settings em tempo real
 eventBus.subscribe('settings.changed' as any, async (payload) => {
-  console.log('⚙️  Settings changed, applying...');
+  logger.info('Configurações alteradas, aplicando...');
   applySettings(payload.settings);
 });
 
@@ -226,15 +230,15 @@ settingsService.initialize().then(async () => {
   allSettings.forEach(s => { settings[s.key] = s.value; });
   applySettings(settings);
 
-  console.log('⚙️  Settings loaded and applied');
+  logger.info('Configurações carregadas e aplicadas');
 }).catch(err => {
-  console.error('⚙️  Failed to initialize settings:', err);
+  logger.error('Falha ao inicializar configurações', { error: err });
 });
 
-console.log('🎛️  AudioAnalyzer started');
-console.log('🔍 EventDetector started');
-console.log('📍 SessionManager started');
-console.log('💾 EventPersistence started');
+logger.info('AudioAnalyzer iniciado');
+logger.info('EventDetector iniciado');
+logger.info('SessionManager iniciado');
+logger.info('EventPersistence iniciado');
 
 // Inicializar SocketManager para WebSocket real-time updates
 const socketManager = new SocketManager(httpServer, {
@@ -278,10 +282,11 @@ app.get('/audio/status', (req, res) => {
 app.post('/audio/start', async (req, res) => {
   try {
     await audioManager.start();
-    res.json({ success: true, message: 'Audio capture started' });
+    res.json({ success: true, message: 'Captura de áudio iniciada' });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ success: false, error: errorMsg });
+    logger.error('Falha ao iniciar captura de áudio', { error: errorMsg });
+    res.status(500).json({ error: { message: 'Falha ao iniciar captura de áudio', code: 'AUDIO_START_ERROR' } });
   }
 });
 
@@ -289,10 +294,11 @@ app.post('/audio/start', async (req, res) => {
 app.post('/audio/stop', async (req, res) => {
   try {
     await audioManager.stop();
-    res.json({ success: true, message: 'Audio capture stopped' });
+    res.json({ success: true, message: 'Captura de áudio parada' });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ success: false, error: errorMsg });
+    logger.error('Falha ao parar captura de áudio', { error: errorMsg });
+    res.status(500).json({ error: { message: 'Falha ao parar captura de áudio', code: 'AUDIO_STOP_ERROR' } });
   }
 });
 
@@ -318,7 +324,7 @@ app.post('/streaming/start', async (req, res) => {
     // Configurar health monitor para auto-restart
     healthMonitor.setStreamingConfig(config);
 
-    res.json({ success: true, message: 'Streaming started', config: {
+    res.json({ success: true, message: 'Streaming iniciado', config: {
       host: config.icecastHost,
       port: config.icecastPort,
       mountPoint: config.mountPoint,
@@ -326,7 +332,8 @@ app.post('/streaming/start', async (req, res) => {
     }});
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ success: false, error: errorMsg });
+    logger.error('Falha ao iniciar streaming', { error: errorMsg });
+    res.status(500).json({ error: { message: 'Falha ao iniciar streaming', code: 'STREAMING_START_ERROR' } });
   }
 });
 
@@ -334,10 +341,11 @@ app.post('/streaming/start', async (req, res) => {
 app.post('/streaming/stop', async (req, res) => {
   try {
     await audioManager.stopStreaming();
-    res.json({ success: true, message: 'Streaming stopped' });
+    res.json({ success: true, message: 'Streaming parado' });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ success: false, error: errorMsg });
+    logger.error('Falha ao parar streaming', { error: errorMsg });
+    res.status(500).json({ error: { message: 'Falha ao parar streaming', code: 'STREAMING_STOP_ERROR' } });
   }
 });
 
@@ -347,7 +355,7 @@ app.post('/streaming/restart', async (req, res) => {
     const status = audioManager.getStreamingStatus();
 
     if (!status.active) {
-      res.status(400).json({ success: false, error: 'Streaming is not active' });
+      res.status(400).json({ error: { message: 'Streaming não está ativo', code: 'STREAMING_NOT_ACTIVE' } });
       return;
     }
 
@@ -365,7 +373,7 @@ app.post('/streaming/restart', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Streaming restarted with new configuration',
+      message: 'Streaming reiniciado com nova configuração',
       config: {
         host: config.icecastHost,
         port: config.icecastPort,
@@ -375,7 +383,8 @@ app.post('/streaming/restart', async (req, res) => {
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ success: false, error: errorMsg });
+    logger.error('Falha ao reiniciar streaming', { error: errorMsg });
+    res.status(500).json({ error: { message: 'Falha ao reiniciar streaming', code: 'STREAMING_RESTART_ERROR' } });
   }
 });
 
@@ -392,8 +401,7 @@ app.get('/stream.wav', (req, res) => {
 
   if (!wavStream) {
     res.status(503).json({
-      success: false,
-      error: 'WAV streaming not available. Start streaming first.'
+      error: { message: 'Stream WAV indisponível. Inicie o streaming primeiro.', code: 'WAV_STREAM_UNAVAILABLE' }
     });
     return;
   }
@@ -413,7 +421,7 @@ app.get('/stream.wav', (req, res) => {
   const clientStream = new PassThrough();
   wavClients.add(clientStream);
 
-  console.log(`Client connected to WAV stream (total: ${wavClients.size})`);
+  logger.info('Cliente conectado ao stream WAV', { totalClients: wavClients.size });
 
   // Enviar para response
   clientStream.pipe(res);
@@ -422,7 +430,7 @@ app.get('/stream.wav', (req, res) => {
   const cleanup = () => {
     wavClients.delete(clientStream);
     clientStream.destroy();
-    console.log(`Client disconnected from WAV stream (remaining: ${wavClients.size})`);
+    logger.info('Cliente desconectado do stream WAV', { remainingClients: wavClients.size });
   };
 
   req.on('close', cleanup);
@@ -430,14 +438,18 @@ app.get('/stream.wav', (req, res) => {
   clientStream.on('error', cleanup);
 });
 
+// Registrar middleware de rotas não encontradas e error handler (ÚLTIMO)
+app.use(notFoundHandler);
+app.use(errorHandler);
+
 httpServer.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`🔌 WebSocket server ready`);
+  logger.info(`Servidor iniciado na porta ${PORT}`);
+  logger.info('Servidor WebSocket pronto');
 });
 
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  logger.info(`${signal} recebido, encerrando graciosamente...`);
 
   try {
     // Parar socket manager primeiro (fecha conexões WebSocket)
@@ -445,19 +457,19 @@ const gracefulShutdown = async (signal: string) => {
 
     // Parar event persistence (para de persistir eventos)
     await eventPersistence.destroy();
-    console.log('💾 EventPersistence stopped');
+    logger.info('EventPersistence parado');
 
     // Parar session manager (encerra sessão ativa se houver)
     await sessionManager.destroy();
-    console.log('📍 SessionManager stopped');
+    logger.info('SessionManager parado');
 
     // Parar event detector (para de escutar eventos)
     await eventDetector.stop();
-    console.log('🔍 EventDetector stopped');
+    logger.info('EventDetector parado');
 
     // Parar audio analyzer
     audioAnalyzer.stop();
-    console.log('🎛️  AudioAnalyzer stopped');
+    logger.info('AudioAnalyzer parado');
 
     // Parar health monitor
     await healthMonitor.stop();
@@ -465,10 +477,10 @@ const gracefulShutdown = async (signal: string) => {
     // Parar audio manager
     await audioManager.cleanup();
 
-    console.log('Cleanup completed, exiting...');
+    logger.info('Cleanup concluído, encerrando...');
     process.exit(0);
   } catch (err) {
-    console.error('Error during shutdown:', err);
+    logger.error('Erro durante shutdown', { error: err });
     process.exit(1);
   }
 };
@@ -479,8 +491,8 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handler para recovery failures
 audioManager.on('recovery_failed', (data) => {
-  console.error('🚨 FFmpeg recovery failed after max retries:', data);
-  console.error('Exiting process to allow PM2 restart...');
+  logger.error('Recuperação do FFmpeg falhou após máximo de tentativas', { data });
+  logger.error('Encerrando processo para permitir restart pelo PM2...');
   gracefulShutdown('RECOVERY_FAILED').then(() => {
     process.exit(1);
   });

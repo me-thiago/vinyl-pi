@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../prisma/client';
 import { EventPersistence } from '../services/event-persistence';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('EventsRouter');
 
 /**
  * Dependências para o router de eventos
@@ -76,16 +79,14 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
       // Validar valores numéricos
       if (isNaN(limit) || limit < 1) {
         res.status(400).json({
-          error: 'Parâmetro inválido',
-          message: 'limit deve ser um número entre 1 e 1000'
+          error: { message: 'Parâmetro inválido: limit deve ser um número entre 1 e 1000', code: 'VALIDATION_ERROR' }
         });
         return;
       }
 
       if (isNaN(offset) || offset < 0) {
         res.status(400).json({
-          error: 'Parâmetro inválido',
-          message: 'offset deve ser um número maior ou igual a 0'
+          error: { message: 'Parâmetro inválido: offset deve ser um número maior ou igual a 0', code: 'VALIDATION_ERROR' }
         });
         return;
       }
@@ -116,8 +117,7 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
           const dateFromParsed = new Date(date_from);
           if (isNaN(dateFromParsed.getTime())) {
             res.status(400).json({
-              error: 'Parâmetro inválido',
-              message: 'date_from deve ser uma data ISO válida'
+              error: { message: 'Parâmetro inválido: date_from deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
             });
             return;
           }
@@ -128,8 +128,7 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
           const dateToParsed = new Date(date_to);
           if (isNaN(dateToParsed.getTime())) {
             res.status(400).json({
-              error: 'Parâmetro inválido',
-              message: 'date_to deve ser uma data ISO válida'
+              error: { message: 'Parâmetro inválido: date_to deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
             });
             return;
           }
@@ -171,9 +170,9 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
       res.json(response);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('Erro ao buscar eventos', { error: errorMsg });
       res.status(500).json({
-        error: 'Erro ao buscar eventos',
-        message: errorMsg
+        error: { message: 'Erro ao buscar eventos', code: 'EVENTS_FETCH_ERROR' }
       });
     }
   });
@@ -186,8 +185,7 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
   router.get('/events/stats', (req: Request, res: Response) => {
     if (!eventPersistence) {
       res.status(503).json({
-        error: 'Serviço indisponível',
-        message: 'EventPersistence não está configurado'
+        error: { message: 'Serviço indisponível: EventPersistence não está configurado', code: 'SERVICE_UNAVAILABLE' }
       });
       return;
     }

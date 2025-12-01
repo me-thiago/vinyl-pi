@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../prisma/client';
 import { SessionManager } from '../services/session-manager';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SessionsRouter');
 
 /**
  * Dependências para o router de sessões
@@ -87,16 +90,14 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
 
       if (isNaN(limit) || limit < 1) {
         res.status(400).json({
-          error: 'Parâmetro inválido',
-          message: 'limit deve ser um número entre 1 e 100'
+          error: { message: 'Parâmetro inválido: limit deve ser um número entre 1 e 100', code: 'VALIDATION_ERROR' }
         });
         return;
       }
 
       if (isNaN(offset) || offset < 0) {
         res.status(400).json({
-          error: 'Parâmetro inválido',
-          message: 'offset deve ser um número maior ou igual a 0'
+          error: { message: 'Parâmetro inválido: offset deve ser um número maior ou igual a 0', code: 'VALIDATION_ERROR' }
         });
         return;
       }
@@ -116,8 +117,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
           const dateFromParsed = new Date(date_from);
           if (isNaN(dateFromParsed.getTime())) {
             res.status(400).json({
-              error: 'Parâmetro inválido',
-              message: 'date_from deve ser uma data ISO válida'
+              error: { message: 'Parâmetro inválido: date_from deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
             });
             return;
           }
@@ -128,8 +128,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
           const dateToParsed = new Date(date_to);
           if (isNaN(dateToParsed.getTime())) {
             res.status(400).json({
-              error: 'Parâmetro inválido',
-              message: 'date_to deve ser uma data ISO válida'
+              error: { message: 'Parâmetro inválido: date_to deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
             });
             return;
           }
@@ -171,9 +170,9 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
       res.json(response);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('Erro ao buscar sessões', { error: errorMsg });
       res.status(500).json({
-        error: 'Erro ao buscar sessões',
-        message: errorMsg
+        error: { message: 'Erro ao buscar sessões', code: 'SESSIONS_FETCH_ERROR' }
       });
     }
   });
@@ -186,8 +185,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
   router.get('/sessions/active', (req: Request, res: Response) => {
     if (!sessionManager) {
       res.status(503).json({
-        error: 'Serviço indisponível',
-        message: 'SessionManager não está configurado'
+        error: { message: 'Serviço indisponível: SessionManager não está configurado', code: 'SERVICE_UNAVAILABLE' }
       });
       return;
     }
@@ -236,8 +234,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
 
       if (!session) {
         res.status(404).json({
-          error: 'Sessão não encontrada',
-          message: `Nenhuma sessão com id '${id}'`
+          error: { message: `Sessão não encontrada: nenhuma sessão com id '${id}'`, code: 'SESSION_NOT_FOUND' }
         });
         return;
       }
@@ -259,9 +256,9 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
       res.json(response);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('Erro ao buscar sessão', { id: req.params.id, error: errorMsg });
       res.status(500).json({
-        error: 'Erro ao buscar sessão',
-        message: errorMsg
+        error: { message: 'Erro ao buscar sessão', code: 'SESSION_FETCH_ERROR' }
       });
     }
   });

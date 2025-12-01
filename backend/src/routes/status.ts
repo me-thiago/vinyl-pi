@@ -3,6 +3,9 @@ import { AudioManager } from '../services/audio-manager';
 import { AudioAnalyzer } from '../services/audio-analyzer';
 import { EventDetector } from '../services/event-detector';
 import { SessionManager } from '../services/session-manager';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('StatusRouter');
 
 /**
  * Dependências opcionais para status estendido
@@ -76,7 +79,8 @@ export function createStatusRouter(
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: 'Failed to get status', message: errorMsg });
+      logger.error('Erro ao obter status', { error: errorMsg });
+      res.status(500).json({ error: { message: 'Falha ao obter status do sistema', code: 'STATUS_ERROR' } });
     }
   });
 
@@ -107,7 +111,8 @@ export function createStatusRouter(
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: 'Failed to get audio status', message: errorMsg });
+      logger.error('Erro ao obter status de áudio', { error: errorMsg });
+      res.status(500).json({ error: { message: 'Falha ao obter status de áudio', code: 'AUDIO_STATUS_ERROR' } });
     }
   });
 

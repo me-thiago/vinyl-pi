@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { eventBus } from '../utils/event-bus';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SettingsService');
 
 /**
  * Definição de uma setting com metadata
@@ -123,7 +126,7 @@ export class SettingsService {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    console.log('⚙️  SettingsService initializing...');
+    logger.info('Inicializando SettingsService...');
 
     // Carregar ou criar cada setting
     for (const def of SETTINGS_DEFINITIONS) {
@@ -148,12 +151,12 @@ export class SettingsService {
         });
 
         this.cache[def.key] = value;
-        console.log(`  ✓ Created setting: ${def.key} = ${value}`);
+        logger.debug('Configuração criada', { key: def.key, value });
       }
     }
 
     this.initialized = true;
-    console.log('⚙️  SettingsService ready');
+    logger.info('SettingsService pronto');
   }
 
   /**
@@ -210,7 +213,7 @@ export class SettingsService {
     for (const [key, value] of Object.entries(updates)) {
       const def = SETTINGS_DEFINITIONS.find(d => d.key === key);
       if (!def) {
-        console.warn(`⚙️  Unknown setting: ${key}`);
+        logger.warn('Configuração desconhecida', { key });
         continue;
       }
 
@@ -242,7 +245,7 @@ export class SettingsService {
 
       if (oldValue !== value) {
         changedSettings.push(key);
-        console.log(`⚙️  Setting updated: ${key} = ${value}`);
+        logger.info('Configuração atualizada', { key, value });
       }
     }
 

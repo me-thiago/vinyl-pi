@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { SettingsService } from '../services/settings-service';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SettingsRouter');
 
 export interface SettingsRouterDependencies {
   settingsService: SettingsService;
@@ -28,8 +31,8 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
       res.json({ settings });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('Error fetching settings:', errorMsg);
-      res.status(500).json({ error: errorMsg });
+      logger.error('Erro ao buscar configurações', { error: errorMsg });
+      res.status(500).json({ error: { message: 'Erro ao buscar configurações', code: 'SETTINGS_FETCH_ERROR' } });
     }
   });
 
@@ -44,7 +47,7 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
       const updates = req.body;
 
       if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-        res.status(400).json({ error: 'Body must be an object with settings to update' });
+        res.status(400).json({ error: { message: 'O corpo da requisição deve ser um objeto com configurações para atualizar', code: 'VALIDATION_ERROR' } });
         return;
       }
 
@@ -54,13 +57,13 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
       const settings = await settingsService.getAll();
       res.json({
         success: true,
-        message: 'Settings updated',
+        message: 'Configurações atualizadas',
         settings
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('Error updating settings:', errorMsg);
-      res.status(400).json({ error: errorMsg });
+      logger.error('Erro ao atualizar configurações', { error: errorMsg });
+      res.status(400).json({ error: { message: 'Erro ao atualizar configurações', code: 'SETTINGS_UPDATE_ERROR' } });
     }
   });
 
@@ -75,13 +78,13 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
       const settings = await settingsService.getAll();
       res.json({
         success: true,
-        message: 'All settings reset to defaults',
+        message: 'Todas as configurações restauradas para valores padrão',
         settings
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('Error resetting settings:', errorMsg);
-      res.status(500).json({ error: errorMsg });
+      logger.error('Erro ao restaurar configurações', { error: errorMsg });
+      res.status(500).json({ error: { message: 'Erro ao restaurar configurações', code: 'SETTINGS_RESET_ERROR' } });
     }
   });
 
@@ -98,13 +101,13 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
       const settings = await settingsService.getAll();
       res.json({
         success: true,
-        message: `Setting ${key} reset to default`,
+        message: `Configuração ${key} restaurada para valor padrão`,
         settings
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('Error resetting setting:', errorMsg);
-      res.status(400).json({ error: errorMsg });
+      logger.error('Erro ao restaurar configuração', { key: req.params.key, error: errorMsg });
+      res.status(400).json({ error: { message: 'Erro ao restaurar configuração', code: 'SETTING_RESET_ERROR' } });
     }
   });
 
@@ -117,13 +120,13 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
       res.json({
         device: process.env.AUDIO_DEVICE || 'plughw:0,0',
         sampleRate: parseInt(process.env.AUDIO_SAMPLE_RATE || '44100'),
-        version: 'v1.18',
+        version: 'v1.19',
         icecastUrl: `http://${process.env.ICECAST_HOST || 'localhost'}:${process.env.ICECAST_PORT || '8000'}${process.env.ICECAST_MOUNT_POINT || '/stream'}`
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('Error fetching system info:', errorMsg);
-      res.status(500).json({ error: errorMsg });
+      logger.error('Erro ao buscar informações do sistema', { error: errorMsg });
+      res.status(500).json({ error: { message: 'Erro ao buscar informações do sistema', code: 'SYSTEM_INFO_ERROR' } });
     }
   });
 

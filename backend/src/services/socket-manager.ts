@@ -2,10 +2,13 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { eventBus, EventType } from '../utils/event-bus';
 import { createSubscriptionManager, Destroyable, SubscriptionManager } from '../utils/lifecycle';
+import { createLogger } from '../utils/logger';
 import { AudioManager } from './audio-manager';
 import { AudioAnalyzer } from './audio-analyzer';
 import { EventDetector } from './event-detector';
 import { SessionManager } from './session-manager';
+
+const logger = createLogger('SocketManager');
 
 /**
  * Dependências para o SocketManager
@@ -96,7 +99,7 @@ export class SocketManager implements Destroyable {
     this.setupEventBusSubscriptions();
     this.startStatusBroadcast();
 
-    console.log('🔌 SocketManager initialized');
+    logger.info('SocketManager inicializado');
   }
 
   /**
@@ -104,19 +107,19 @@ export class SocketManager implements Destroyable {
    */
   private setupConnectionHandlers(): void {
     this.io.on('connection', (socket: Socket) => {
-      console.log(`🔌 Client connected: ${socket.id}`);
+      logger.info('Cliente conectado', { socketId: socket.id });
 
       // Enviar status inicial imediatamente após conexão
       this.emitStatus(socket);
 
       // Handler de desconexão
       socket.on('disconnect', (reason) => {
-        console.log(`🔌 Client disconnected: ${socket.id} (${reason})`);
+        logger.info('Cliente desconectado', { socketId: socket.id, reason });
       });
 
       // Handler de erro
       socket.on('error', (error) => {
-        console.error(`🔌 Socket error for ${socket.id}:`, error);
+        logger.error('Erro no socket', { socketId: socket.id, error });
       });
     });
   }
@@ -259,7 +262,7 @@ export class SocketManager implements Destroyable {
    * Cleanup: para interval e remove subscriptions
    */
   async destroy(): Promise<void> {
-    console.log('🔌 SocketManager shutting down...');
+    logger.info('SocketManager encerrando...');
 
     // Parar broadcast de status
     if (this.statusInterval) {
@@ -273,6 +276,6 @@ export class SocketManager implements Destroyable {
     // Fechar todas as conexões
     this.io.close();
 
-    console.log('🔌 SocketManager stopped');
+    logger.info('SocketManager parado');
   }
 }
