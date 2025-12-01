@@ -1,6 +1,7 @@
 # Story V1.21: Install Script Completo
 
 **Epic:** V1 - Foundation Core (MVP)
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  
@@ -27,4 +28,9 @@ para que o setup seja simples e reproduzível.
 - [PRD v3.0](../prd-v3.md) - Seção 10.1 (Quick Start)
 - [PRD v3.0](../prd-v3.md) - Seção 10.2 (Validação Pós-Instalação)
 - [Epics](../epics.md) - Epic V1
+
+## Dev Agent Record
+
+### Context Reference
+- [Story Context](../v1-21-install-script.context.xml)
 

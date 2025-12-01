@@ -1,0 +1,384 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.1">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>19</storyId>
+    <title>Error Handling Robusto</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-30</generatedAt>
+    <updatedAt>2025-11-30</updatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-19-error-handling.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter tratamento de erros robusto em toda a aplicação</iWant>
+    <soThat>o sistema seja estável e forneça feedback útil em caso de problemas</soThat>
+    <tasks>
+      <task id="1">Criar middleware de error handling global no Express</task>
+      <task id="2">Revisar e adicionar try-catch em todas operações async</task>
+      <task id="3">Implementar logging de erros via Winston</task>
+      <task id="4">Padronizar respostas HTTP (400, 404, 500)</task>
+      <task id="5">Criar mensagens de erro user-friendly em português BR</task>
+      <task id="6">Implementar Error boundaries no React</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" status="not-started">Middleware de error handling global no Express</criterion>
+    <criterion id="AC2" status="done">Try-catch em todas operações async</criterion>
+    <criterion id="AC3" status="partial">Logging de erros via Winston</criterion>
+    <criterion id="AC4" status="partial">Respostas HTTP apropriadas (400, 404, 500)</criterion>
+    <criterion id="AC5" status="partial">Mensagens de erro user-friendly em português BR</criterion>
+    <criterion id="AC6" status="not-started">Error boundaries no React para erros de UI</criterion>
+  </acceptanceCriteria>
+
+  <!-- ================================================================== -->
+  <!-- ANÁLISE DETALHADA DO ESTADO ATUAL (Atualizado 2025-11-30)          -->
+  <!-- ================================================================== -->
+
+  <currentStateAnalysis>
+    <summary>
+      <item criterion="AC1" status="NOT_STARTED" effort="high">Middleware global não existe - criar do zero</item>
+      <item criterion="AC2" status="DONE" effort="none">Try-catch já implementado em todas routes e services</item>
+      <item criterion="AC3" status="PARTIAL" effort="medium">Services usam Winston, routes usam console.error</item>
+      <item criterion="AC4" status="PARTIAL" effort="low">Códigos HTTP corretos, formato de resposta inconsistente</item>
+      <item criterion="AC5" status="PARTIAL" effort="low">sessions.ts e events.ts em PT-BR, outros em inglês</item>
+      <item criterion="AC6" status="NOT_STARTED" effort="medium">Error Boundary não existe - criar do zero</item>
+    </summary>
+
+    <!-- AC1: Middleware Global -->
+    <criterionAnalysis id="AC1">
+      <status>NOT_STARTED</status>
+      <findings>
+        <finding type="missing">Pasta backend/src/middleware/ não existe</finding>
+        <finding type="missing">Arquivo error-handler.ts não existe</finding>
+        <finding type="missing">Nenhum app.use(errorHandler) em index.ts</finding>
+        <finding type="issue">Cada rota trata erros individualmente com padrões diferentes</finding>
+      </findings>
+      <workRequired>
+        <task>Criar pasta backend/src/middleware/</task>
+        <task>Criar backend/src/middleware/error-handler.ts</task>
+        <task>Registrar middleware como ÚLTIMO em index.ts</task>
+      </workRequired>
+    </criterionAnalysis>
+
+    <!-- AC2: Try-Catch -->
+    <criterionAnalysis id="AC2">
+      <status>DONE</status>
+      <findings>
+        <finding type="ok">routes/sessions.ts - todos endpoints com try-catch</finding>
+        <finding type="ok">routes/events.ts - todos endpoints com try-catch</finding>
+        <finding type="ok">routes/settings.ts - todos endpoints com try-catch</finding>
+        <finding type="ok">routes/status.ts - todos endpoints com try-catch</finding>
+        <finding type="ok">index.ts - endpoints inline com try-catch</finding>
+        <finding type="ok">Todos services têm try-catch onde necessário</finding>
+      </findings>
+      <workRequired>
+        <task>Nenhum trabalho necessário</task>
+      </workRequired>
+    </criterionAnalysis>
+
+    <!-- AC3: Winston Logging -->
+    <criterionAnalysis id="AC3">
+      <status>PARTIAL</status>
+      <findings>
+        <!-- Arquivos que JÁ usam Winston corretamente -->
+        <finding type="ok">services/audio-manager.ts - usa Winston com arquivo logs/audio-manager.log</finding>
+        <finding type="ok">services/audio-analyzer.ts - usa Winston</finding>
+        <finding type="ok">services/event-detector.ts - usa Winston</finding>
+        <finding type="ok">services/event-persistence.ts - usa Winston</finding>
+        <finding type="ok">services/session-manager.ts - usa Winston</finding>
+        <finding type="ok">services/health-monitor.ts - usa Winston</finding>
+        <finding type="ok">utils/event-bus.ts - usa Winston</finding>
+
+        <!-- Arquivos que usam console.* (PRECISAM MIGRAR) -->
+        <finding type="issue" file="routes/settings.ts" lines="31,62,83,106,125">Usa console.error ao invés de Winston</finding>
+        <finding type="issue" file="routes/sessions.ts">Não importa Winston, não loga erros</finding>
+        <finding type="issue" file="routes/events.ts">Não importa Winston, não loga erros</finding>
+        <finding type="issue" file="routes/status.ts">Não importa Winston, não loga erros</finding>
+        <finding type="issue" file="index.ts" lines="70,77,84,104-148,209-237,416-483">~40 linhas com console.log/error/warn</finding>
+        <finding type="issue" file="services/settings-service.ts" lines="126,151,156,213,245">Usa console.log/warn</finding>
+        <finding type="issue" file="services/socket-manager.ts" lines="99,107,114,119,262,276">Usa console.log/error</finding>
+
+        <!-- Problema arquitetural -->
+        <finding type="issue">Cada service cria seu próprio logger - não há logger centralizado</finding>
+      </findings>
+      <workRequired>
+        <task priority="high">Criar backend/src/utils/logger.ts - logger centralizado reutilizável</task>
+        <task>Migrar routes/settings.ts de console.error para logger</task>
+        <task>Adicionar logging em routes/sessions.ts</task>
+        <task>Adicionar logging em routes/events.ts</task>
+        <task>Adicionar logging em routes/status.ts</task>
+        <task>Migrar index.ts de console.* para logger</task>
+        <task>Migrar services/settings-service.ts de console.* para logger</task>
+        <task>Migrar services/socket-manager.ts de console.* para logger</task>
+        <task>Refatorar services existentes para usar logger centralizado</task>
+      </workRequired>
+    </criterionAnalysis>
+
+    <!-- AC4: HTTP Status Codes -->
+    <criterionAnalysis id="AC4">
+      <status>PARTIAL</status>
+      <findings>
+        <!-- Status codes estão corretos -->
+        <finding type="ok">400 (Bad Request) - usado corretamente para validações</finding>
+        <finding type="ok">404 (Not Found) - usado em sessions/:id quando não encontra</finding>
+        <finding type="ok">500 (Internal Error) - usado para erros gerais</finding>
+        <finding type="ok">503 (Service Unavailable) - usado quando streaming não ativo</finding>
+
+        <!-- Formato de resposta INCONSISTENTE -->
+        <finding type="issue" file="routes/sessions.ts">Formato: { error: "...", message: "..." }</finding>
+        <finding type="issue" file="routes/events.ts">Formato: { error: "...", message: "..." }</finding>
+        <finding type="issue" file="routes/settings.ts">Formato: { error: "..." } (sem message)</finding>
+        <finding type="issue" file="routes/status.ts">Formato: { error: "...", message: "..." }</finding>
+        <finding type="issue" file="index.ts">Formato: { success: false, error: "..." }</finding>
+        <finding type="issue">Nenhum usa formato definido na arquitetura: { error: { message, code?, details? } }</finding>
+      </findings>
+      <workRequired>
+        <task>Padronizar TODAS as respostas de erro para: { error: { message: string, code?: string } }</task>
+        <task>Definir códigos de erro (ERROR_SESSION_NOT_FOUND, ERROR_VALIDATION, etc.)</task>
+      </workRequired>
+    </criterionAnalysis>
+
+    <!-- AC5: Mensagens PT-BR -->
+    <criterionAnalysis id="AC5">
+      <status>PARTIAL</status>
+      <findings>
+        <!-- Arquivos JÁ em português -->
+        <finding type="ok" file="routes/sessions.ts">Mensagens em português: "Parâmetro inválido", "Sessão não encontrada", "Serviço indisponível"</finding>
+        <finding type="ok" file="routes/events.ts">Mensagens em português: "Parâmetro inválido", "Erro ao buscar eventos"</finding>
+
+        <!-- Arquivos em INGLÊS (precisam traduzir) -->
+        <finding type="issue" file="routes/settings.ts">"Body must be an object...", "Error fetching settings"</finding>
+        <finding type="issue" file="routes/status.ts">"Failed to get status", "Failed to get audio status"</finding>
+        <finding type="issue" file="index.ts">"Audio capture started", "Streaming not available", etc.</finding>
+      </findings>
+      <workRequired>
+        <task>Traduzir mensagens em routes/settings.ts para português BR</task>
+        <task>Traduzir mensagens em routes/status.ts para português BR</task>
+        <task>Traduzir mensagens em index.ts para português BR</task>
+      </workRequired>
+    </criterionAnalysis>
+
+    <!-- AC6: Error Boundaries -->
+    <criterionAnalysis id="AC6">
+      <status>NOT_STARTED</status>
+      <findings>
+        <finding type="missing">Componente ErrorBoundary.tsx não existe</finding>
+        <finding type="missing">Nenhum error boundary em App.tsx ou Layout</finding>
+        <finding type="missing">Não há fallback UI para erros de renderização</finding>
+      </findings>
+      <workRequired>
+        <task>Criar frontend/src/components/ErrorBoundary.tsx</task>
+        <task>Implementar getDerivedStateFromError e componentDidCatch</task>
+        <task>Criar fallback UI com mensagem amigável e botão "Recarregar"</task>
+        <task>Envolver App ou Layout principal com ErrorBoundary</task>
+        <task>Opcionalmente criar boundaries por seção (Player, Dashboard, etc.)</task>
+      </workRequired>
+    </criterionAnalysis>
+  </currentStateAnalysis>
+
+  <!-- ================================================================== -->
+  <!-- ARQUIVOS A CRIAR                                                   -->
+  <!-- ================================================================== -->
+
+  <filesToCreate>
+    <file priority="1">
+      <path>backend/src/utils/logger.ts</path>
+      <purpose>Logger Winston centralizado e reutilizável</purpose>
+      <notes>Exportar instância singleton. Configurar transports para console e arquivo. Suportar níveis: error, warn, info, debug.</notes>
+    </file>
+    <file priority="2">
+      <path>backend/src/middleware/error-handler.ts</path>
+      <purpose>Middleware global de tratamento de erros Express</purpose>
+      <notes>Capturar erros síncronos e async. Formatar resposta padrão. Logar via Winston. Esconder stack em produção.</notes>
+    </file>
+    <file priority="3">
+      <path>frontend/src/components/ErrorBoundary.tsx</path>
+      <purpose>Error Boundary React para capturar erros de renderização</purpose>
+      <notes>Class component com getDerivedStateFromError e componentDidCatch. Fallback UI em português.</notes>
+    </file>
+  </filesToCreate>
+
+  <!-- ================================================================== -->
+  <!-- ARQUIVOS A MODIFICAR                                               -->
+  <!-- ================================================================== -->
+
+  <filesToModify>
+    <file priority="1">
+      <path>backend/src/index.ts</path>
+      <changes>
+        <change>Importar e registrar error-handler middleware como ÚLTIMO</change>
+        <change>Substituir ~40 linhas de console.* por logger centralizado</change>
+        <change>Traduzir mensagens para português BR</change>
+      </changes>
+    </file>
+    <file priority="2">
+      <path>backend/src/routes/settings.ts</path>
+      <changes>
+        <change>Importar logger centralizado</change>
+        <change>Substituir console.error por logger.error (linhas 31, 62, 83, 106, 125)</change>
+        <change>Padronizar formato de erro para { error: { message, code } }</change>
+        <change>Traduzir mensagens para português BR</change>
+      </changes>
+    </file>
+    <file priority="3">
+      <path>backend/src/routes/status.ts</path>
+      <changes>
+        <change>Importar logger centralizado</change>
+        <change>Adicionar logging de erros</change>
+        <change>Padronizar formato de erro</change>
+        <change>Traduzir "Failed to get status" para português</change>
+      </changes>
+    </file>
+    <file priority="4">
+      <path>backend/src/routes/sessions.ts</path>
+      <changes>
+        <change>Importar logger centralizado</change>
+        <change>Adicionar logging de erros nos catch blocks</change>
+        <change>Padronizar formato de erro para { error: { message, code } }</change>
+      </changes>
+    </file>
+    <file priority="5">
+      <path>backend/src/routes/events.ts</path>
+      <changes>
+        <change>Importar logger centralizado</change>
+        <change>Adicionar logging de erros nos catch blocks</change>
+        <change>Padronizar formato de erro para { error: { message, code } }</change>
+      </changes>
+    </file>
+    <file priority="6">
+      <path>backend/src/services/settings-service.ts</path>
+      <changes>
+        <change>Importar logger centralizado</change>
+        <change>Substituir console.log/warn por logger (linhas 126, 151, 156, 213, 245)</change>
+      </changes>
+    </file>
+    <file priority="7">
+      <path>backend/src/services/socket-manager.ts</path>
+      <changes>
+        <change>Importar logger centralizado</change>
+        <change>Substituir console.log/error por logger (linhas 99, 107, 114, 119, 262, 276)</change>
+      </changes>
+    </file>
+    <file priority="8">
+      <path>frontend/src/App.tsx</path>
+      <changes>
+        <change>Importar ErrorBoundary</change>
+        <change>Envolver conteúdo principal com ErrorBoundary</change>
+      </changes>
+    </file>
+  </filesToModify>
+
+  <!-- ================================================================== -->
+  <!-- ARTEFATOS E DEPENDÊNCIAS                                           -->
+  <!-- ================================================================== -->
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD v3.0</title>
+        <section>6.1 Stack Tecnológico</section>
+        <snippet>Logs: Winston com rotate. Error handling robusto mencionado no Sprint 7-8 V1.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões</title>
+        <section>Padrões de Formato - Error Format</section>
+        <snippet>HTTP status codes padrão (200, 400, 404, 500). Error response sempre { error: { message, code?, details? } }. Logging via Winston. User-Facing Errors em português BR.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões</title>
+        <section>Padrões de Lifecycle - Error Recovery</section>
+        <snippet>Backend: try-catch em todos async operations, log + resposta HTTP adequada. Frontend: Error boundaries para React errors, toast notifications para API errors.</snippet>
+      </doc>
+    </docs>
+
+    <dependencies>
+      <node status="installed">
+        <package>express</package>
+        <version>^4.21.2</version>
+        <usage>Framework web - suporta middleware de error handling</usage>
+      </node>
+      <node status="installed">
+        <package>winston</package>
+        <version>^3.18.3</version>
+        <usage>Logging estruturado com rotation - JÁ INSTALADO</usage>
+      </node>
+      <node status="installed">
+        <package>winston-daily-rotate-file</package>
+        <version>^5.0.0</version>
+        <usage>Rotação de logs por dia - JÁ INSTALADO</usage>
+      </node>
+      <node-frontend status="installed">
+        <package>react</package>
+        <version>^19.1.1</version>
+        <usage>React 19 - suporta Error Boundaries nativamente</usage>
+      </node-frontend>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Error response format: { error: { message: string, code?: string, details?: unknown } }</constraint>
+    <constraint type="language">Mensagens de erro devem ser em português BR</constraint>
+    <constraint type="logging">Usar Winston para logging de erros, NÃO console.error em produção</constraint>
+    <constraint type="architecture">Não expor stack traces em respostas HTTP de produção</constraint>
+    <constraint type="architecture">Middleware de error handling deve ser o ÚLTIMO middleware registrado</constraint>
+    <constraint type="frontend">Error boundaries devem capturar erros de renderização e exibir fallback UI</constraint>
+    <constraint type="http">Status codes: 400 (bad request/validation), 404 (not found), 500 (internal error), 503 (service unavailable)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Express Error Middleware</name>
+      <kind>middleware signature</kind>
+      <signature>(err: Error, req: Request, res: Response, next: NextFunction) => void</signature>
+      <path>backend/src/middleware/error-handler.ts (a criar)</path>
+    </interface>
+    <interface>
+      <name>Error Response Format</name>
+      <kind>API response</kind>
+      <signature>{ error: { message: string, code?: string, details?: unknown } }</signature>
+      <path>docs/architecture.md</path>
+    </interface>
+    <interface>
+      <name>React Error Boundary</name>
+      <kind>React component</kind>
+      <signature>class ErrorBoundary extends React.Component with static getDerivedStateFromError and componentDidCatch</signature>
+      <path>frontend/src/components/ErrorBoundary.tsx (a criar)</path>
+    </interface>
+    <interface>
+      <name>Centralized Logger</name>
+      <kind>utility module</kind>
+      <signature>export const logger: winston.Logger with methods error(), warn(), info(), debug()</signature>
+      <path>backend/src/utils/logger.ts (a criar)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Backend usa Jest com supertest para testes de rotas. Frontend usa Vitest com @testing-library/react. Testes colocalizados com source (*test.ts). Padrão AAA (Arrange, Act, Assert).
+    </standards>
+    <locations>
+      <location>backend/src/__tests__/</location>
+      <location>backend/src/__tests__/routes/</location>
+      <location>backend/src/__tests__/services/</location>
+      <location>backend/src/__tests__/middleware/ (a criar)</location>
+      <location>frontend/src/__tests__/ (a criar se necessário)</location>
+    </locations>
+    <ideas>
+      <idea acId="AC1">Testar middleware captura erros síncronos e async e retorna formato correto</idea>
+      <idea acId="AC1">Testar que stack trace não é exposto em produção (NODE_ENV=production)</idea>
+      <idea acId="AC1">Testar que middleware loga erro via Winston</idea>
+      <idea acId="AC3">Testar que logger centralizado escreve em arquivo e console</idea>
+      <idea acId="AC4">Testar resposta 400 para bad request, 404 para not found, 500 para internal error</idea>
+      <idea acId="AC4">Testar que formato de erro é consistente: { error: { message, code? } }</idea>
+      <idea acId="AC5">Testar que mensagens de erro estão em português BR</idea>
+      <idea acId="AC6">Testar que ErrorBoundary renderiza fallback em caso de erro de componente</idea>
+      <idea acId="AC6">Testar que ErrorBoundary loga erro via componentDidCatch</idea>
+    </ideas>
+  </tests>
+</story-context>

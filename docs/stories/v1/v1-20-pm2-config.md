@@ -1,6 +1,7 @@
 # Story V1.20: PM2 Config e Auto-Start
 
 **Epic:** V1 - Foundation Core (MVP)
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  
@@ -25,4 +26,9 @@ para que funcione sem intervenção manual.
 - [PRD v3.0](../prd-v3.md) - Seção 6.1 (Stack Tecnológico - Process Manager)
 - [PRD v3.0](../prd-v3.md) - Seção 18.B (Configuração Exemplo Completa)
 - [Epics](../epics.md) - Epic V1
+
+## Dev Agent Record
+
+### Context Reference
+- [Story Context](../v1-20-pm2-config.context.xml)
 

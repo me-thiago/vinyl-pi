@@ -1,0 +1,323 @@
+<story-context id="v1-20-pm2-config" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>20</storyId>
+    <title>PM2 Config e Auto-Start</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-30</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-20-pm2-config.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que o sistema inicie automaticamente após reboot</iWant>
+    <soThat>funcione sem intervenção manual</soThat>
+    <tasks>
+      <task id="1">Revisar e melhorar ecosystem.config.js existente</task>
+      <task id="2">Configurar scripts de start em package.json</task>
+      <task id="3">Garantir auto-restart e max_memory_restart</task>
+      <task id="4">Configurar logs rotativos (app.log, error.log)</task>
+      <task id="5">Executar e documentar pm2 startup</task>
+      <task id="6">Criar documentação de operação</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" priority="must">
+      <description>Arquivo ecosystem.config.js criado para PM2</description>
+      <currentState>PARCIAL - Arquivo existe mas precisa melhorias</currentState>
+      <analysis>
+        O arquivo ecosystem.config.js já existe na raiz do projeto com 3 apps configurados:
+        - vinyl-os-icecast: Gerencia Icecast2 via PM2 (usando interpreter: 'none')
+        - vinyl-backend: Roda npm run dev (modo desenvolvimento, não produção)
+        - vinyl-frontend: Roda npm run preview:prod
+
+        PROBLEMAS:
+        1. Backend usa "npm run dev" (ts-node) em vez de "npm start" (node dist/index.js)
+        2. Falta autorestart no backend e frontend
+        3. Falta max_memory_restart nos apps Node.js
+        4. Logs vão para ./logs/ (relativo ao cwd do PM2, pode ser inconsistente)
+      </analysis>
+      <filesToModify>
+        <file path="ecosystem.config.js" reason="Melhorar configuração para produção" />
+      </filesToModify>
+    </criterion>
+
+    <criterion id="AC2" priority="must">
+      <description>Script de start configurado</description>
+      <currentState>PARCIAL - Scripts básicos existem</currentState>
+      <analysis>
+        Backend package.json tem:
+        - "dev": "ts-node src/index.ts" (desenvolvimento)
+        - "build": "tsc" (build TypeScript)
+        - "start": "node dist/index.js" (produção)
+
+        FALTA:
+        1. Script "pm2:start" para iniciar via PM2
+        2. Script "pm2:stop" para parar
+        3. Script "pm2:restart" para reiniciar
+        4. Script "pm2:logs" para visualizar logs
+      </analysis>
+      <filesToModify>
+        <file path="backend/package.json" reason="Adicionar scripts PM2" />
+        <file path="package.json" reason="Adicionar scripts PM2 no root" />
+      </filesToModify>
+    </criterion>
+
+    <criterion id="AC3" priority="must">
+      <description>Auto-restart habilitado</description>
+      <currentState>PARCIAL - Apenas Icecast tem autorestart</currentState>
+      <analysis>
+        Configuração atual:
+        - vinyl-os-icecast: autorestart: true, max_memory_restart: '100M' ✓
+        - vinyl-backend: autorestart: NÃO CONFIGURADO ✗
+        - vinyl-frontend: autorestart: NÃO CONFIGURADO ✗
+
+        NECESSÁRIO:
+        1. Adicionar autorestart: true em todos os apps
+        2. Adicionar max_memory_restart em apps Node.js
+        3. Adicionar restart_delay para evitar restart loops
+        4. Considerar exp_backoff_restart_delay para crashes
+      </analysis>
+      <filesToModify>
+        <file path="ecosystem.config.js" reason="Adicionar autorestart e restart policies" />
+      </filesToModify>
+    </criterion>
+
+    <criterion id="AC4" priority="must">
+      <description>Logs configurados (app.log, error.log)</description>
+      <currentState>PARCIAL - Logs básicos configurados</currentState>
+      <analysis>
+        Configuração atual:
+        - Logs separados por app (out, error, combined)
+        - Diretório: ./logs/ (relativo)
+        - time: true para timestamps
+
+        PROBLEMAS:
+        1. Sem rotação de logs (podem crescer indefinidamente)
+        2. Caminhos relativos podem causar inconsistência
+        3. Sem log_date_format configurado
+
+        NOTA: Winston já faz rotação interna dos logs do backend.
+        PM2 logs são separados e precisam de rotação própria.
+
+        SOLUÇÃO RECOMENDADA:
+        1. Usar pm2-logrotate module
+        2. Configurar merge_logs: false para separar por instância
+        3. Usar caminhos absolutos ou variáveis de ambiente
+      </analysis>
+      <filesToModify>
+        <file path="ecosystem.config.js" reason="Melhorar configuração de logs" />
+      </filesToModify>
+      <filesToCreate>
+        <file path="scripts/setup-pm2-logrotate.sh" reason="Script para configurar rotação de logs PM2" />
+      </filesToCreate>
+    </criterion>
+
+    <criterion id="AC5" priority="must">
+      <description>Comando pm2 startup executado e configurado</description>
+      <currentState>NÃO INICIADO</currentState>
+      <analysis>
+        O comando "pm2 startup" gera um script systemd para iniciar PM2 no boot.
+
+        PASSOS NECESSÁRIOS:
+        1. Executar: pm2 startup (gera comando sudo)
+        2. Executar o comando sudo gerado
+        3. Iniciar todos os apps: pm2 start ecosystem.config.js
+        4. Salvar estado: pm2 save
+        5. Verificar: pm2 resurrect (testa se funciona)
+
+        NOTA: O usuário final precisará executar esses comandos manualmente
+        ou via script de instalação (V1.21).
+      </analysis>
+      <filesToCreate>
+        <file path="scripts/setup-pm2-startup.sh" reason="Script para configurar PM2 startup" />
+      </filesToCreate>
+    </criterion>
+
+    <criterion id="AC6" priority="must">
+      <description>Documentação de como iniciar/parar serviço</description>
+      <currentState>NÃO INICIADO</currentState>
+      <analysis>
+        Precisa documentar:
+        1. Como iniciar o sistema completo
+        2. Como parar o sistema
+        3. Como reiniciar um serviço específico
+        4. Como ver logs
+        5. Como verificar status
+        6. Comandos de troubleshooting
+
+        Já existe ./scripts/system-health.sh que pode ser referenciado.
+      </analysis>
+      <filesToCreate>
+        <file path="docs/operations.md" reason="Documentação de operação" />
+      </filesToCreate>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd-v3.md" title="PRD v3.0" section="Seção 6.1 Stack Tecnológico">
+        Define PM2 ^5.4.3 como Process Manager para produção. Seção 18.B tem exemplo de ecosystem.config.js.
+      </doc>
+      <doc path="docs/architecture.md" title="Arquitetura" section="Tabela de Resumo">
+        Lista PM2 na categoria Deploy com: "Auto-restart, clustering opcional, monitoring".
+      </doc>
+      <doc path="scripts/README.md" title="Scripts README" section="Vinyl-OS System Health Monitor">
+        Documenta script system-health.sh que monitora PM2 e processos do sistema.
+      </doc>
+    </docs>
+
+    <code>
+      <file path="ecosystem.config.js" kind="config" reason="Configuração PM2 existente a ser melhorada">
+        <currentConfig>
+          - 3 apps: vinyl-os-icecast, vinyl-backend, vinyl-frontend
+          - Icecast: autorestart true, max_memory_restart 100M
+          - Backend: npm run dev (PROBLEMA: deveria ser produção)
+          - Frontend: npm run preview:prod
+          - Logs: ./logs/ (separados por app)
+        </currentConfig>
+      </file>
+      <file path="backend/package.json" kind="config" lines="6-15" reason="Scripts npm que precisam de extensão">
+        <existingScripts>
+          - dev: ts-node src/index.ts
+          - build: tsc
+          - start: node dist/index.js
+          - prisma:generate, test, test:watch, test:coverage
+        </existingScripts>
+      </file>
+      <file path="backend/src/index.ts" kind="entrypoint" lines="443-491" reason="Graceful shutdown handlers">
+        Já implementa handlers para SIGTERM e SIGINT com cleanup ordenado de todos os serviços.
+        Isso é essencial para PM2 restart funcionar corretamente.
+      </file>
+      <file path="scripts/system-health.sh" kind="utility" reason="Script de monitoramento que usa PM2">
+        Monitora status PM2, processos, memória, temperatura. Pode ser referenciado na documentação.
+      </file>
+      <file path="scripts/setup-persistent-logs.sh" kind="utility" reason="Script para logs persistentes do sistema">
+        Configura journald persistente. Complementa logs do PM2.
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="pm2" version="^5.4.3" scope="global" status="required">
+          Process manager para Node.js em produção. Instalar globalmente: npm install -g pm2
+        </package>
+        <package name="pm2-logrotate" version="latest" scope="pm2-module" status="recommended">
+          Módulo PM2 para rotação automática de logs. Instalar: pm2 install pm2-logrotate
+        </package>
+      </node>
+      <system>
+        <package name="systemd" status="required">
+          PM2 usa systemd para auto-start no boot via pm2 startup.
+        </package>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface name="PM2 CLI" kind="command-line">
+      <commands>
+        <command>pm2 start ecosystem.config.js</command>
+        <command>pm2 stop all</command>
+        <command>pm2 restart vinyl-backend</command>
+        <command>pm2 logs vinyl-backend --lines 100</command>
+        <command>pm2 monit</command>
+        <command>pm2 status</command>
+        <command>pm2 save</command>
+        <command>pm2 startup</command>
+        <command>pm2 resurrect</command>
+      </commands>
+    </interface>
+    <interface name="Graceful Shutdown" kind="signal-handler" path="backend/src/index.ts:443-491">
+      O backend já implementa handlers para SIGTERM e SIGINT que:
+      1. Param SocketManager
+      2. Param EventPersistence
+      3. Param SessionManager (encerra sessão ativa se houver)
+      4. Param EventDetector
+      5. Param AudioAnalyzer
+      6. Param HealthMonitor
+      7. Param AudioManager (cleanup FFmpeg)
+      Isso garante que PM2 restart seja graceful.
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint type="production">
+      Backend DEVE usar "npm start" (node dist/index.js) em produção, NÃO "npm run dev" (ts-node).
+      Isso requer que "npm run build" seja executado antes do primeiro start.
+    </constraint>
+    <constraint type="filesystem">
+      Logs devem usar caminhos absolutos ou ser relativos ao diretório do projeto,
+      não ao cwd do PM2 que pode variar.
+    </constraint>
+    <constraint type="memory">
+      Raspberry Pi tem memória limitada. Configurar max_memory_restart para evitar
+      que memory leaks derrubem o sistema.
+    </constraint>
+    <constraint type="user">
+      PM2 startup requer privilégios de sudo para criar o service systemd.
+      O usuário final precisará executar comandos manualmente.
+    </constraint>
+    <constraint type="dependencies">
+      PM2 e pm2-logrotate devem ser instalados globalmente, não como dependências do projeto.
+    </constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Backend usa Jest com ts-jest para testes unitários. Testes ficam em src/__tests__/.
+      Padrão: nomearquivo.test.ts. Para PM2 config, testes manuais são mais apropriados
+      que testes unitários, já que envolve processos do sistema.
+    </standards>
+    <locations>
+      <location>backend/src/__tests__/**/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea forAC="AC1">Verificar manualmente que ecosystem.config.js é válido: node -e "require('./ecosystem.config.js')"</idea>
+      <idea forAC="AC2">Testar scripts: npm run pm2:start, verificar status, npm run pm2:stop</idea>
+      <idea forAC="AC3">Simular crash: pm2 restart vinyl-backend, verificar que reinicia automaticamente</idea>
+      <idea forAC="AC3">Testar memory limit: simular alto uso de memória e verificar restart</idea>
+      <idea forAC="AC4">Executar por 24h e verificar que logs são rotacionados corretamente</idea>
+      <idea forAC="AC5">Reboot do sistema e verificar que PM2 inicia automaticamente</idea>
+      <idea forAC="AC6">Seguir documentação em máquina limpa para validar instruções</idea>
+    </ideas>
+  </tests>
+
+  <currentStateAnalysis>
+    <summary>
+      O projeto já tem uma configuração PM2 básica funcional, mas precisa de melhorias
+      significativas para produção:
+
+      1. Backend usa modo desenvolvimento (ts-node) em vez de produção (node dist/)
+      2. Falta autorestart nos apps Node.js
+      3. Logs não têm rotação configurada
+      4. Falta documentação de operação
+      5. pm2 startup não foi configurado
+    </summary>
+
+    <existingImplementation>
+      <item status="exists">ecosystem.config.js com 3 apps configurados</item>
+      <item status="exists">Graceful shutdown handlers no backend</item>
+      <item status="exists">Scripts npm básicos (dev, build, start)</item>
+      <item status="exists">Diretório logs/ com estrutura</item>
+      <item status="exists">system-health.sh que monitora PM2</item>
+    </existingImplementation>
+
+    <requiredChanges>
+      <change priority="high">Alterar vinyl-backend para usar npm start em vez de npm run dev</change>
+      <change priority="high">Adicionar autorestart: true em todos os apps</change>
+      <change priority="high">Adicionar max_memory_restart para apps Node.js</change>
+      <change priority="medium">Configurar pm2-logrotate</change>
+      <change priority="medium">Adicionar scripts PM2 ao package.json</change>
+      <change priority="medium">Criar script setup-pm2-startup.sh</change>
+      <change priority="medium">Criar docs/operations.md</change>
+    </requiredChanges>
+
+    <estimatedEffort>
+      Baixa complexidade. Principalmente configuração e documentação.
+      Mudanças pontuais em arquivos existentes + criação de 2-3 arquivos novos.
+    </estimatedEffort>
+  </currentStateAnalysis>
+</story-context>

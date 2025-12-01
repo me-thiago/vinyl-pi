@@ -56,10 +56,10 @@ development_status:
   v1-16-log-eventos-ui: done
   v1-17-historico-sessoes: done
   v1-18-configuracoes-basicas: done
-  v1-19-error-handling: drafted
-  v1-20-pm2-config: drafted
-  v1-21-install-script: drafted
-  v1-22-documentacao-basica: drafted
+  v1-19-error-handling: review
+  v1-20-pm2-config: ready-for-dev
+  v1-21-install-script: ready-for-dev
+  v1-22-documentacao-basica: ready-for-dev
   epic-v1-retrospective: optional
 
   # Epic V2 - Coleção & Reconhecimento Musical
