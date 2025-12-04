@@ -22,6 +22,7 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { corsOriginCallback } from './utils/cors-validator';
 import { apiLimiter } from './middleware/rate-limiter';
 import { setupSwagger } from './config/swagger';
+import { staticCache } from './middleware/static-cache';
 
 const logger = createLogger('Server');
 
@@ -281,6 +282,14 @@ app.use('/api', createSettingsRouter({
 // Swagger UI e documentação OpenAPI
 // Acessível em /api/docs e /api/docs.json
 setupSwagger(app);
+
+// Servir arquivos estáticos do frontend em produção
+// O frontend compilado deve ser copiado para a pasta 'public' do backend
+// Cache headers otimizados: assets com hash = 1 ano imutável, outros = 24h
+if (process.env.NODE_ENV === 'production') {
+  app.use(staticCache());
+  app.use(express.static('public'));
+}
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Vinyl-OS Backend is running' });
