@@ -1,0 +1,155 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>06</storyId>
+    <title>Configurar CI/CD com GitHub Actions</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-06-ci-github-actions.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter um pipeline de CI/CD configurado no GitHub Actions</iWant>
+    <soThat>testes sejam executados automaticamente em cada push e pull request</soThat>
+    <tasks>
+      <task id="1">Criar workflow principal
+        <subtask>Criar .github/workflows/ci.yml</subtask>
+        <subtask>Configurar trigger para push e PR em main</subtask>
+        <subtask>Configurar Node.js matrix (20.x)</subtask>
+      </task>
+      <task id="2">Configurar jobs de backend
+        <subtask>Job de lint (ESLint)</subtask>
+        <subtask>Job de testes (Jest)</subtask>
+        <subtask>Job de build (TypeScript)</subtask>
+      </task>
+      <task id="3">Configurar jobs de frontend
+        <subtask>Job de lint (ESLint)</subtask>
+        <subtask>Job de testes (Vitest)</subtask>
+        <subtask>Job de build (Vite)</subtask>
+      </task>
+      <task id="4">Configurar cobertura (opcional)
+        <subtask>Gerar relatório de cobertura</subtask>
+        <subtask>Upload para Codecov (se desejado)</subtask>
+      </task>
+      <task id="5">Adicionar badge ao README
+        <subtask>Badge de status do workflow</subtask>
+        <subtask>Badge de cobertura (se configurado)</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Workflow GitHub Actions criado em .github/workflows/ci.yml</criterion>
+    <criterion id="AC2">Testes do backend executados em push/PR para main</criterion>
+    <criterion id="AC3">Testes do frontend executados em push/PR para main</criterion>
+    <criterion id="AC4">Build verificado para ambos frontend e backend</criterion>
+    <criterion id="AC5">Linting executado (ESLint)</criterion>
+    <criterion id="AC6">Relatório de cobertura gerado (opcional: upload para Codecov)</criterion>
+    <criterion id="AC7">Badge de status no README.md</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Ambiente de Desenvolvimento</section>
+        <snippet>Node.js 20.x LTS, npm 10.x+, TypeScript 5.x+. Comandos: npm run dev, npm run build, npm test.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>backend/package.json</path>
+        <kind>package manifest</kind>
+        <symbol>scripts</symbol>
+        <lines>6-14</lines>
+        <reason>Scripts disponíveis: dev, build, start, test, test:watch, test:coverage. Verificar se existe script lint.</reason>
+      </file>
+      <file>
+        <path>frontend/package.json</path>
+        <kind>package manifest</kind>
+        <symbol>scripts</symbol>
+        <lines>6-14</lines>
+        <reason>Scripts disponíveis: dev, build, lint, preview, test, test:coverage. ESLint já configurado.</reason>
+      </file>
+      <file>
+        <path>backend/src/__tests__/</path>
+        <kind>test directory</kind>
+        <reason>Estrutura de testes do backend com Jest.</reason>
+      </file>
+      <file>
+        <path>frontend/src/__tests__/</path>
+        <kind>test directory</kind>
+        <reason>Estrutura de testes do frontend com Vitest.</reason>
+      </file>
+      <file>
+        <path>README.md</path>
+        <kind>documentation</kind>
+        <reason>Arquivo onde badge de CI será adicionado.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node-backend">
+        <package name="jest" version="^30.2.0">Framework de testes</package>
+        <package name="ts-jest" version="^29.4.5">Jest com TypeScript</package>
+        <package name="typescript" version="^5.9.3">Compilador TypeScript</package>
+        <package name="supertest" version="^7.1.4">Testes de API HTTP</package>
+      </ecosystem>
+      <ecosystem name="node-frontend">
+        <package name="vitest" version="^4.0.7">Framework de testes</package>
+        <package name="eslint" version="^9.36.0">Linter</package>
+        <package name="typescript" version="~5.9.3">Compilador TypeScript</package>
+        <package name="vite" version="^7.1.7">Build tool</package>
+        <package name="@testing-library/react" version="^16.3.0">Testing utilities</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Usar Node.js 20.x LTS (versão estável do projeto)</constraint>
+    <constraint>Workflow deve rodar em ubuntu-latest</constraint>
+    <constraint>Usar npm ci para instalação determinística</constraint>
+    <constraint>Cache de npm configurado para acelerar builds</constraint>
+    <constraint>Jobs de backend e frontend podem rodar em paralelo</constraint>
+    <constraint>Workflow deve falhar se qualquer job falhar</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CI Workflow</name>
+      <kind>GitHub Actions YAML</kind>
+      <signature>on: push/pull_request to main, jobs: backend, frontend</signature>
+      <path>.github/workflows/ci.yml</path>
+    </interface>
+    <interface>
+      <name>Backend Scripts</name>
+      <kind>npm scripts</kind>
+      <signature>npm run lint (a criar), npm test, npm run build</signature>
+      <path>backend/package.json</path>
+    </interface>
+    <interface>
+      <name>Frontend Scripts</name>
+      <kind>npm scripts</kind>
+      <signature>npm run lint, npm test, npm run build</signature>
+      <path>frontend/package.json</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>CI workflow não requer testes unitários diretos. Validação é feita pela execução bem-sucedida do workflow no GitHub.</standards>
+    <locations>
+      <location>.github/workflows/ci.yml</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Criar workflow válido que passa na validação YAML do GitHub</idea>
+      <idea ac="AC2">Backend job executa npm test com sucesso</idea>
+      <idea ac="AC3">Frontend job executa npm test com sucesso</idea>
+      <idea ac="AC4">Ambos jobs executam npm run build com sucesso</idea>
+      <idea ac="AC5">Ambos jobs executam npm run lint com sucesso</idea>
+      <idea ac="AC6">Coverage reports são gerados em ambos projetos</idea>
+      <idea ac="AC7">Badge mostra status correto após execução do workflow</idea>
+    </ideas>
+  </tests>
+</story-context>

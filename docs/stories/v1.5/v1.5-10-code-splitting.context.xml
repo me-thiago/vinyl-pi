@@ -1,0 +1,217 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1.5</epicId>
+    <storyId>10</storyId>
+    <title>Implementar Code Splitting no Frontend</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-10-code-splitting.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>que a interface carregue rapidamente</iWant>
+    <soThat>tenha boa experiência mesmo em redes mais lentas</soThat>
+    <tasks>
+      <task id="1">Implementar lazy loading de rotas
+        <subtask>Converter imports de páginas para React.lazy</subtask>
+        <subtask>Adicionar Suspense com fallback</subtask>
+        <subtask>Testar carregamento de cada rota</subtask>
+      </task>
+      <task id="2">Otimizar chunks do Vite
+        <subtask>Configurar manualChunks no vite.config.ts</subtask>
+        <subtask>Separar vendor chunks (react, socket.io, etc.)</subtask>
+        <subtask>Analisar bundle com rollup-plugin-visualizer</subtask>
+      </task>
+      <task id="3">Adicionar loading states
+        <subtask>Criar componente PageLoader</subtask>
+        <subtask>Configurar Suspense boundaries</subtask>
+      </task>
+      <task id="4">Configurar cache headers no backend
+        <subtask>Adicionar middleware para assets estáticos</subtask>
+        <subtask>Cache-Control para JS/CSS/imagens</subtask>
+        <subtask>Configurar ETags</subtask>
+      </task>
+      <task id="5">Validar performance
+        <subtask>Medir tamanho do bundle inicial</subtask>
+        <subtask>Testar com Lighthouse</subtask>
+        <subtask>Verificar waterfall de carregamento</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Rotas implementadas com lazy loading (React.lazy)</criterion>
+    <criterion id="AC2">Code splitting por rota configurado no Vite</criterion>
+    <criterion id="AC3">Componentes pesados carregados sob demanda</criterion>
+    <criterion id="AC4">Bundle inicial menor que 100KB (gzipped)</criterion>
+    <criterion id="AC5">Loading states para chunks sendo carregados</criterion>
+    <criterion id="AC6">Cache headers configurados no Express para assets</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Frontend, Performance</section>
+        <snippet>Frontend: Code splitting, lazy loading de rotas, asset optimization via Vite. React 19 + Vite 7 + shadcn/ui. Build tool rápido, ideal para desenvolvimento.</snippet>
+      </doc>
+      <doc>
+        <path>README.md</path>
+        <title>Vinyl-OS README</title>
+        <section>Build para Produção</section>
+        <snippet>npm run build:frontend executa build de produção via Vite.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>frontend/src/main.tsx</path>
+        <kind>entry-point</kind>
+        <symbol>createRoot, Routes</symbol>
+        <lines>1-31</lines>
+        <reason>Entry point onde as rotas são definidas. Atualmente importa todas as páginas estaticamente, precisa mudar para React.lazy.</reason>
+      </file>
+      <file>
+        <path>frontend/src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-267</lines>
+        <reason>Componente principal que renderiza a home page. Importa Player e outros componentes que podem ser lazy-loaded.</reason>
+      </file>
+      <file>
+        <path>frontend/vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-40</lines>
+        <reason>Configuração do Vite onde manualChunks deve ser adicionado para otimizar o bundle.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Dashboard.tsx</path>
+        <kind>page</kind>
+        <symbol>Dashboard</symbol>
+        <reason>Página que deve ser lazy-loaded.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Diagnostics.tsx</path>
+        <kind>page</kind>
+        <symbol>Diagnostics</symbol>
+        <reason>Página que deve ser lazy-loaded.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Sessions.tsx</path>
+        <kind>page</kind>
+        <symbol>Sessions</symbol>
+        <reason>Página que deve ser lazy-loaded.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Settings.tsx</path>
+        <kind>page</kind>
+        <symbol>Settings</symbol>
+        <reason>Página que deve ser lazy-loaded.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/SessionDetail.tsx</path>
+        <kind>page</kind>
+        <symbol>SessionDetail</symbol>
+        <reason>Página que deve ser lazy-loaded.</reason>
+      </file>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>server</kind>
+        <symbol>express, app</symbol>
+        <lines>1-50</lines>
+        <reason>Servidor Express onde middleware de cache headers para assets estáticos deve ser adicionado.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>react-dom</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>react-router-dom</package>
+        <version>^6.30.1</version>
+      </node>
+      <node>
+        <package>vite</package>
+        <version>^7.1.7</version>
+      </node>
+      <node>
+        <package>@vitejs/plugin-react</package>
+        <version>^5.0.4</version>
+      </node>
+      <node>
+        <package>socket.io-client</package>
+        <version>^4.8.1</version>
+      </node>
+      <node>
+        <package>recharts</package>
+        <version>^2.15.4</version>
+      </node>
+      <node>
+        <package>express</package>
+        <version>^4.21.2</version>
+      </node>
+      <node note="A ser adicionado">
+        <package>rollup-plugin-visualizer</package>
+        <version>latest</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Manter compatibilidade com React 19 e Vite 7</constraint>
+    <constraint>Bundle inicial deve ser menor que 100KB gzipped</constraint>
+    <constraint>Usar React.lazy e Suspense para code splitting</constraint>
+    <constraint>Configurar manualChunks para vendor chunks no Vite</constraint>
+    <constraint>Cache headers devem seguir boas práticas (immutable para assets com hash)</constraint>
+    <constraint>Loading states devem usar componentes existentes do shadcn/ui quando possível</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>React.lazy</name>
+      <kind>React API</kind>
+      <signature>const Component = lazy(() => import('./Component'))</signature>
+      <path>react</path>
+    </interface>
+    <interface>
+      <name>Suspense</name>
+      <kind>React Component</kind>
+      <signature>&lt;Suspense fallback={&lt;Loading /&gt;}&gt;{children}&lt;/Suspense&gt;</signature>
+      <path>react</path>
+    </interface>
+    <interface>
+      <name>Vite manualChunks</name>
+      <kind>Build Config</kind>
+      <signature>build.rollupOptions.output.manualChunks: { [chunkName]: [modules] }</signature>
+      <path>frontend/vite.config.ts</path>
+    </interface>
+    <interface>
+      <name>Express static middleware</name>
+      <kind>Express Middleware</kind>
+      <signature>app.use(express.static('public', { maxAge, etag }))</signature>
+      <path>backend/src/index.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Frontend usa Vitest para testes unitários. Testes existem em frontend/src/**/__tests__/. Padrão de nomeação: *.test.tsx.</standards>
+    <locations>
+      <location>frontend/src/**/__tests__/*.test.tsx</location>
+      <location>frontend/src/**/__tests__/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Verificar que rotas são lazy-loaded corretamente (mock de import dinâmico)</idea>
+      <idea criterionId="AC4">Teste de build para verificar tamanho do bundle inicial</idea>
+      <idea criterionId="AC5">Testar que PageLoader é exibido durante carregamento de chunks</idea>
+      <idea criterionId="AC6">Testar headers de cache nos assets estáticos via supertest</idea>
+    </ideas>
+  </tests>
+</story-context>

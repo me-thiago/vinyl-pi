@@ -11,7 +11,8 @@ import {
   ArrowLeft,
   RefreshCw,
   Wifi,
-  WifiOff
+  WifiOff,
+  Headphones
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -258,9 +259,17 @@ export default function Dashboard() {
                 </span>
               </div>
               {currentStatus?.streaming.active && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {currentStatus.streaming.bitrate} kbps • {currentStatus.streaming.mount_point}
-                </p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {currentStatus.streaming.bitrate} kbps • {currentStatus.streaming.mount_point}
+                  </p>
+                  {currentStatus.streaming.listeners !== undefined && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Headphones className="w-3 h-3" />
+                      {currentStatus.streaming.listeners} {currentStatus.streaming.listeners === 1 ? 'ouvinte' : 'ouvintes'}
+                    </p>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

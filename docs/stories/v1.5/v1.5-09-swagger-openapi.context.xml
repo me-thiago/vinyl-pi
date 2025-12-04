@@ -1,0 +1,174 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>09</storyId>
+    <title>Gerar Documentação de API com Swagger/OpenAPI</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-09-swagger-openapi.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter documentação de API auto-gerada com Swagger UI</iWant>
+    <soThat>possa explorar e testar endpoints facilmente</soThat>
+    <tasks>
+      <task id="1">Instalar dependências
+        <subtask>Adicionar swagger-jsdoc ao package.json</subtask>
+        <subtask>Adicionar swagger-ui-express ao package.json</subtask>
+        <subtask>Adicionar @types se necessário</subtask>
+      </task>
+      <task id="2">Configurar Swagger
+        <subtask>Criar backend/src/config/swagger.ts</subtask>
+        <subtask>Definir info, servers, tags</subtask>
+        <subtask>Configurar rota /api/docs</subtask>
+      </task>
+      <task id="3">Documentar endpoints de Status
+        <subtask>GET /api/status</subtask>
+        <subtask>GET /api/health</subtask>
+      </task>
+      <task id="4">Documentar endpoints de Settings
+        <subtask>GET /api/settings</subtask>
+        <subtask>PUT /api/settings</subtask>
+        <subtask>GET /api/settings/:key</subtask>
+      </task>
+      <task id="5">Documentar endpoints de Sessions
+        <subtask>GET /api/sessions</subtask>
+        <subtask>GET /api/sessions/:id</subtask>
+        <subtask>GET /api/sessions/:id/events</subtask>
+      </task>
+      <task id="6">Documentar endpoints de Events
+        <subtask>GET /api/events</subtask>
+        <subtask>GET /api/events/:id</subtask>
+      </task>
+      <task id="7">Definir schemas de resposta
+        <subtask>Schema Session</subtask>
+        <subtask>Schema AudioEvent</subtask>
+        <subtask>Schema Setting</subtask>
+        <subtask>Schema AudioStatus</subtask>
+        <subtask>Schema Error</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">swagger-jsdoc e swagger-ui-express instalados</criterion>
+    <criterion id="AC2">Todos os endpoints documentados com JSDoc/OpenAPI</criterion>
+    <criterion id="AC3">Swagger UI disponível em /api/docs</criterion>
+    <criterion id="AC4">Schemas de request/response documentados</criterion>
+    <criterion id="AC5">Autenticação documentada (se aplicável)</criterion>
+    <criterion id="AC6">Exemplos de uso incluídos</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Contratos de API</section>
+        <snippet>Define todos os endpoints REST: /api/health, /api/status, /api/sessions, /api/events, /api/settings. Formato de resposta: { data, meta? } ou { error: { message, code } }.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>API Response Format</section>
+        <snippet>Success: { data: T, meta?: { total, limit, offset } }. Error: { error: { message, code?, details? } }.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>server entry point</kind>
+        <symbol>app</symbol>
+        <lines>28-50</lines>
+        <reason>Onde Swagger UI será montado como middleware.</reason>
+      </file>
+      <file>
+        <path>backend/src/routes/status.ts</path>
+        <kind>route</kind>
+        <symbol>createStatusRouter</symbol>
+        <lines>1-121</lines>
+        <reason>Endpoints /api/status e /api/status/audio para documentar.</reason>
+      </file>
+      <file>
+        <path>backend/src/routes/settings.ts</path>
+        <kind>route</kind>
+        <symbol>createSettingsRouter</symbol>
+        <reason>Endpoints /api/settings para documentar.</reason>
+      </file>
+      <file>
+        <path>backend/src/routes/sessions.ts</path>
+        <kind>route</kind>
+        <symbol>createSessionsRouter</symbol>
+        <reason>Endpoints /api/sessions para documentar.</reason>
+      </file>
+      <file>
+        <path>backend/src/routes/events.ts</path>
+        <kind>route</kind>
+        <symbol>createEventsRouter</symbol>
+        <reason>Endpoints /api/events para documentar.</reason>
+      </file>
+      <file>
+        <path>backend/prisma/schema.prisma</path>
+        <kind>database schema</kind>
+        <reason>Modelos Session, AudioEvent, Setting para gerar schemas OpenAPI.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="express" version="^4.21.2">Framework web</package>
+        <package name="swagger-jsdoc" version="to-add">Geração de spec a partir de JSDoc</package>
+        <package name="swagger-ui-express" version="to-add">UI para explorar API</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>OpenAPI 3.0.0 specification</constraint>
+    <constraint>Swagger UI em /api/docs (não requer autenticação - sistema local)</constraint>
+    <constraint>Spec JSON disponível em /api/docs.json</constraint>
+    <constraint>Tags organizadas: Status, Settings, Sessions, Events</constraint>
+    <constraint>Descrições em português BR</constraint>
+    <constraint>Exemplos de resposta em cada endpoint</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Swagger Config</name>
+      <kind>module</kind>
+      <signature>setupSwagger(app: Express): void</signature>
+      <path>backend/src/config/swagger.ts</path>
+    </interface>
+    <interface>
+      <name>OpenAPI Spec</name>
+      <kind>configuration</kind>
+      <signature>{ openapi: '3.0.0', info: {...}, servers: [...], tags: [...] }</signature>
+      <path>backend/src/config/swagger.ts</path>
+    </interface>
+    <interface>
+      <name>Swagger UI Route</name>
+      <kind>HTTP GET</kind>
+      <signature>GET /api/docs - Swagger UI interface</signature>
+    </interface>
+    <interface>
+      <name>OpenAPI JSON Route</name>
+      <kind>HTTP GET</kind>
+      <signature>GET /api/docs.json - OpenAPI spec JSON</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Testes de integração para verificar que /api/docs retorna HTML e /api/docs.json retorna spec válido. Validação de spec OpenAPI.</standards>
+    <locations>
+      <location>backend/src/__tests__/config/swagger.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Verificar que dependências são importadas corretamente</idea>
+      <idea ac="AC2">Validar que todos os endpoints estão documentados na spec</idea>
+      <idea ac="AC3">Testar que GET /api/docs retorna HTML com status 200</idea>
+      <idea ac="AC4">Validar schemas de resposta na spec JSON</idea>
+      <idea ac="AC6">Verificar que exemplos estão presentes nos endpoints</idea>
+    </ideas>
+  </tests>
+</story-context>

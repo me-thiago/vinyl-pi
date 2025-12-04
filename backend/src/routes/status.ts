@@ -37,14 +37,14 @@ export function createStatusRouter(
    *
    * Retorna status completo do sistema incluindo:
    * - Audio capture status
-   * - Streaming status
+   * - Streaming status (com contagem de listeners do Icecast)
    * - Audio analysis (level, silence)
-   * - Session info (futuro)
+   * - Session info
    */
-  router.get('/status', (req: Request, res: Response) => {
+  router.get('/status', async (req: Request, res: Response) => {
     try {
       const audioStatus = audioManager.getStatus();
-      const streamingStatus = audioManager.getStreamingStatus();
+      const streamingStatus = await audioManager.getStreamingStatusWithListeners();
 
       // Obter dados de análise se disponíveis
       const levelDb = audioAnalyzer?.getCurrentLevelDb() ?? audioStatus.levelDb ?? null;
@@ -66,7 +66,7 @@ export function createStatusRouter(
         session: sessionData,
         streaming: {
           active: streamingStatus.active,
-          listeners: streamingStatus.listeners ?? undefined,
+          listeners: streamingStatus.listeners,
           bitrate: streamingStatus.bitrate,
           mount_point: streamingStatus.mountPoint
         },

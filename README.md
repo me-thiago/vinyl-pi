@@ -1,5 +1,7 @@
 # Vinyl-OS
 
+[![CI](https://github.com/me-thiago/vinyl-pi/actions/workflows/ci.yml/badge.svg)](https://github.com/me-thiago/vinyl-pi/actions/workflows/ci.yml)
+
 Sistema de monitoramento e gerenciamento de reprodução de vinis com streaming ao vivo.
 
 ## 📖 Visão Geral

@@ -67,18 +67,18 @@ development_status:
   v1.5-1-cors-restricao: done               # Critico
   v1.5-2-validacao-input-zod: done          # Critico
   v1.5-3-cleanup-archived: done             # Critico
-  v1.5-4-logger-centralizado: ready-for-dev # Alto
-  v1.5-5-rate-limiting: drafted            # Alto
-  v1.5-6-ci-github-actions: drafted        # Alto
-  v1.5-7-icecast-listeners: drafted        # Alto
-  v1.5-8-testes-frontend: drafted          # Medio
-  v1.5-9-swagger-openapi: drafted          # Medio
-  v1.5-10-code-splitting: backlog          # Medio
-  v1.5-11-enum-eventtype: backlog          # Medio
-  v1.5-12-sentry-errors: backlog           # Baixo
-  v1.5-13-estrutura-i18n: backlog          # Baixo
-  v1.5-14-testes-e2e: backlog              # Baixo
-  v1.5-15-contributing-changelog: backlog  # Baixo
+  v1.5-4-logger-centralizado: done          # Alto
+  v1.5-5-rate-limiting: done               # Alto
+  v1.5-6-ci-github-actions: done           # Alto
+  v1.5-7-icecast-listeners: done           # Alto
+  v1.5-8-testes-frontend: ready-for-dev    # Medio
+  v1.5-9-swagger-openapi: ready-for-dev    # Medio
+  v1.5-10-code-splitting: drafted          # Medio
+  v1.5-11-enum-eventtype: drafted          # Medio
+  v1.5-12-sentry-errors: drafted           # Baixo
+  v1.5-13-estrutura-i18n: drafted          # Baixo
+  v1.5-14-testes-e2e: drafted              # Baixo
+  v1.5-15-contributing-changelog: drafted  # Baixo
   epic-v1.5-retrospective: optional
 
   # Epic V2 - Coleção & Reconhecimento Musical

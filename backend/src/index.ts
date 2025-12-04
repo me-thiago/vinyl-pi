@@ -20,6 +20,8 @@ import { eventBus } from './utils/event-bus';
 import { createLogger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { corsOriginCallback } from './utils/cors-validator';
+import { apiLimiter } from './middleware/rate-limiter';
+import { setupSwagger } from './config/swagger';
 
 const logger = createLogger('Server');
 
@@ -38,6 +40,11 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Rate limiting para rotas de API
+// Protege contra abuso e ataques DoS
+// Configurável via RATE_LIMIT_WINDOW_MS e RATE_LIMIT_MAX
+app.use('/api', apiLimiter);
 
 // WAV Stream Broadcaster
 // Mantém lista de clientes conectados e transmite dados para todos simultaneamente
@@ -270,6 +277,10 @@ app.use('/api', createSessionsRouter({
 app.use('/api', createSettingsRouter({
   settingsService
 }));
+
+// Swagger UI e documentação OpenAPI
+// Acessível em /api/docs e /api/docs.json
+setupSwagger(app);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Vinyl-OS Backend is running' });

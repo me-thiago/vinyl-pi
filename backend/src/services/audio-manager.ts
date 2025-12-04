@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { unlink, access } from 'fs';
 import { promisify } from 'util';
 import { createLogger } from '../utils/logger';
+import { getListenerCount } from './icecast-stats';
 
 const execAsync = promisify(exec);
 const unlinkAsync = promisify(unlink);
@@ -444,19 +445,33 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Retorna o status atual do streaming
+   * Retorna o status atual do streaming (síncrono, sem listeners)
    * @returns Status do streaming
    */
   getStreamingStatus(): StreamingStatus {
-    const baseStatus: StreamingStatus = {
+    return {
       active: this.isStreaming,
       bitrate: this.streamingConfig?.bitrate || 0,
       mountPoint: this.streamingConfig?.mountPoint || '',
-      listeners: undefined, // TODO: Implementar query ao Icecast2 stats
+      listeners: undefined,
       error: this.currentError
     };
+  }
 
-    return baseStatus;
+  /**
+   * Retorna o status atual do streaming com contagem de listeners
+   * @returns Status do streaming com listeners
+   */
+  async getStreamingStatusWithListeners(): Promise<StreamingStatus> {
+    const listeners = this.isStreaming ? await getListenerCount() : 0;
+
+    return {
+      active: this.isStreaming,
+      bitrate: this.streamingConfig?.bitrate || 0,
+      mountPoint: this.streamingConfig?.mountPoint || '',
+      listeners,
+      error: this.currentError
+    };
   }
 
   /**

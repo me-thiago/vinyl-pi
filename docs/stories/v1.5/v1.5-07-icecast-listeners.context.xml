@@ -1,0 +1,167 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>07</storyId>
+    <title>Implementar Query de Listeners do Icecast</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-07-icecast-listeners.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>ver quantos ouvintes estão conectados ao stream</iWant>
+    <soThat>eu saiba se outras pessoas estão escutando</soThat>
+    <tasks>
+      <task id="1">Criar serviço de query do Icecast
+        <subtask>Criar backend/src/services/icecast-stats.ts</subtask>
+        <subtask>Implementar parse do XML/JSON de stats</subtask>
+        <subtask>Cache com TTL de 5 segundos</subtask>
+      </task>
+      <task id="2">Integrar com AudioManager
+        <subtask>Adicionar método getListenerCount() ao AudioManager</subtask>
+        <subtask>Atualizar getStatus() para incluir listeners</subtask>
+        <subtask>Remover TODO comentado</subtask>
+      </task>
+      <task id="3">Expor via API
+        <subtask>Atualizar GET /api/status para incluir listeners</subtask>
+        <subtask>Emitir via WebSocket quando listeners mudar</subtask>
+      </task>
+      <task id="4">Atualizar Frontend
+        <subtask>Exibir contador no player</subtask>
+        <subtask>Exibir no dashboard</subtask>
+      </task>
+      <task id="5">Testes
+        <subtask>Mock do endpoint Icecast para testes</subtask>
+        <subtask>Teste de cache</subtask>
+        <subtask>Teste de fallback quando Icecast offline</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Função para query do Icecast2 stats endpoint implementada</criterion>
+    <criterion id="AC2">Contador de listeners disponível via API (GET /api/status)</criterion>
+    <criterion id="AC3">Contador atualizado periodicamente (a cada 5-10 segundos)</criterion>
+    <criterion id="AC4">Frontend exibe número de listeners no player/dashboard</criterion>
+    <criterion id="AC5">Tratamento de erro quando Icecast não está acessível</criterion>
+    <criterion id="AC6">Cache local para evitar queries excessivas</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Backend ↔ Audio</section>
+        <snippet>HTTP POST para Icecast2 mount point (streaming). Icecast2 fornece endpoint de estatísticas em /status-json.xsl ou /admin/stats.</snippet>
+      </doc>
+      <doc>
+        <path>config/icecast.xml</path>
+        <title>Configuração Icecast2</title>
+        <section>Configuração do servidor</section>
+        <snippet>Contém host, porta e configurações do Icecast2 local.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>service</kind>
+        <symbol>getStreamingStatus()</symbol>
+        <lines>450-460</lines>
+        <reason>Método atual retorna listeners: undefined com TODO comentado. Deve ser integrado com novo serviço.</reason>
+      </file>
+      <file>
+        <path>backend/src/routes/status.ts</path>
+        <kind>route</kind>
+        <symbol>GET /status</symbol>
+        <lines>44-85</lines>
+        <reason>Rota que retorna status incluindo streaming.listeners. Já preparada para receber valor.</reason>
+      </file>
+      <file>
+        <path>backend/src/services/socket-manager.ts</path>
+        <kind>service</kind>
+        <symbol>SocketManager</symbol>
+        <reason>Gerencia WebSocket. Pode emitir atualização de listeners em tempo real.</reason>
+      </file>
+      <file>
+        <path>frontend/src/hooks/useSocket.ts</path>
+        <kind>hook</kind>
+        <symbol>StatusPayload</symbol>
+        <lines>8-26</lines>
+        <reason>Interface já define streaming.listeners?: number. Frontend já preparado para receber.</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/Player/Player.tsx</path>
+        <kind>component</kind>
+        <symbol>Player</symbol>
+        <reason>Componente onde contador de listeners pode ser exibido.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Dashboard.tsx</path>
+        <kind>page</kind>
+        <symbol>Dashboard</symbol>
+        <reason>Página onde contador de listeners pode ser exibido.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="express" version="^4.21.2">Framework web</package>
+        <package name="socket.io" version="^4.8.1">WebSocket para real-time updates</package>
+      </ecosystem>
+      <ecosystem name="system">
+        <package name="icecast2">Servidor de streaming - fornece /status-json.xsl</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Usar endpoint /status-json.xsl do Icecast2 (retorna JSON)</constraint>
+    <constraint>Cache de 5 segundos para evitar sobrecarga no Icecast</constraint>
+    <constraint>Timeout de 3 segundos para requisições ao Icecast</constraint>
+    <constraint>Retornar cache antigo se Icecast estiver offline</constraint>
+    <constraint>Usar variáveis ICECAST_HOST e ICECAST_PORT do .env</constraint>
+    <constraint>Não quebrar funcionalidade se Icecast não estiver disponível</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Icecast Stats Service</name>
+      <kind>service module</kind>
+      <signature>getIcecastStats(): Promise&lt;IcecastStats | null&gt;, getListenerCount(): Promise&lt;number&gt;</signature>
+      <path>backend/src/services/icecast-stats.ts</path>
+    </interface>
+    <interface>
+      <name>IcecastStats</name>
+      <kind>TypeScript interface</kind>
+      <signature>{ listeners: number, source: string, bitrate: number, serverName: string }</signature>
+      <path>backend/src/services/icecast-stats.ts</path>
+    </interface>
+    <interface>
+      <name>Icecast JSON Endpoint</name>
+      <kind>HTTP GET</kind>
+      <signature>GET http://{host}:{port}/status-json.xsl</signature>
+    </interface>
+    <interface>
+      <name>Status API Response</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/status → { streaming: { listeners: number, ... } }</signature>
+      <path>backend/src/routes/status.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Jest para backend, mock de fetch para simular respostas do Icecast. Vitest para frontend com mock de useSocket.</standards>
+    <locations>
+      <location>backend/src/__tests__/services/icecast-stats.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Testar parse correto do JSON do Icecast</idea>
+      <idea ac="AC2">Testar que /api/status retorna listeners quando disponível</idea>
+      <idea ac="AC3">Testar que cache expira após 5 segundos</idea>
+      <idea ac="AC5">Testar fallback quando fetch falha (timeout, erro de conexão)</idea>
+      <idea ac="AC6">Testar que múltiplas chamadas dentro de 5s usam cache</idea>
+    </ideas>
+  </tests>
+</story-context>

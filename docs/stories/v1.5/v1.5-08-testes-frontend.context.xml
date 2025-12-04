@@ -1,0 +1,185 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>08</storyId>
+    <title>Aumentar Cobertura de Testes do Frontend</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-08-testes-frontend.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter maior cobertura de testes no frontend</iWant>
+    <soThat>regressões sejam detectadas automaticamente</soThat>
+    <tasks>
+      <task id="1">Configurar relatório de cobertura
+        <subtask>Atualizar vite.config.ts com coverage provider</subtask>
+        <subtask>Adicionar script test:coverage ao package.json</subtask>
+        <subtask>Configurar thresholds mínimos</subtask>
+      </task>
+      <task id="2">Testar Hooks customizados
+        <subtask>Criar __tests__/hooks/useSocket.test.ts</subtask>
+        <subtask>Criar __tests__/hooks/useAudioStream.test.ts</subtask>
+        <subtask>Criar __tests__/hooks/useSettings.test.ts (se existir)</subtask>
+      </task>
+      <task id="3">Testar Componentes principais
+        <subtask>Criar __tests__/components/Player.test.tsx</subtask>
+        <subtask>Criar __tests__/components/VUMeter.test.tsx</subtask>
+        <subtask>Criar __tests__/components/EventLog.test.tsx</subtask>
+        <subtask>Criar __tests__/components/SessionList.test.tsx</subtask>
+      </task>
+      <task id="4">Testar Páginas
+        <subtask>Criar __tests__/pages/Dashboard.test.tsx</subtask>
+        <subtask>Criar __tests__/pages/Settings.test.tsx</subtask>
+        <subtask>Criar __tests__/pages/Diagnostics.test.tsx</subtask>
+      </task>
+      <task id="5">Testes de integração
+        <subtask>Testar fluxo de play/pause do Player</subtask>
+        <subtask>Testar atualização em tempo real via WebSocket mock</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Cobertura de testes > 60% para componentes principais</criterion>
+    <criterion id="AC2">Todos os hooks customizados testados (useSocket, useAudioStream, etc.)</criterion>
+    <criterion id="AC3">Componentes críticos testados (Player, Dashboard, Settings)</criterion>
+    <criterion id="AC4">Testes de integração para fluxos principais</criterion>
+    <criterion id="AC5">Relatório de cobertura configurado no Vitest</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Test Organization</section>
+        <snippet>Test files: *.test.ts co-localizados com source. Integration tests: __tests__/integration/. Setup: __tests__/setup.ts.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>frontend/src/hooks/useSocket.ts</path>
+        <kind>hook</kind>
+        <symbol>useSocket</symbol>
+        <lines>1-213</lines>
+        <reason>Hook principal para WebSocket. Precisa de testes com mock de socket.io-client.</reason>
+      </file>
+      <file>
+        <path>frontend/src/hooks/useAudioStream.ts</path>
+        <kind>hook</kind>
+        <symbol>useAudioStream</symbol>
+        <reason>Hook para streaming de áudio. Precisa de testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/hooks/useStreamingControl.ts</path>
+        <kind>hook</kind>
+        <symbol>useStreamingControl</symbol>
+        <reason>Hook para controle de streaming. Precisa de testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/Player/Player.tsx</path>
+        <kind>component</kind>
+        <symbol>Player</symbol>
+        <reason>Componente principal do player. Já tem teste básico em __tests__/.</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/Player/__tests__/Player.test.tsx</path>
+        <kind>test</kind>
+        <symbol>Player tests</symbol>
+        <reason>Teste existente. Pode servir de referência para novos testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/vu-meter.tsx</path>
+        <kind>component</kind>
+        <symbol>VUMeter</symbol>
+        <reason>Componente de visualização de nível de áudio. Precisa de testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Dashboard.tsx</path>
+        <kind>page</kind>
+        <symbol>Dashboard</symbol>
+        <reason>Página principal. Precisa de testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Settings.tsx</path>
+        <kind>page</kind>
+        <symbol>Settings</symbol>
+        <reason>Página de configurações. Precisa de testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Diagnostics.tsx</path>
+        <kind>page</kind>
+        <symbol>Diagnostics</symbol>
+        <reason>Página de diagnóstico. Precisa de testes.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Sessions.tsx</path>
+        <kind>page</kind>
+        <symbol>Sessions</symbol>
+        <reason>Página de histórico de sessões. Precisa de testes.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node-frontend">
+        <package name="vitest" version="^4.0.7">Framework de testes</package>
+        <package name="@testing-library/react" version="^16.3.0">Utilities para testar React</package>
+        <package name="@testing-library/jest-dom" version="^6.9.1">Matchers para DOM</package>
+        <package name="@testing-library/user-event" version="^14.6.1">Simulação de eventos de usuário</package>
+        <package name="jsdom" version="^27.1.0">DOM virtual para testes</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Usar Vitest como framework de testes (já configurado)</constraint>
+    <constraint>Usar Testing Library para testes de componentes React</constraint>
+    <constraint>Mock de socket.io-client para testes de useSocket</constraint>
+    <constraint>Mock de fetch/API para testes de componentes que fazem requisições</constraint>
+    <constraint>Coverage provider: v8 (nativo e rápido)</constraint>
+    <constraint>Thresholds mínimos: 60% lines, 60% functions, 50% branches</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Vitest Coverage Config</name>
+      <kind>configuration</kind>
+      <signature>test.coverage: { provider: 'v8', reporter: ['text', 'json', 'html'], thresholds: {...} }</signature>
+      <path>frontend/vite.config.ts</path>
+    </interface>
+    <interface>
+      <name>Test Scripts</name>
+      <kind>npm scripts</kind>
+      <signature>test, test:coverage, test:ui</signature>
+      <path>frontend/package.json</path>
+    </interface>
+    <interface>
+      <name>Testing Library Render</name>
+      <kind>test utility</kind>
+      <signature>render(), screen, fireEvent, waitFor</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Vitest com Testing Library. Testes unitários para hooks usando renderHook(). Testes de componentes usando render() e screen queries. Mocks com vi.mock() e vi.fn().</standards>
+    <locations>
+      <location>frontend/src/__tests__/hooks/useSocket.test.ts</location>
+      <location>frontend/src/__tests__/hooks/useAudioStream.test.ts</location>
+      <location>frontend/src/__tests__/components/Player.test.tsx</location>
+      <location>frontend/src/__tests__/components/VUMeter.test.tsx</location>
+      <location>frontend/src/__tests__/pages/Dashboard.test.tsx</location>
+      <location>frontend/src/__tests__/pages/Settings.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Configurar coverage com thresholds e verificar relatório</idea>
+      <idea ac="AC2">useSocket: testar conexão, reconexão, handlers de eventos</idea>
+      <idea ac="AC2">useAudioStream: testar play, pause, erro de stream</idea>
+      <idea ac="AC3">Player: testar render, botão play/pause, estado de conexão</idea>
+      <idea ac="AC3">VUMeter: testar render com diferentes níveis de áudio</idea>
+      <idea ac="AC4">Dashboard: testar render com dados mock, atualização via WebSocket</idea>
+      <idea ac="AC5">Verificar que npm run test:coverage gera relatório HTML</idea>
+    </ideas>
+  </tests>
+</story-context>

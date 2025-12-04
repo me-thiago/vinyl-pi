@@ -1,0 +1,152 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>05</storyId>
+    <title>Adicionar Rate Limiting nas APIs</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-05-rate-limiting.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>administrador do sistema</asA>
+    <iWant>que as APIs tenham rate limiting configurado</iWant>
+    <soThat>o sistema seja protegido contra abuso e ataques de negação de serviço</soThat>
+    <tasks>
+      <task id="1">Instalar express-rate-limit
+        <subtask>Adicionar ao package.json</subtask>
+        <subtask>Adicionar tipos TypeScript se necessário</subtask>
+      </task>
+      <task id="2">Configurar rate limiter
+        <subtask>Criar backend/src/middleware/rate-limiter.ts</subtask>
+        <subtask>Configuração padrão: 100 req/min por IP</subtask>
+        <subtask>Mensagem de erro em português BR</subtask>
+      </task>
+      <task id="3">Aplicar middleware
+        <subtask>Aplicar rate limiter às rotas /api/*</subtask>
+        <subtask>Excluir rotas de streaming e WebSocket</subtask>
+        <subtask>Adicionar variáveis de ambiente</subtask>
+      </task>
+      <task id="4">Testes
+        <subtask>Teste de limite atingido</subtask>
+        <subtask>Teste de reset do contador</subtask>
+        <subtask>Teste de exclusão de rotas de streaming</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">express-rate-limit instalado e configurado</criterion>
+    <criterion id="AC2">Rate limiting global aplicado a todas as rotas API</criterion>
+    <criterion id="AC3">Limites configuráveis via variáveis de ambiente</criterion>
+    <criterion id="AC4">Resposta 429 (Too Many Requests) com mensagem clara em português</criterion>
+    <criterion id="AC5">Endpoints de streaming (/stream, WebSocket) excluídos do rate limiting</criterion>
+    <criterion id="AC6">Headers de rate limit incluídos nas respostas (X-RateLimit-*)</criterion>
+    <criterion id="AC7">Testes para validar comportamento</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Padrões de Implementação - API Response Format</section>
+        <snippet>Define o formato padrão de resposta de erro: { error: { message, code?, details? } }. Rate limiting deve seguir este padrão para mensagens de erro.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>User-Facing Errors</section>
+        <snippet>Mensagens em português BR, técnicas mas acessíveis, sem stack traces expostos, código de erro para troubleshooting.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>server entry point</kind>
+        <symbol>app</symbol>
+        <lines>28-41</lines>
+        <reason>Configuração de CORS e middleware. Rate limiter deve ser aplicado após CORS e antes das rotas.</reason>
+      </file>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>routes</kind>
+        <symbol>app.use('/api', ...)</symbol>
+        <lines>255-272</lines>
+        <reason>Rotas /api/* onde rate limiting deve ser aplicado.</reason>
+      </file>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>streaming endpoints</kind>
+        <symbol>/stream.wav, /streaming/*</symbol>
+        <lines>400-442</lines>
+        <reason>Endpoints de streaming que devem ser EXCLUÍDOS do rate limiting.</reason>
+      </file>
+      <file>
+        <path>backend/src/middleware/error-handler.ts</path>
+        <kind>middleware</kind>
+        <symbol>errorHandler, notFoundHandler</symbol>
+        <reason>Padrão de middleware existente. Rate limiter deve seguir padrão similar.</reason>
+      </file>
+      <file>
+        <path>backend/src/utils/cors-validator.ts</path>
+        <kind>middleware utility</kind>
+        <symbol>corsOriginCallback</symbol>
+        <reason>Exemplo de middleware de segurança existente para referência de padrões.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="express" version="^4.21.2">Framework web principal</package>
+        <package name="cors" version="^2.8.5">Middleware CORS existente</package>
+        <package name="dotenv" version="^16.6.1">Variáveis de ambiente</package>
+        <package name="express-rate-limit" version="to-add">Biblioteca a ser instalada</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Rate limiter deve usar memória local (MemoryStore) - sem Redis (sistema local)</constraint>
+    <constraint>Limites configuráveis via RATE_LIMIT_WINDOW_MS e RATE_LIMIT_MAX no .env</constraint>
+    <constraint>Mensagem de erro em português BR seguindo padrão { error: { message, code } }</constraint>
+    <constraint>Não aplicar rate limit em rotas de streaming e WebSocket</constraint>
+    <constraint>Headers padrão RateLimit-* (não legacy X-RateLimit-*)</constraint>
+    <constraint>Código de erro: RATE_LIMIT_EXCEEDED</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Rate Limiter Middleware</name>
+      <kind>Express middleware</kind>
+      <signature>express.RequestHandler - aplicado via app.use('/api', apiLimiter)</signature>
+      <path>backend/src/middleware/rate-limiter.ts</path>
+    </interface>
+    <interface>
+      <name>Rate Limit Response</name>
+      <kind>HTTP 429 response</kind>
+      <signature>{ error: { message: string, code: 'RATE_LIMIT_EXCEEDED' } }</signature>
+    </interface>
+    <interface>
+      <name>Environment Variables</name>
+      <kind>configuration</kind>
+      <signature>RATE_LIMIT_WINDOW_MS=60000, RATE_LIMIT_MAX=100</signature>
+      <path>.env.example</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Jest é o framework de teste do backend. Testes unitários co-localizados em __tests__/. Supertest para testes de API. Seguir padrão de testes existentes em backend/src/__tests__/.</standards>
+    <locations>
+      <location>backend/src/__tests__/middleware/rate-limiter.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Verificar que middleware é exportado e é função válida</idea>
+      <idea ac="AC2">Testar que requisições em /api/* são limitadas</idea>
+      <idea ac="AC4">Testar resposta 429 com mensagem em português</idea>
+      <idea ac="AC5">Testar que /stream.wav e /streaming/* não são limitadas</idea>
+      <idea ac="AC6">Verificar presença de headers RateLimit-* nas respostas</idea>
+      <idea ac="AC7">Testar reset do contador após janela de tempo</idea>
+    </ideas>
+  </tests>
+</story-context>

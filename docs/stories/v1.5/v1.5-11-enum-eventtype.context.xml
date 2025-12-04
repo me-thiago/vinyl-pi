@@ -1,0 +1,176 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1.5</epicId>
+    <storyId>11</storyId>
+    <title>Criar Enum para EventType no Prisma</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-11-enum-eventtype.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que o campo eventType use um enum ao invés de string livre</iWant>
+    <soThat>apenas tipos de eventos válidos sejam aceitos</soThat>
+    <tasks>
+      <task id="1">Criar enum no schema Prisma
+        <subtask>Definir enum EventType com todos os tipos</subtask>
+        <subtask>Atualizar modelo AudioEvent</subtask>
+        <subtask>Gerar migration</subtask>
+      </task>
+      <task id="2">Criar script de migração de dados
+        <subtask>Mapear strings existentes para enum values</subtask>
+        <subtask>Tratar valores inválidos/desconhecidos</subtask>
+      </task>
+      <task id="3">Atualizar código TypeScript
+        <subtask>Atualizar event-bus.ts</subtask>
+        <subtask>Atualizar event-detector.ts</subtask>
+        <subtask>Atualizar session-manager.ts</subtask>
+        <subtask>Exportar enum para uso no frontend</subtask>
+      </task>
+      <task id="4">Atualizar testes
+        <subtask>Verificar testes existentes</subtask>
+        <subtask>Adicionar testes para validação de enum</subtask>
+      </task>
+      <task id="5">Aplicar migration em produção
+        <subtask>Backup do banco antes da migration</subtask>
+        <subtask>Executar migration</subtask>
+        <subtask>Validar dados</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Enum EventType criado no schema Prisma</criterion>
+    <criterion id="AC2">Migration gerada e aplicada</criterion>
+    <criterion id="AC3">Dados existentes migrados para usar o enum</criterion>
+    <criterion id="AC4">Código TypeScript atualizado para usar o enum</criterion>
+    <criterion id="AC5">Validação de tipo em runtime</criterion>
+    <criterion id="AC6">Testes atualizados</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Arquitetura de Dados, Prisma Schema</section>
+        <snippet>model AudioEvent { eventType String } - Atualmente usa String, deve ser migrado para enum. Prisma ^6.16.0 com SQLite.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>backend/prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>AudioEvent, Session, Setting</symbol>
+        <lines>1-48</lines>
+        <reason>Schema Prisma onde o enum EventType deve ser criado e aplicado ao model AudioEvent.eventType.</reason>
+      </file>
+      <file>
+        <path>backend/src/utils/event-bus.ts</path>
+        <kind>service</kind>
+        <symbol>EventType, EventBus, eventBus</symbol>
+        <lines>1-262</lines>
+        <reason>Define o type EventType como union de strings. Deve ser atualizado para usar o enum do Prisma.</reason>
+      </file>
+      <file>
+        <path>backend/src/services/event-detector.ts</path>
+        <kind>service</kind>
+        <symbol>EventDetector</symbol>
+        <reason>Usa EventType para publicar eventos. Deve ser atualizado para usar enum.</reason>
+      </file>
+      <file>
+        <path>backend/src/services/session-manager.ts</path>
+        <kind>service</kind>
+        <symbol>SessionManager</symbol>
+        <reason>Publica eventos session.started, session.ended. Deve usar enum.</reason>
+      </file>
+      <file>
+        <path>backend/src/services/event-persistence.ts</path>
+        <kind>service</kind>
+        <symbol>EventPersistence</symbol>
+        <reason>Persiste eventos no banco usando eventType. Deve usar enum para inserção.</reason>
+      </file>
+      <file>
+        <path>backend/src/routes/events.ts</path>
+        <kind>route</kind>
+        <symbol>createEventsRouter</symbol>
+        <reason>Endpoint de eventos que retorna eventType. Deve usar enum na resposta.</reason>
+      </file>
+      <file>
+        <path>backend/src/__tests__/utils/event-bus.test.ts</path>
+        <kind>test</kind>
+        <symbol>EventBus tests</symbol>
+        <reason>Testes do EventBus que devem ser atualizados para usar enum.</reason>
+      </file>
+      <file>
+        <path>backend/src/__tests__/services/event-detector.test.ts</path>
+        <kind>test</kind>
+        <symbol>EventDetector tests</symbol>
+        <reason>Testes do EventDetector que devem ser atualizados para usar enum.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>@prisma/client</package>
+        <version>^6.18.0</version>
+      </node>
+      <node>
+        <package>prisma</package>
+        <version>^6.18.0</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>SQLite não suporta enums nativamente; Prisma simula com CHECK constraints</constraint>
+    <constraint>Migration deve ser reversível (backup antes de aplicar)</constraint>
+    <constraint>Manter compatibilidade com strings antigas durante transição</constraint>
+    <constraint>Enum values devem usar UPPER_SNAKE_CASE no Prisma</constraint>
+    <constraint>Mapeamento de strings dot.notation para UPPER_SNAKE_CASE deve ser mantido para compatibilidade</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>EventType (atual)</name>
+      <kind>TypeScript type</kind>
+      <signature>type EventType = 'audio.start' | 'audio.stop' | 'audio.level' | 'silence.detected' | 'silence.ended' | 'turntable.idle' | 'turntable.active' | 'track.change.detected' | 'session.started' | 'session.ended' | 'clipping.detected'</signature>
+      <path>backend/src/utils/event-bus.ts</path>
+    </interface>
+    <interface>
+      <name>EventType (Prisma enum - proposto)</name>
+      <kind>Prisma enum</kind>
+      <signature>enum EventType { AUDIO_START, AUDIO_STOP, AUDIO_LEVEL, SILENCE_DETECTED, SILENCE_ENDED, TURNTABLE_IDLE, TURNTABLE_ACTIVE, TRACK_CHANGE_DETECTED, SESSION_STARTED, SESSION_ENDED, CLIPPING_DETECTED }</signature>
+      <path>backend/prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>AudioEvent model</name>
+      <kind>Prisma model</kind>
+      <signature>model AudioEvent { id String @id, sessionId String?, eventType String, timestamp DateTime, metadata Json? }</signature>
+      <path>backend/prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>eventBus.publish</name>
+      <kind>method</kind>
+      <signature>publish(event: string, payload: Record&lt;string, any&gt;): Promise&lt;void&gt;</signature>
+      <path>backend/src/utils/event-bus.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Backend usa Jest para testes. Testes existem em backend/src/__tests__/. Padrão de nomeação: *.test.ts.</standards>
+    <locations>
+      <location>backend/src/__tests__/utils/*.test.ts</location>
+      <location>backend/src/__tests__/services/*.test.ts</location>
+      <location>backend/src/__tests__/routes/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Testar que enum EventType está definido corretamente no Prisma Client</idea>
+      <idea criterionId="AC3">Testar script de migração com dados de exemplo</idea>
+      <idea criterionId="AC4">Testar que EventBus aceita apenas valores válidos do enum</idea>
+      <idea criterionId="AC5">Testar rejeição de valores inválidos de eventType</idea>
+      <idea criterionId="AC6">Atualizar mocks e fixtures nos testes existentes</idea>
+    </ideas>
+  </tests>
+</story-context>
