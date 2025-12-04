@@ -10,6 +10,8 @@ jobs:
   backend:
     name: Backend (Test & Build)
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "file:./test.db"
 
     steps:
       - name: Checkout repository
@@ -48,7 +50,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --include=optional
 
       - name: Lint
         run: npm run lint -w frontend
