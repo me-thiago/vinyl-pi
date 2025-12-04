@@ -62,6 +62,25 @@ development_status:
   v1-22-documentacao-basica: ready-for-dev
   epic-v1-retrospective: optional
 
+  # Epic V1.5 - Hardening & Quality (Post-Audit)
+  epic-v1.5: backlog
+  v1.5-1-cors-restricao: backlog           # Critico
+  v1.5-2-validacao-input-zod: backlog      # Critico
+  v1.5-3-cleanup-archived: backlog         # Critico
+  v1.5-4-logger-centralizado: backlog      # Alto
+  v1.5-5-rate-limiting: backlog            # Alto
+  v1.5-6-ci-github-actions: backlog        # Alto
+  v1.5-7-icecast-listeners: backlog        # Alto
+  v1.5-8-testes-frontend: backlog          # Medio
+  v1.5-9-swagger-openapi: backlog          # Medio
+  v1.5-10-code-splitting: backlog          # Medio
+  v1.5-11-enum-eventtype: backlog          # Medio
+  v1.5-12-sentry-errors: backlog           # Baixo
+  v1.5-13-estrutura-i18n: backlog          # Baixo
+  v1.5-14-testes-e2e: backlog              # Baixo
+  v1.5-15-contributing-changelog: backlog  # Baixo
+  epic-v1.5-retrospective: optional
+
   # Epic V2 - Coleção & Reconhecimento Musical
   epic-v2: backlog
   v2-1-schema-dados-v2: drafted

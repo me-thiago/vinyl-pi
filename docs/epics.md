@@ -443,6 +443,288 @@ Cada épico inclui:
 
 ---
 
+## Epic V1.5 - Hardening & Quality (Post-Audit)
+
+**Objetivo:** Implementar melhorias de segurança, qualidade e developer experience identificadas no relatório de auditoria de Dezembro 2025.
+
+**Valor:** Sistema mais seguro, código mais robusto, melhor experiência de desenvolvimento e manutenção facilitada.
+
+**Dependências:** V1 completo (MVP funcional)
+
+**Duração Estimada:** 2-3 semanas (2-3 sprints)
+
+**Origem:** [Relatório de Auditoria 2025-12-03](./audit-report-2025-12-03.md)
+
+---
+
+### Story V1.5-01: Restringir CORS para Rede Local 🔴
+
+**Como** administrador do sistema,  
+**quero** que o CORS seja restrito apenas para origens da rede local,  
+**para que** o sistema não aceite requisições de origens não autorizadas.
+
+**Critérios de Aceitação:**
+1. CORS restrito para aceitar apenas origens da rede local
+2. Lista de origens permitidas configurável via variável de ambiente
+3. Localhost (127.0.0.1, localhost) sempre permitido
+4. IPs da rede local (192.168.x.x, 10.x.x.x, 172.16-31.x.x) permitidos
+5. Requisições de origens não permitidas retornam erro 403
+6. Testes unitários para validação de origem
+
+**Pré-requisitos:** Nenhum
+
+---
+
+### Story V1.5-02: Adicionar Validação de Input com Zod 🔴
+
+**Como** desenvolvedor,  
+**quero** que todas as rotas da API validem os dados de entrada usando Zod,  
+**para que** inputs malformados sejam rejeitados antes de processar.
+
+**Critérios de Aceitação:**
+1. Zod instalado como dependência do backend
+2. Schemas Zod criados para todos os endpoints que recebem body/params
+3. Middleware de validação genérico criado
+4. Rotas de settings validam payload com schema específico
+5. Erros de validação retornam 400 com mensagens claras em português
+6. Testes unitários para schemas de validação
+
+**Pré-requisitos:** V1.5-01 (recomendado mas não obrigatório)
+
+---
+
+### Story V1.5-03: Cleanup - Remover Projeto Arquivado 🔴
+
+**Como** desenvolvedor,  
+**quero** que o código arquivado seja removido ou movido para fora do repositório principal,  
+**para que** o repositório fique mais limpo e leve.
+
+**Critérios de Aceitação:**
+1. Diretório `archived_project/` removido do branch principal
+2. Código arquivado preservado em branch separado `archive/legacy-v0` (opcional)
+3. `.gitignore` atualizado para ignorar `archived_project/`
+4. Código morto identificado removido (ex: `fifoPath` não utilizado)
+5. Documentação atualizada refletindo a remoção
+
+**Pré-requisitos:** Nenhum
+
+---
+
+### Story V1.5-04: Centralizar Configuração do Winston Logger 🟡
+
+**Como** desenvolvedor,  
+**quero** que todos os serviços usem o logger centralizado de `utils/logger.ts`,  
+**para que** a configuração de logging seja consistente em toda a aplicação.
+
+**Critérios de Aceitação:**
+1. Todos os serviços usam `createLogger('ServiceName')` de `utils/logger.ts`
+2. Configurações duplicadas de Winston removidas de todos os arquivos
+3. Função factory `createLogger` retorna logger com prefixo do serviço
+4. Logs mantêm formato consistente: `[timestamp] [level] [ServiceName]: message`
+5. Testes existentes continuam passando
+
+**Pré-requisitos:** V1.19 - Error Handling
+
+---
+
+### Story V1.5-05: Adicionar Rate Limiting nas APIs 🟡
+
+**Como** administrador do sistema,  
+**quero** que as APIs tenham rate limiting configurado,  
+**para que** o sistema seja protegido contra abuso e ataques de negação de serviço.
+
+**Critérios de Aceitação:**
+1. `express-rate-limit` instalado e configurado
+2. Rate limiting global aplicado a todas as rotas API
+3. Limites configuráveis via variáveis de ambiente
+4. Resposta 429 (Too Many Requests) com mensagem clara em português
+5. Endpoints de streaming (`/stream`, WebSocket) excluídos do rate limiting
+6. Headers de rate limit incluídos nas respostas
+7. Testes para validar comportamento
+
+**Pré-requisitos:** Nenhum
+
+---
+
+### Story V1.5-06: Configurar CI/CD com GitHub Actions 🟡
+
+**Como** desenvolvedor,  
+**quero** ter um pipeline de CI/CD configurado no GitHub Actions,  
+**para que** testes sejam executados automaticamente em cada push e pull request.
+
+**Critérios de Aceitação:**
+1. Workflow GitHub Actions criado em `.github/workflows/ci.yml`
+2. Testes do backend executados em push/PR para main
+3. Testes do frontend executados em push/PR para main
+4. Build verificado para ambos frontend e backend
+5. Linting executado (ESLint)
+6. Relatório de cobertura gerado
+7. Badge de status no README.md
+
+**Pré-requisitos:** Testes já configurados (Jest/Vitest)
+
+---
+
+### Story V1.5-07: Implementar Query de Listeners do Icecast 🟡
+
+**Como** usuário,  
+**quero** ver quantos ouvintes estão conectados ao stream,  
+**para que** eu saiba se outras pessoas estão escutando.
+
+**Critérios de Aceitação:**
+1. Função para query do Icecast2 stats endpoint implementada
+2. Contador de listeners disponível via API (`GET /api/status`)
+3. Contador atualizado periodicamente (a cada 5-10 segundos)
+4. Frontend exibe número de listeners no player/dashboard
+5. Tratamento de erro quando Icecast não está acessível
+6. Cache local para evitar queries excessivas
+
+**Pré-requisitos:** V1.3 - Configuração Icecast
+
+---
+
+### Story V1.5-08: Aumentar Cobertura de Testes do Frontend 🟢
+
+**Como** desenvolvedor,  
+**quero** ter maior cobertura de testes no frontend,  
+**para que** regressões sejam detectadas automaticamente.
+
+**Critérios de Aceitação:**
+1. Cobertura de testes > 60% para componentes principais
+2. Todos os hooks customizados testados
+3. Componentes críticos testados (Player, Dashboard, Settings)
+4. Testes de integração para fluxos principais
+5. Relatório de cobertura configurado no Vitest
+
+**Pré-requisitos:** Vitest já configurado
+
+---
+
+### Story V1.5-09: Gerar Documentação de API com Swagger/OpenAPI 🟢
+
+**Como** desenvolvedor,  
+**quero** ter documentação de API auto-gerada com Swagger UI,  
+**para que** possa explorar e testar endpoints facilmente.
+
+**Critérios de Aceitação:**
+1. swagger-jsdoc e swagger-ui-express instalados
+2. Todos os endpoints documentados com JSDoc/OpenAPI
+3. Swagger UI disponível em `/api/docs`
+4. Schemas de request/response documentados
+5. Exemplos de uso incluídos
+
+**Pré-requisitos:** Nenhum
+
+---
+
+### Story V1.5-10: Implementar Code Splitting no Frontend 🟢
+
+**Como** usuário,  
+**quero** que a interface carregue rapidamente,  
+**para que** tenha boa experiência mesmo em redes mais lentas.
+
+**Critérios de Aceitação:**
+1. Rotas implementadas com lazy loading (React.lazy)
+2. Code splitting por rota configurado no Vite
+3. Componentes pesados carregados sob demanda
+4. Bundle inicial < 100KB (gzipped)
+5. Loading states para chunks sendo carregados
+6. Cache headers configurados no Express para assets
+
+**Pré-requisitos:** React Router configurado
+
+---
+
+### Story V1.5-11: Criar Enum para EventType no Prisma 🟢
+
+**Como** desenvolvedor,  
+**quero** que o campo `eventType` use um enum ao invés de string livre,  
+**para que** apenas tipos de eventos válidos sejam aceitos.
+
+**Critérios de Aceitação:**
+1. Enum `EventType` criado no schema Prisma
+2. Migration gerada e aplicada
+3. Dados existentes migrados para usar o enum
+4. Código TypeScript atualizado para usar o enum
+5. Validação de tipo em runtime
+6. Testes atualizados
+
+**Pré-requisitos:** Banco de dados SQLite existente
+
+---
+
+### Story V1.5-12: Adicionar Sentry para Error Tracking 🔵
+
+**Como** desenvolvedor,  
+**quero** que erros de produção sejam enviados para um serviço de monitoramento,  
+**para que** possa identificar e corrigir problemas rapidamente.
+
+**Critérios de Aceitação:**
+1. Sentry SDK instalado no frontend
+2. Sentry SDK instalado no backend (opcional)
+3. ErrorBoundary integrado com Sentry
+4. Source maps enviados para Sentry
+5. Variáveis de ambiente para DSN configuradas
+6. Erros capturados incluem contexto
+
+**Pré-requisitos:** V1.19 - Error Handling, Conta no Sentry
+
+---
+
+### Story V1.5-13: Preparar Estrutura para Internacionalização (i18n) 🔵
+
+**Como** desenvolvedor,  
+**quero** que o frontend tenha estrutura preparada para internacionalização,  
+**para que** futuramente possa suportar múltiplos idiomas facilmente.
+
+**Critérios de Aceitação:**
+1. react-i18next instalado e configurado
+2. Arquivo de traduções para português BR criado
+3. Principais componentes migrados para usar i18n
+4. Detecção automática de idioma do navegador
+5. Fallback para português quando tradução não existe
+6. Hook `useTranslation` disponível em todos componentes
+
+**Pré-requisitos:** Nenhum
+
+---
+
+### Story V1.5-14: Adicionar Testes End-to-End com Playwright 🔵
+
+**Como** desenvolvedor,  
+**quero** ter testes end-to-end automatizados,  
+**para que** possa validar fluxos completos da aplicação.
+
+**Critérios de Aceitação:**
+1. Playwright instalado e configurado
+2. Testes para fluxo principal: abrir player e verificar streaming
+3. Testes para navegação entre páginas
+4. Testes para alteração de configurações
+5. Testes executáveis no CI
+6. Screenshots de falhas para debugging
+
+**Pré-requisitos:** V1.5-06 - CI configurado
+
+---
+
+### Story V1.5-15: Criar CONTRIBUTING.md e CHANGELOG.md 🔵
+
+**Como** contribuidor,  
+**quero** ter documentação clara sobre como contribuir e histórico de mudanças,  
+**para que** possa participar do projeto de forma organizada.
+
+**Critérios de Aceitação:**
+1. CONTRIBUTING.md criado com guia de contribuição
+2. CHANGELOG.md criado seguindo formato keepachangelog.com
+3. Seções claras: Como configurar ambiente, como submeter PRs
+4. Convenções de código documentadas
+5. Processo de review documentado
+6. Histórico das versões até agora documentado
+
+**Pré-requisitos:** Nenhum
+
+---
+
 ## Epic V2 - Coleção & Reconhecimento Musical
 
 **Objetivo:** Adicionar gestão completa de coleção física de discos e reconhecimento musical com validação contra a coleção.
