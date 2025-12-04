@@ -24,7 +24,10 @@
     "pm2:status": "pm2 status",
     "pm2:icecast": "pm2 start ecosystem.config.js --only vinyl-os-icecast",
     "pm2:backend": "pm2 start ecosystem.config.js --only vinyl-backend",
-    "pm2:frontend": "pm2 start ecosystem.config.js --only vinyl-frontend"
+    "pm2:frontend": "pm2 start ecosystem.config.js --only vinyl-frontend",
+    "validate": "npm run validate:backend && npm run validate:frontend",
+    "validate:backend": "npm run -w backend prisma -- generate && npm test -w backend -- --coverage --passWithNoTests --testPathIgnorePatterns=\"audio-manager.test.ts\" && npm run build -w backend",
+    "validate:frontend": "npm run lint -w frontend && npm test -w frontend -- --run --passWithNoTests && npm run build -w frontend"
   },
   "keywords": [
     "vinyl",

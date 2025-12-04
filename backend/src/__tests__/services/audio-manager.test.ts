@@ -10,23 +10,31 @@ jest.mock('child_process', () => ({
   })
 }));
 
-// Mock winston
-jest.mock('winston', () => ({
-  createLogger: jest.fn(() => ({
+// Mock winston - definido inline pois jest.mock é hoisted
+jest.mock('winston', () => {
+  const mockLoggerInstance = {
     info: jest.fn(),
     warn: jest.fn(),
-    error: jest.fn()
-  })),
-  format: {
-    combine: jest.fn(),
-    timestamp: jest.fn(),
-    printf: jest.fn()
-  },
-  transports: {
-    Console: jest.fn(),
-    File: jest.fn()
-  }
-}));
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn().mockReturnThis()
+  };
+  return {
+    createLogger: jest.fn(() => mockLoggerInstance),
+    format: {
+      combine: jest.fn(),
+      timestamp: jest.fn(),
+      printf: jest.fn(),
+      errors: jest.fn(),
+      json: jest.fn(),
+      colorize: jest.fn()
+    },
+    transports: {
+      Console: jest.fn(),
+      File: jest.fn()
+    }
+  };
+});
 
 const mockSpawn = require('child_process').spawn;
 

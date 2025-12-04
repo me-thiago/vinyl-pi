@@ -288,7 +288,8 @@ describe('EventDetector', () => {
           duration: 1
         },
         clippingConfig: {
-          threshold: -1
+          threshold: -1,
+          cooldown: 1000
         }
       });
     });
@@ -381,6 +382,8 @@ describe('EventDetector', () => {
   describe('Clipping Detection', () => {
     beforeEach(() => {
       detector.start();
+      // Desabilitar cooldown para testes de múltiplos eventos
+      detector.setClippingCooldown(0);
     });
 
     it('should detect clipping when level exceeds threshold', async () => {

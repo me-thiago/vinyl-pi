@@ -309,7 +309,6 @@ describe('Settings - alterações pendentes', () => {
 
   it('deve mostrar botão Salvar Buffer quando há alteração pendente', async () => {
     renderWithRouter(<Settings />);
-    const user = userEvent.setup();
 
     await waitFor(() => {
       expect(screen.getByRole('slider')).toBeInTheDocument();
