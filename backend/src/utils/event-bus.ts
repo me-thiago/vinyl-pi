@@ -1,19 +1,6 @@
-import winston from 'winston';
+import { createLogger } from './logger';
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/event-bus.log' })
-  ]
-});
+const logger = createLogger('EventBus');
 
 /**
  * Event types supported in V1

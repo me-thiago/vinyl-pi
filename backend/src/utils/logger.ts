@@ -24,15 +24,25 @@ import path from 'path';
 const LOG_DIR = path.resolve(__dirname, '../../../logs');
 
 // Formato personalizado para console (colorido em dev)
-const consoleFormat = winston.format.combine(
+// Nota: colorize pode não estar disponível em ambiente de teste com mocks
+const consoleFormatters = [
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.colorize({ all: true }),
+];
+
+// Adicionar colorize apenas se disponível (pode faltar em mocks de teste)
+if (typeof winston.format.colorize === 'function') {
+  consoleFormatters.push(winston.format.colorize({ all: true }));
+}
+
+consoleFormatters.push(
   winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
     const svc = service ? `[${service}] ` : '';
     const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
     return `${timestamp} ${level}: ${svc}${message}${metaStr}`;
   })
 );
+
+const consoleFormat = winston.format.combine(...consoleFormatters);
 
 // Formato para arquivo (JSON estruturado)
 const fileFormat = winston.format.combine(

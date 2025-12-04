@@ -1,0 +1,205 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>04</storyId>
+    <title>Centralizar Configuração do Winston Logger</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-04-logger-centralizado.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que todos os serviços usem o logger centralizado de utils/logger.ts</iWant>
+    <soThat>a configuração de logging seja consistente em toda a aplicação</soThat>
+    <tasks>
+      <task id="1">
+        <title>Revisar e aprimorar utils/logger.ts</title>
+        <subtasks>
+          <subtask>Garantir função factory createLogger(serviceName) existe</subtask>
+          <subtask>Adicionar prefixo de serviço aos logs</subtask>
+          <subtask>Exportar configuração padrão</subtask>
+        </subtasks>
+      </task>
+      <task id="2">
+        <title>Migrar serviços para logger centralizado</title>
+        <subtasks>
+          <subtask>Migrar audio-manager.ts</subtask>
+          <subtask>Migrar event-bus.ts</subtask>
+          <subtask>Migrar event-detector.ts</subtask>
+          <subtask>Migrar session-manager.ts</subtask>
+          <subtask>Migrar health-monitor.ts</subtask>
+          <subtask>Migrar socket-manager.ts</subtask>
+          <subtask>Migrar settings-service.ts</subtask>
+          <subtask>Migrar broadcaster.ts (se existir)</subtask>
+        </subtasks>
+      </task>
+      <task id="3">
+        <title>Remover imports duplicados de Winston</title>
+        <subtasks>
+          <subtask>Verificar que nenhum arquivo importa winston diretamente</subtask>
+          <subtask>Remover import winston from 'winston' duplicados</subtask>
+        </subtasks>
+      </task>
+      <task id="4">
+        <title>Validar logs em runtime</title>
+        <subtasks>
+          <subtask>Iniciar aplicação e verificar formato dos logs</subtask>
+          <subtask>Verificar rotação de arquivos funcionando</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Todos os serviços usam createLogger('ServiceName') de utils/logger.ts</criterion>
+    <criterion id="AC2">Configurações duplicadas de Winston removidas de todos os arquivos</criterion>
+    <criterion id="AC3">Função factory createLogger retorna logger com prefixo do serviço</criterion>
+    <criterion id="AC4">Logs mantêm formato consistente: [timestamp] [level] [ServiceName]: message</criterion>
+    <criterion id="AC5">Testes existentes continuam passando</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/audit-report-2025-12-03.md</path>
+        <title>Relatório de Auditoria</title>
+        <section>Seção 2: Backend (8/10)</section>
+        <snippet>Logger duplicado - Cada service cria seu próprio Winston logger. Recomendação: Usar createLogger('ServiceName') de utils/logger.ts em todos os serviços.</snippet>
+      </doc>
+      <doc>
+        <path>docs/audit-report-2025-12-03.md</path>
+        <title>Relatório de Auditoria</title>
+        <section>Seção 1: Arquitetura (9/10)</section>
+        <snippet>Duplicação de logger config - Winston é configurado manualmente em múltiplos arquivos ao invés de usar o centralizado em utils/logger.ts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões</title>
+        <section>Padrões de Consistência - Logging Format</section>
+        <snippet>Winston structured logging. Format: JSON em produção, readable em desenvolvimento. Levels: error, warn, info, debug. Context: incluir sessionId, userId quando disponível.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>backend/src/utils/logger.ts</path>
+        <kind>utility</kind>
+        <symbol>createLogger, logger</symbol>
+        <lines>1-102</lines>
+        <reason>Logger centralizado já existente - confirmar que está completo e bem configurado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>service</kind>
+        <symbol>logger (duplicado)</symbol>
+        <lines>5-24</lines>
+        <reason>Serviço com logger Winston configurado manualmente - precisa migrar para createLogger</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/event-bus.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <lines>early</lines>
+        <reason>Verificar se usa logger centralizado ou duplicado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/event-detector.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <lines>early</lines>
+        <reason>Verificar se usa logger centralizado ou duplicado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/session-manager.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <lines>early</lines>
+        <reason>Verificar se usa logger centralizado ou duplicado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/health-monitor.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <lines>early</lines>
+        <reason>Verificar se usa logger centralizado ou duplicado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/socket-manager.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <lines>early</lines>
+        <reason>Verificar se usa logger centralizado ou duplicado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/settings-service.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <lines>early</lines>
+        <reason>Verificar se usa logger centralizado ou duplicado</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/index.ts</path>
+        <kind>entry-point</kind>
+        <symbol>createLogger</symbol>
+        <lines>20,23</lines>
+        <reason>Exemplo correto de uso do logger centralizado - usar como referência</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>winston</package>
+        <version>^3.18.3</version>
+        <usage>Biblioteca de logging - deve ser importada apenas em utils/logger.ts</usage>
+      </node>
+      <node>
+        <package>winston-daily-rotate-file</package>
+        <version>^5.0.0</version>
+        <usage>Rotação diária de logs - configurada em utils/logger.ts</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Não modificar a API pública do createLogger - apenas ajustar implementação se necessário</constraint>
+    <constraint>Manter formato de log existente: timestamp [level]: [service] message</constraint>
+    <constraint>Garantir que rotação de arquivos continua funcionando</constraint>
+    <constraint>Logs de erro devem ir para arquivo separado (vinyl-os-error-*.log)</constraint>
+    <constraint>Preservar níveis de log: error, warn, info, debug</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>createLogger</name>
+      <kind>function signature</kind>
+      <signature>createLogger(serviceName: string): winston.Logger</signature>
+      <path>backend/src/utils/logger.ts:97-99</path>
+    </interface>
+    <interface>
+      <name>Logger Instance</name>
+      <kind>module export</kind>
+      <signature>export const logger: winston.Logger</signature>
+      <path>backend/src/utils/logger.ts:71-84</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Jest para testes unitários. Rodar npm test após migração para garantir que nenhum teste quebrou. Verificação manual dos logs em runtime.</standards>
+    <locations>
+      <location>backend/src/__tests__/</location>
+    </locations>
+    <ideas>
+      <idea ac="AC5">Rodar npm test após todas as migrações para garantir que testes passam</idea>
+      <idea ac="AC2">Grep por 'winston.createLogger' no codebase - deve retornar apenas utils/logger.ts</idea>
+      <idea ac="AC2">Grep por "import winston from 'winston'" - deve retornar apenas utils/logger.ts</idea>
+      <idea ac="AC4">Iniciar aplicação e verificar que logs aparecem com formato [ServiceName] message</idea>
+      <idea ac="AC4">Verificar que arquivos vinyl-os-*.log são criados em logs/</idea>
+      <idea ac="AC1">Verificar que cada serviço usa const logger = createLogger('ServiceName')</idea>
+    </ideas>
+  </tests>
+
+  <notes>
+    <note type="info">O arquivo utils/logger.ts já existe e está bem configurado com createLogger(). O trabalho é principalmente remover configurações duplicadas dos serviços e usar import { createLogger } from '../utils/logger'.</note>
+    <note type="info">O index.ts já usa o padrão correto: const logger = createLogger('Server'). Usar como referência.</note>
+  </notes>
+</story-context>

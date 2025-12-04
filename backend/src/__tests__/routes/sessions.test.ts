@@ -127,14 +127,12 @@ describe('Sessions Router', () => {
         );
       });
 
-      it('should cap limit at 100', async () => {
-        await request(app).get('/api/sessions?limit=500');
+      it('should reject limit above 100', async () => {
+        const response = await request(app).get('/api/sessions?limit=500');
 
-        expect(mockFindMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            take: 100
-          })
-        );
+        expect(response.status).toBe(400);
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('limit');
       });
 
       it('should respect offset', async () => {
@@ -166,14 +164,16 @@ describe('Sessions Router', () => {
         const response = await request(app).get('/api/sessions?limit=invalid');
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe('Parâmetro inválido');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('limit');
       });
 
       it('should reject negative offset', async () => {
         const response = await request(app).get('/api/sessions?offset=-1');
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe('Parâmetro inválido');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('offset');
       });
     });
 
@@ -227,14 +227,16 @@ describe('Sessions Router', () => {
         const response = await request(app).get('/api/sessions?date_from=invalid');
 
         expect(response.status).toBe(400);
-        expect(response.body.message).toContain('date_from');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('date_from');
       });
 
       it('should reject invalid date_to', async () => {
         const response = await request(app).get('/api/sessions?date_to=invalid');
 
         expect(response.status).toBe(400);
-        expect(response.body.message).toContain('date_to');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('date_to');
       });
     });
 
@@ -257,7 +259,8 @@ describe('Sessions Router', () => {
         const response = await request(app).get('/api/sessions');
 
         expect(response.status).toBe(500);
-        expect(response.body.error).toBe('Erro ao buscar sessões');
+        expect(response.body.error.message).toBe('Erro ao buscar sessões');
+        expect(response.body.error.code).toBe('SESSIONS_FETCH_ERROR');
       });
     });
   });
@@ -290,7 +293,7 @@ describe('Sessions Router', () => {
       const response = await request(appWithoutManager).get('/api/sessions/active');
 
       expect(response.status).toBe(503);
-      expect(response.body.error).toBe('Serviço indisponível');
+      expect(response.body.error.message).toBe('Serviço indisponível: SessionManager não está configurado');
     });
   });
 
@@ -352,7 +355,7 @@ describe('Sessions Router', () => {
       const response = await request(app).get('/api/sessions/non-existent');
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toBe('Sessão não encontrada');
+      expect(response.body.error.message).toContain('Sessão não encontrada');
     });
 
     it('should order events by timestamp ascending', async () => {
@@ -380,7 +383,8 @@ describe('Sessions Router', () => {
       const response = await request(app).get('/api/sessions/session-123');
 
       expect(response.status).toBe(500);
-      expect(response.body.error).toBe('Erro ao buscar sessão');
+      expect(response.body.error.message).toBe('Erro ao buscar sessão');
+      expect(response.body.error.code).toBe('SESSION_FETCH_ERROR');
     });
   });
 });

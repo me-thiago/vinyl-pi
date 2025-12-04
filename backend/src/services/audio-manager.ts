@@ -2,26 +2,13 @@ import { spawn, exec, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { unlink, access } from 'fs';
 import { promisify } from 'util';
-import winston from 'winston';
+import { createLogger } from '../utils/logger';
 
 const execAsync = promisify(exec);
 const unlinkAsync = promisify(unlink);
 const accessAsync = promisify(access);
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/audio-manager.log' })
-  ]
-});
+const logger = createLogger('AudioManager');
 
 /**
  * Configuração de captura de áudio

@@ -56,23 +56,23 @@ development_status:
   v1-16-log-eventos-ui: done
   v1-17-historico-sessoes: done
   v1-18-configuracoes-basicas: done
-  v1-19-error-handling: review
-  v1-20-pm2-config: ready-for-dev
-  v1-21-install-script: ready-for-dev
-  v1-22-documentacao-basica: ready-for-dev
-  epic-v1-retrospective: optional
+  v1-19-error-handling: done
+  v1-20-pm2-config: done
+  v1-21-install-script: done
+  v1-22-documentacao-basica: done
+  epic-v1-retrospective: completed
 
   # Epic V1.5 - Hardening & Quality (Post-Audit)
-  epic-v1.5: backlog
-  v1.5-1-cors-restricao: backlog           # Critico
-  v1.5-2-validacao-input-zod: backlog      # Critico
-  v1.5-3-cleanup-archived: backlog         # Critico
-  v1.5-4-logger-centralizado: backlog      # Alto
-  v1.5-5-rate-limiting: backlog            # Alto
-  v1.5-6-ci-github-actions: backlog        # Alto
-  v1.5-7-icecast-listeners: backlog        # Alto
-  v1.5-8-testes-frontend: backlog          # Medio
-  v1.5-9-swagger-openapi: backlog          # Medio
+  epic-v1.5: contexted
+  v1.5-1-cors-restricao: done               # Critico
+  v1.5-2-validacao-input-zod: done          # Critico
+  v1.5-3-cleanup-archived: done             # Critico
+  v1.5-4-logger-centralizado: ready-for-dev # Alto
+  v1.5-5-rate-limiting: drafted            # Alto
+  v1.5-6-ci-github-actions: drafted        # Alto
+  v1.5-7-icecast-listeners: drafted        # Alto
+  v1.5-8-testes-frontend: drafted          # Medio
+  v1.5-9-swagger-openapi: drafted          # Medio
   v1.5-10-code-splitting: backlog          # Medio
   v1.5-11-enum-eventtype: backlog          # Medio
   v1.5-12-sentry-errors: backlog           # Baixo

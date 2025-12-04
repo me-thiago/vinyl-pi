@@ -1,0 +1,185 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>02</storyId>
+    <title>Adicionar Validação de Input com Zod</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-02-validacao-input-zod.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que todas as rotas da API validem os dados de entrada usando Zod</iWant>
+    <soThat>inputs malformados sejam rejeitados antes de processar</soThat>
+    <tasks>
+      <task id="1">
+        <title>Instalar e configurar Zod</title>
+        <subtasks>
+          <subtask>Adicionar zod ao package.json</subtask>
+          <subtask>Criar backend/src/schemas/index.ts para exports centralizados</subtask>
+        </subtasks>
+      </task>
+      <task id="2">
+        <title>Criar schemas de validação</title>
+        <subtasks>
+          <subtask>Schema para Settings (PATCH /api/settings)</subtask>
+          <subtask>Schema para query params de Sessions (GET /api/sessions)</subtask>
+          <subtask>Schema para query params de Events (GET /api/events)</subtask>
+        </subtasks>
+      </task>
+      <task id="3">
+        <title>Criar middleware de validação</title>
+        <subtasks>
+          <subtask>Criar backend/src/middleware/validate.ts</subtask>
+          <subtask>Suporte a validação de body, params e query</subtask>
+          <subtask>Mensagens de erro em português BR</subtask>
+        </subtasks>
+      </task>
+      <task id="4">
+        <title>Aplicar validação nas rotas</title>
+        <subtasks>
+          <subtask>Atualizar routes/settings.ts</subtask>
+          <subtask>Atualizar routes/sessions.ts</subtask>
+          <subtask>Atualizar routes/events.ts</subtask>
+        </subtasks>
+      </task>
+      <task id="5">
+        <title>Testes</title>
+        <subtasks>
+          <subtask>Testes unitários para schemas</subtask>
+          <subtask>Testes de integração para rotas</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Zod instalado como dependência do backend</criterion>
+    <criterion id="AC2">Schemas Zod criados para todos os endpoints que recebem body/params</criterion>
+    <criterion id="AC3">Middleware de validação genérico criado</criterion>
+    <criterion id="AC4">Rotas de settings validam payload com schema específico</criterion>
+    <criterion id="AC5">Erros de validação retornam 400 com mensagens claras em português</criterion>
+    <criterion id="AC6">Testes unitários para schemas de validação</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/audit-report-2025-12-03.md</path>
+        <title>Relatório de Auditoria</title>
+        <section>Seção 2: Backend (8/10) e Seção 7: Segurança (6/10)</section>
+        <snippet>Ausência de validação de input nas rotas. Exemplo: routes/settings.ts aceita qualquer payload sem validação. Recomendação: Adicionar Zod para validação de schemas.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões</title>
+        <section>Padrões de Formato - Error Format</section>
+        <snippet>Error response sempre { error: { message, code?, details? } }. HTTP status codes padrão (200, 400, 404, 500).</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD v3.0</title>
+        <section>Seção 7: API Contracts</section>
+        <snippet>PUT /api/settings com body contendo audio, recognition, streaming configs. Tipos esperados documentados.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>backend/src/routes/settings.ts</path>
+        <kind>route</kind>
+        <symbol>PATCH /api/settings</symbol>
+        <lines>45-68</lines>
+        <reason>Rota principal que precisa validação de body - atualmente aceita qualquer payload</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/routes/sessions.ts</path>
+        <kind>route</kind>
+        <symbol>GET /api/sessions</symbol>
+        <lines>all</lines>
+        <reason>Rota que recebe query params (limit, offset, date_from, date_to) para validar</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/routes/events.ts</path>
+        <kind>route</kind>
+        <symbol>GET /api/events</symbol>
+        <lines>all</lines>
+        <reason>Rota que recebe query params (session_id, limit, offset) para validar</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/middleware/error-handler.ts</path>
+        <kind>middleware</kind>
+        <symbol>errorHandler</symbol>
+        <lines>all</lines>
+        <reason>Padrão de error handling para integração com erros de validação</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/settings-service.ts</path>
+        <kind>service</kind>
+        <symbol>SettingsService</symbol>
+        <lines>all</lines>
+        <reason>Serviço que processa settings - tipos esperados para schemas</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>express</package>
+        <version>^4.21.2</version>
+        <usage>Framework web onde middleware será aplicado</usage>
+      </node>
+      <node>
+        <package>zod</package>
+        <version>^3.23.x (a instalar)</version>
+        <usage>Biblioteca de validação de schemas TypeScript-first</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Mensagens de erro de validação em português BR</constraint>
+    <constraint>Manter padrão de resposta de erro existente: { error: { message, code, details } }</constraint>
+    <constraint>Middleware deve ser reutilizável para body, query e params</constraint>
+    <constraint>Tipos TypeScript devem ser inferidos dos schemas Zod (z.infer)</constraint>
+    <constraint>Schemas devem ser permissivos com campos opcionais para PATCH parcial</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Validation Middleware</name>
+      <kind>function signature</kind>
+      <signature>validate(schema: ZodSchema, source: 'body' | 'query' | 'params') => RequestHandler</signature>
+      <path>backend/src/middleware/validate.ts (a criar)</path>
+    </interface>
+    <interface>
+      <name>Settings Schema</name>
+      <kind>Zod schema</kind>
+      <signature>z.object({ 'silence.threshold': z.number().min(-100).max(0).optional(), ... })</signature>
+      <path>backend/src/schemas/settings.schema.ts (a criar)</path>
+    </interface>
+    <interface>
+      <name>Pagination Schema</name>
+      <kind>Zod schema</kind>
+      <signature>z.object({ limit: z.coerce.number().optional(), offset: z.coerce.number().optional() })</signature>
+      <path>backend/src/schemas/pagination.schema.ts (a criar)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Jest para testes unitários e de integração no backend. Arquivos de teste co-localizados com source (*.test.ts). Usar supertest para testes de rotas HTTP.</standards>
+    <locations>
+      <location>backend/src/__tests__/</location>
+      <location>backend/src/schemas/*.test.ts</location>
+      <location>backend/src/middleware/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC2">Testar settingsSchema aceita payload válido com campos opcionais</idea>
+      <idea ac="AC2">Testar settingsSchema rejeita valores fora do range (threshold > 0)</idea>
+      <idea ac="AC5">Testar que erro de validação retorna 400 com mensagem em português</idea>
+      <idea ac="AC3">Testar middleware validate() com body, query e params</idea>
+      <idea ac="AC4">Testar PATCH /api/settings com payload inválido retorna 400</idea>
+      <idea ac="AC4">Testar PATCH /api/settings com payload válido retorna 200</idea>
+      <idea ac="AC2">Testar paginationSchema converte strings para números (coerce)</idea>
+    </ideas>
+  </tests>
+</story-context>

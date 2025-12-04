@@ -1,22 +1,9 @@
-import winston from 'winston';
 import prisma from '../prisma/client';
 import { eventBus } from '../utils/event-bus';
 import { createSubscriptionManager, Destroyable } from '../utils/lifecycle';
+import { createLogger } from '../utils/logger';
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] [SessionManager] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/session-manager.log' })
-  ]
-});
+const logger = createLogger('SessionManager');
 
 /**
  * Estados da máquina de estados de sessão

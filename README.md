@@ -32,6 +32,20 @@ Vinyl-OS é uma plataforma completa que permite capturar áudio de toca-discos v
 
 ## 📋 Requisitos de Sistema
 
+### Hardware Recomendado
+- **Raspberry Pi 4B ou 5** (4GB+ RAM recomendado)
+- **Dispositivo de áudio USB** (placa de som ou pré-amplificador com saída USB)
+- **Cartão microSD** 32GB+ (Class 10 ou superior)
+- **Conexão Ethernet** (recomendado para streaming estável)
+
+### Hardware Testado
+- Raspberry Pi 4B 4GB
+- Raspberry Pi 5 8GB
+- Behringer U-Phono UFO202 (USB Audio Interface)
+- Art DJ Pre II (USB Phono Preamp)
+
+### Software
+- Raspberry Pi OS (64-bit) - Bookworm ou superior
 - Node.js 20 LTS ou superior
 - npm 9+ ou yarn 1.22+
 - FFmpeg instalado no sistema
@@ -78,14 +92,42 @@ arecord -l  # Lista dispositivos de captura
 
 ## 🚀 Instalação
 
-### 1. Clone o repositório
+### Instalação Automatizada (Recomendado)
+
+O script de instalação automatiza todo o processo de setup:
+
+```bash
+# Clone o repositório
+git clone <repository-url>
+cd vinyl-os
+
+# Execute o script de instalação
+./scripts/install.sh
+```
+
+O script irá:
+1. Instalar dependências do sistema (Node.js, FFmpeg, Icecast2, etc.)
+2. Instalar dependências do projeto (npm packages)
+3. Configurar banco de dados Prisma
+4. Configurar Icecast2
+5. Configurar PM2 para auto-start
+6. Compilar backend e frontend
+7. Executar testes de validação
+
+**Tempo estimado:** 10-20 minutos
+
+### Instalação Manual
+
+Se preferir instalar manualmente:
+
+#### 1. Clone o repositório
 
 ```bash
 git clone <repository-url>
 cd vinyl-os
 ```
 
-### 2. Instale as dependências
+#### 2. Instale as dependências
 
 ```bash
 # Instalar dependências de todos os workspaces
@@ -257,6 +299,150 @@ pm2 save
 pm2 startup
 
 # Seguir instruções exibidas pelo comando acima
+```
+
+## 🎵 Como Usar
+
+### Interface Web
+
+Após iniciar os serviços, acesse a interface web:
+- **URL local:** `http://localhost:5173`
+- **Na rede:** `http://<ip-do-raspberry>:5173`
+
+### Páginas Disponíveis
+
+#### Dashboard (Página Inicial)
+- Visualização do status do streaming em tempo real
+- Indicadores de nível de áudio (VU meters)
+- Status da conexão Icecast
+- Últimos eventos detectados
+
+#### Player
+- Player de áudio integrado com stream Icecast
+- Controles de play/pause
+- Indicador de buffer e latência
+
+#### Diagnóstico
+- Configurações de thresholds para detecção de eventos
+- Silêncio: ajuste o limite de dB para detecção
+- Clipping: ajuste a sensibilidade
+- Visualização em tempo real dos níveis
+
+#### Sessões
+- Histórico de sessões de escuta
+- Filtros por data e duração
+- Estatísticas de uso
+
+#### Configurações
+- Configurações do dispositivo de áudio
+- Parâmetros do streaming
+- Opções de logging
+
+### Monitoramento via Terminal
+
+```bash
+# Ver status de todos os serviços
+npm run pm2:status
+
+# Logs em tempo real
+npm run pm2:logs
+
+# Logs apenas do backend
+pm2 logs vinyl-backend --lines 100
+
+# Health check do sistema
+./scripts/system-health.sh
+```
+
+### Acessar o Stream de Áudio
+
+O stream Icecast está disponível em:
+- **URL:** `http://<ip-do-raspberry>:8000/stream`
+- **Formato:** MP3 192kbps
+
+Você pode ouvir em qualquer player que suporte streams HTTP:
+```bash
+# VLC
+vlc http://localhost:8000/stream
+
+# mpv
+mpv http://localhost:8000/stream
+
+# ffplay
+ffplay http://localhost:8000/stream
+```
+
+## 🔍 Troubleshooting
+
+### Problemas Comuns
+
+| Problema | Causa Provável | Solução |
+|----------|----------------|---------|
+| "Device not found" | Dispositivo de áudio não detectado | Execute `arecord -l` para listar dispositivos e ajuste `AUDIO_DEVICE` no `.env` |
+| "Permission denied" ao capturar áudio | Usuário não está no grupo audio | Execute `sudo usermod -a -G audio $USER` e faça logout/login |
+| Stream cortando/falhando | Buffer insuficiente ou WiFi instável | Use conexão Ethernet; aumente `buffer_size` nas configurações |
+| "Connection refused" no Icecast | Senha incorreta ou serviço parado | Verifique senhas em `config/icecast.xml`; execute `pm2 restart vinyl-os-icecast` |
+| Alto uso de CPU | Bitrate muito alto ou muitos processos | Reduza bitrate para 128k; feche aplicações não essenciais |
+| Eventos não detectados | Thresholds mal configurados | Ajuste na página de Diagnóstico; verifique se há sinal de áudio |
+| Frontend não carrega | Build não executado ou porta em uso | Execute `npm run build:frontend`; verifique se porta 5173 está livre |
+| Backend não responde | Erro no startup ou porta em uso | Verifique logs com `pm2 logs vinyl-backend`; porta 3001 deve estar livre |
+
+### Verificar Dispositivos de Áudio
+
+```bash
+# Listar dispositivos de captura
+arecord -l
+
+# Testar captura (grava 5 segundos)
+arecord -D plughw:0,0 -f cd -d 5 /tmp/test.wav
+
+# Reproduzir gravação de teste
+aplay /tmp/test.wav
+```
+
+### Verificar Serviços
+
+```bash
+# Status do PM2
+pm2 status
+
+# Status do Icecast
+curl -s http://localhost:8000/status-json.xsl | jq .
+
+# Health check da API
+curl http://localhost:3001/health
+
+# Status do streaming
+curl http://localhost:3001/api/status
+```
+
+### Logs Úteis
+
+```bash
+# Logs do PM2 (todos os serviços)
+pm2 logs
+
+# Logs apenas de erros
+pm2 logs --err
+
+# Logs do Icecast
+cat logs/error.log
+
+# Logs do sistema (journald)
+sudo journalctl -u pm2-$USER -f
+```
+
+### Reiniciar Serviços
+
+```bash
+# Reiniciar tudo
+npm run pm2:restart
+
+# Reiniciar apenas o backend
+pm2 restart vinyl-backend
+
+# Parar tudo e iniciar novamente
+npm run pm2:stop && npm run pm2:start
 ```
 
 ## 📁 Estrutura do Projeto

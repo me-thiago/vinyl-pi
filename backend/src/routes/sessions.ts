@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import prisma from '../prisma/client';
 import { SessionManager } from '../services/session-manager';
 import { createLogger } from '../utils/logger';
+import { validate } from '../middleware/validate';
+import { sessionsQuerySchema, sessionIdParamSchema, SessionsQueryInput } from '../schemas';
 
 const logger = createLogger('SessionsRouter');
 
@@ -12,15 +14,7 @@ export interface SessionsRouterDependencies {
   sessionManager?: SessionManager;
 }
 
-/**
- * Query parameters para GET /api/sessions
- */
-interface SessionsQueryParams {
-  limit?: string;
-  offset?: string;
-  date_from?: string;
-  date_to?: string;
-}
+// Query params são validados via Zod schema (SessionsQueryInput)
 
 /**
  * Resposta do endpoint GET /api/sessions
@@ -69,38 +63,20 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
   /**
    * GET /api/sessions
    *
-   * Query params:
+   * Query params (validados via Zod):
    * - limit: Limite de resultados (default: 20, max: 100)
    * - offset: Offset para paginação (default: 0)
    * - date_from: Data início (ISO string)
    * - date_to: Data fim (ISO string)
    */
-  router.get('/sessions', async (req: Request<{}, {}, {}, SessionsQueryParams>, res: Response) => {
+  router.get('/sessions', validate(sessionsQuerySchema, 'query'), async (req: Request, res: Response) => {
     try {
-      const {
-        limit: limitStr,
-        offset: offsetStr,
-        date_from,
-        date_to
-      } = req.query;
+      // Query já validada e tipada pelo Zod
+      const { limit: queryLimit, offset: queryOffset, date_from, date_to } = req.query as SessionsQueryInput;
 
-      // Parse e validar limit/offset
-      const limit = Math.min(parseInt(limitStr || '20', 10), 100);
-      const offset = parseInt(offsetStr || '0', 10);
-
-      if (isNaN(limit) || limit < 1) {
-        res.status(400).json({
-          error: { message: 'Parâmetro inválido: limit deve ser um número entre 1 e 100', code: 'VALIDATION_ERROR' }
-        });
-        return;
-      }
-
-      if (isNaN(offset) || offset < 0) {
-        res.status(400).json({
-          error: { message: 'Parâmetro inválido: offset deve ser um número maior ou igual a 0', code: 'VALIDATION_ERROR' }
-        });
-        return;
-      }
+      // Aplicar defaults
+      const limit = Math.min(queryLimit ?? 20, 100);
+      const offset = queryOffset ?? 0;
 
       // Construir filtro where
       const where: {
@@ -112,27 +88,11 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
 
       if (date_from || date_to) {
         where.startedAt = {};
-
         if (date_from) {
-          const dateFromParsed = new Date(date_from);
-          if (isNaN(dateFromParsed.getTime())) {
-            res.status(400).json({
-              error: { message: 'Parâmetro inválido: date_from deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
-            });
-            return;
-          }
-          where.startedAt.gte = dateFromParsed;
+          where.startedAt.gte = new Date(date_from);
         }
-
         if (date_to) {
-          const dateToParsed = new Date(date_to);
-          if (isNaN(dateToParsed.getTime())) {
-            res.status(400).json({
-              error: { message: 'Parâmetro inválido: date_to deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
-            });
-            return;
-          }
-          where.startedAt.lte = dateToParsed;
+          where.startedAt.lte = new Date(date_to);
         }
       }
 
@@ -213,7 +173,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
    *
    * Retorna detalhes de uma sessão específica com seus eventos
    */
-  router.get('/sessions/:id', async (req: Request<{ id: string }>, res: Response) => {
+  router.get('/sessions/:id', validate(sessionIdParamSchema, 'params'), async (req: Request<{ id: string }>, res: Response) => {
     try {
       const { id } = req.params;
 

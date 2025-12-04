@@ -1,0 +1,150 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>01</storyId>
+    <title>Restringir CORS para Rede Local</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-01-cors-restricao.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>administrador do sistema</asA>
+    <iWant>que o CORS seja restrito apenas para origens da rede local</iWant>
+    <soThat>o sistema não aceite requisições de origens não autorizadas</soThat>
+    <tasks>
+      <task id="1">
+        <title>Criar função de validação de origem</title>
+        <subtasks>
+          <subtask>Criar backend/src/utils/cors-validator.ts</subtask>
+          <subtask>Implementar regex para IPs de rede local</subtask>
+          <subtask>Implementar validação de localhost</subtask>
+          <subtask>Testes unitários</subtask>
+        </subtasks>
+      </task>
+      <task id="2">
+        <title>Configurar CORS com validação customizada</title>
+        <subtasks>
+          <subtask>Atualizar configuração CORS em backend/src/index.ts</subtask>
+          <subtask>Adicionar variável ALLOWED_ORIGINS ao .env.example</subtask>
+          <subtask>Documentar configuração</subtask>
+        </subtasks>
+      </task>
+      <task id="3">
+        <title>Testes de integração</title>
+        <subtasks>
+          <subtask>Testar requisição de origem permitida</subtask>
+          <subtask>Testar requisição de origem bloqueada</subtask>
+          <subtask>Testar requisição sem origem (same-origin)</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">CORS restrito para aceitar apenas origens da rede local</criterion>
+    <criterion id="AC2">Lista de origens permitidas configurável via variável de ambiente</criterion>
+    <criterion id="AC3">Localhost (127.0.0.1, localhost) sempre permitido</criterion>
+    <criterion id="AC4">IPs da rede local (192.168.x.x, 10.x.x.x, 172.16-31.x.x) permitidos</criterion>
+    <criterion id="AC5">Requisições de origens não permitidas retornam erro 403</criterion>
+    <criterion id="AC6">Testes unitários para validação de origem</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/audit-report-2025-12-03.md</path>
+        <title>Relatório de Auditoria</title>
+        <section>Seção 7: Segurança (6/10)</section>
+        <snippet>CORS muito permissivo: app.use(cors({ origin: true })) aceita QUALQUER origem. Recomendação: Restringir CORS para IPs da rede local.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD v3.0</title>
+        <section>Seção 11: Segurança &amp; Privacidade</section>
+        <snippet>Icecast: Bind apenas em rede local (192.168.x.x / 10.x.x.x). Princípio local-first: tudo funciona sem internet.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões</title>
+        <section>Arquitetura de Segurança</section>
+        <snippet>Network isolation: Icecast2 bind apenas em rede local. No authentication: sistema single-user local.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>backend/src/index.ts</path>
+        <kind>entry-point</kind>
+        <symbol>cors middleware</symbol>
+        <lines>32-35</lines>
+        <reason>Configuração atual de CORS permissiva que precisa ser modificada</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/utils/logger.ts</path>
+        <kind>utility</kind>
+        <symbol>createLogger</symbol>
+        <lines>97-99</lines>
+        <reason>Logger centralizado para usar no novo módulo cors-validator</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/middleware/error-handler.ts</path>
+        <kind>middleware</kind>
+        <symbol>errorHandler</symbol>
+        <lines>all</lines>
+        <reason>Padrão de middleware para referência de implementação</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>cors</package>
+        <version>^2.8.5</version>
+        <usage>Middleware CORS existente a ser configurado com validação customizada</usage>
+      </node>
+      <node>
+        <package>express</package>
+        <version>^4.21.2</version>
+        <usage>Framework web onde CORS será aplicado</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Usar padrão de middleware Express existente no projeto</constraint>
+    <constraint>Manter compatibilidade com requisições same-origin (sem header Origin)</constraint>
+    <constraint>Validação deve ser eficiente para não impactar latência das requisições</constraint>
+    <constraint>Usar createLogger para logging consistente</constraint>
+    <constraint>Mensagens de erro em português BR conforme padrão do projeto</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CORS Origin Validator</name>
+      <kind>function signature</kind>
+      <signature>isLocalOrigin(origin: string | undefined): boolean</signature>
+      <path>backend/src/utils/cors-validator.ts (a criar)</path>
+    </interface>
+    <interface>
+      <name>Express CORS Config</name>
+      <kind>middleware config</kind>
+      <signature>cors({ origin: (origin, callback) => void, credentials: boolean })</signature>
+      <path>backend/src/index.ts:32-35</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Jest para testes unitários e de integração no backend. Arquivos de teste co-localizados com source (*.test.ts). Usar supertest para testes de rotas HTTP.</standards>
+    <locations>
+      <location>backend/src/__tests__/</location>
+      <location>backend/src/utils/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1,AC3">Testar isLocalOrigin com localhost e 127.0.0.1 retorna true</idea>
+      <idea ac="AC4">Testar isLocalOrigin com IPs de rede local (192.168.1.1, 10.0.0.1, 172.16.0.1) retorna true</idea>
+      <idea ac="AC5">Testar isLocalOrigin com origem externa (https://evil.com) retorna false</idea>
+      <idea ac="AC3">Testar requisição sem header Origin (same-origin) é aceita</idea>
+      <idea ac="AC2">Testar que ALLOWED_ORIGINS do .env adiciona origens extras permitidas</idea>
+      <idea ac="AC5">Testar que requisição de origem bloqueada não executa o handler</idea>
+    </ideas>
+  </tests>
+</story-context>

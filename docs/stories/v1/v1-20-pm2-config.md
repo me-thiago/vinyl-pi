@@ -1,7 +1,7 @@
 # Story V1.20: PM2 Config e Auto-Start
 
 **Epic:** V1 - Foundation Core (MVP)
-**Status:** ready-for-dev
+**Status:** done
 
 **User Story:**
 Como usuário,  

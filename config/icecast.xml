@@ -1,7 +1,35 @@
+<!--
+  Icecast2 Configuration for Vinyl-OS
+  ====================================
+
+  Este arquivo configura o servidor de streaming Icecast2.
+  O FFmpeg envia áudio para este servidor, que distribui para os listeners.
+
+  Arquivo de configuração customizado usado pelo PM2 (ecosystem.config.js).
+  NÃO confundir com /etc/icecast2/icecast.xml (configuração do sistema).
+
+  Para testar a configuração:
+    icecast2 -c /caminho/para/config/icecast.xml
+
+  Para ver status do streaming:
+    curl http://localhost:8000/status-json.xsl
+
+  Documentação oficial:
+    https://icecast.org/docs/icecast-trunk/
+-->
 <icecast>
+  <!-- Informações do servidor (exibidas na página de status) -->
   <location>Vinyl-OS</location>
   <admin>admin@localhost</admin>
 
+  <!--
+    Limits - Configurações de capacidade
+    =====================================
+    - clients: Número máximo de listeners simultâneos
+    - sources: Número máximo de streams de entrada
+    - queue-size: Tamanho do buffer interno (bytes)
+    - burst-size: Dados enviados imediatamente ao conectar (para preenchimento de buffer)
+  -->
   <limits>
     <clients>10</clients>
     <sources>2</sources>

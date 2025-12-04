@@ -1,0 +1,141 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>v1.5</epicId>
+    <storyId>03</storyId>
+    <title>Cleanup - Remover Projeto Arquivado</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-03-cleanup-archived.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que o código arquivado seja removido ou movido para fora do repositório principal</iWant>
+    <soThat>o repositório fique mais limpo e leve</soThat>
+    <tasks>
+      <task id="1">
+        <title>Preservar código em branch separado (opcional)</title>
+        <subtasks>
+          <subtask>Criar branch archive/legacy-v0 a partir do commit atual</subtask>
+          <subtask>Push do branch de archive</subtask>
+        </subtasks>
+      </task>
+      <task id="2">
+        <title>Remover diretório archived_project/</title>
+        <subtasks>
+          <subtask>Executar git rm -r archived_project/</subtask>
+          <subtask>Commit da remoção</subtask>
+        </subtasks>
+      </task>
+      <task id="3">
+        <title>Atualizar .gitignore</title>
+        <subtasks>
+          <subtask>Adicionar archived_project/ ao .gitignore</subtask>
+          <subtask>Adicionar comentário explicativo</subtask>
+        </subtasks>
+      </task>
+      <task id="4">
+        <title>Remover código morto identificado</title>
+        <subtasks>
+          <subtask>Remover fifoPath não utilizado em audio-manager.ts</subtask>
+          <subtask>Verificar e remover outros dead codes mencionados na auditoria</subtask>
+        </subtasks>
+      </task>
+      <task id="5">
+        <title>Documentar no CHANGELOG (quando existir)</title>
+        <subtasks>
+          <subtask>Registrar remoção do código arquivado</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Diretório archived_project/ removido do branch principal</criterion>
+    <criterion id="AC2">Código arquivado preservado em branch separado archive/legacy-v0 (opcional)</criterion>
+    <criterion id="AC3">.gitignore atualizado para ignorar archived_project/ caso seja recriado localmente</criterion>
+    <criterion id="AC4">Código morto identificado removido (ex: fifoPath não utilizado no AudioManager)</criterion>
+    <criterion id="AC5">Documentação atualizada refletindo a remoção</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/audit-report-2025-12-03.md</path>
+        <title>Relatório de Auditoria</title>
+        <section>Seção 1: Arquitetura (9/10)</section>
+        <snippet>archived_project/ (8.4MB) deveria estar no .gitignore ou em branch separado. Duplicação de logger config.</snippet>
+      </doc>
+      <doc>
+        <path>docs/audit-report-2025-12-03.md</path>
+        <title>Relatório de Auditoria</title>
+        <section>Seção 5: Audio Pipeline (8/10)</section>
+        <snippet>FIFO não utilizado - path definido mas não usado: private fifoPath: string = '/tmp/vinyl-audio.fifo';</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>service</kind>
+        <symbol>fifoPath</symbol>
+        <lines>129</lines>
+        <reason>Propriedade fifoPath definida mas nunca utilizada - código morto a remover</reason>
+      </artifact>
+      <artifact>
+        <path>.gitignore</path>
+        <kind>config</kind>
+        <symbol>gitignore patterns</symbol>
+        <lines>all</lines>
+        <reason>Arquivo a ser atualizado com entrada para archived_project/</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <system>
+        <tool>git</tool>
+        <usage>Comandos git rm, git branch para manipulação do repositório</usage>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Não usar git filter-branch a menos que haja dados sensíveis no archived_project/</constraint>
+    <constraint>Preservar histórico em branch separado antes de remover (opcional mas recomendado)</constraint>
+    <constraint>Verificar que archived_project/ não é referenciado em nenhum lugar do código</constraint>
+    <constraint>fifoPath é usado internamente pelo AudioManager para FIFO - verificar se ainda é necessário</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Git Commands</name>
+      <kind>shell commands</kind>
+      <signature>git rm -r archived_project/</signature>
+      <path>terminal</path>
+    </interface>
+    <interface>
+      <name>Git Branch Archive</name>
+      <kind>shell commands</kind>
+      <signature>git checkout -b archive/legacy-v0 &amp;&amp; git push origin archive/legacy-v0</signature>
+      <path>terminal</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Esta story é principalmente operacional (git/cleanup). Testes manuais de verificação. Se código for modificado (remoção de fifoPath), rodar npm test para garantir que nada quebrou.</standards>
+    <locations>
+      <location>backend/src/__tests__/services/audio-manager.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Verificar que archived_project/ não existe após git rm</idea>
+      <idea ac="AC3">Verificar que .gitignore contém entrada para archived_project/</idea>
+      <idea ac="AC4">Rodar npm test após remoção de fifoPath para garantir que testes passam</idea>
+      <idea ac="AC4">Grep por 'fifoPath' no codebase para confirmar que não há referências</idea>
+      <idea ac="AC2">Verificar que branch archive/legacy-v0 existe no remote</idea>
+    </ideas>
+  </tests>
+
+  <notes>
+    <note type="warning">⚠️ ATENÇÃO: Verificar se archived_project/ contém dados sensíveis antes de remover. Se sim, considerar git filter-branch ou BFG Repo Cleaner.</note>
+    <note type="info">O fifoPath é usado para comunicação entre processos FFmpeg no dual-streaming. Verificar se métodos createFifo() e cleanupFifo() ainda são usados antes de remover.</note>
+  </notes>
+</story-context>

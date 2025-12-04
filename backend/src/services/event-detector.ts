@@ -1,22 +1,9 @@
-import winston from 'winston';
 import { eventBus } from '../utils/event-bus';
 import { createSubscriptionManager } from '../utils/lifecycle';
+import { createLogger } from '../utils/logger';
 import { AudioAnalysisData } from './audio-analyzer';
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] [EventDetector] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/event-detector.log' })
-  ]
-});
+const logger = createLogger('EventDetector');
 
 /**
  * Configuração de detecção de silêncio

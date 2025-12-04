@@ -1,0 +1,229 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>21</storyId>
+    <title>Install Script Completo</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-21-install-script.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>ter um script de instalação que configure tudo automaticamente</iWant>
+    <soThat>o setup seja simples e reproduzível</soThat>
+    <tasks>
+      <task id="1">Criar script scripts/install.sh</task>
+      <task id="2">Instalar dependências do sistema (Node.js, FFmpeg, Icecast2, etc.)</task>
+      <task id="3">Instalar dependências do projeto (npm install)</task>
+      <task id="4">Configurar Prisma e database</task>
+      <task id="5">Configurar Icecast2</task>
+      <task id="6">Setup inicial de PM2</task>
+      <task id="7">Testes básicos de funcionamento</task>
+      <task id="8">Documentar processo de instalação</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Script `scripts/install.sh` criado</criterion>
+    <criterion id="AC2">Instala dependências do sistema (Node.js, FFmpeg, Icecast2, etc.)</criterion>
+    <criterion id="AC3">Instala dependências do projeto (npm install)</criterion>
+    <criterion id="AC4">Configura Prisma e database</criterion>
+    <criterion id="AC5">Configura Icecast2</criterion>
+    <criterion id="AC6">Setup inicial de PM2</criterion>
+    <criterion id="AC7">Testes básicos de funcionamento</criterion>
+    <criterion id="AC8">Documentação do processo de instalação</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>10.1 Quick Start</section>
+        <snippet>Instruções de instalação em 30 minutos: apt update, instalar Node.js 20, FFmpeg, Icecast2, clone repo, npm install, npm run build, configurar Icecast, PM2 start.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>10.2 Validação Pós-Instalação</section>
+        <snippet>Comandos para validar: pm2 status, systemctl status icecast2, arecord teste, ffmpeg teste de streaming, pm2 logs.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>10.3 Troubleshooting Comum</section>
+        <snippet>Tabela de problemas comuns: Device not found, Permission denied, Stream cortando, Icecast connection refused, Alto uso de CPU.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Ambiente de Desenvolvimento</section>
+        <snippet>Pré-requisitos: Node.js 20.x LTS, npm 10.x+, SQLite3, FFmpeg, TypeScript 5.x+. Setup com npm install, prisma generate, prisma migrate dev.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Arquitetura de Deploy</section>
+        <snippet>Target: Raspberry Pi 4B/5 com Pi OS 64-bit, PM2 como process manager, Nginx opcional. Deploy: clone, npm install, build, .env, icecast install, pm2 start.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Vinyl-OS - Epic Breakdown</title>
+        <section>Story V1.21</section>
+        <snippet>Install Script deve: criar scripts/install.sh, instalar deps sistema, npm install, Prisma setup, Icecast config, PM2 setup, testes e docs.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>scripts</symbol>
+        <lines>11-27</lines>
+        <reason>Contém scripts npm existentes para dev, build, start, PM2. O install.sh deve usar estes scripts.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/package.json</path>
+        <kind>config</kind>
+        <symbol>dependencies/devDependencies</symbol>
+        <lines>20-44</lines>
+        <reason>Lista de dependências do backend: @prisma/client, express, socket.io, winston, etc. Necessário para npm install.</reason>
+      </artifact>
+      <artifact>
+        <path>frontend/package.json</path>
+        <kind>config</kind>
+        <symbol>dependencies/devDependencies</symbol>
+        <lines>16-57</lines>
+        <reason>Lista de dependências do frontend: react, vite, tailwindcss, socket.io-client, etc. Necessário para npm install e build.</reason>
+      </artifact>
+      <artifact>
+        <path>ecosystem.config.js</path>
+        <kind>config</kind>
+        <symbol>apps</symbol>
+        <lines>1-50</lines>
+        <reason>Configuração PM2 com 3 apps: vinyl-os-icecast, vinyl-backend, vinyl-frontend. O script deve configurar PM2 baseado neste arquivo.</reason>
+      </artifact>
+      <artifact>
+        <path>scripts/setup-persistent-logs.sh</path>
+        <kind>script</kind>
+        <symbol>journald setup</symbol>
+        <lines>1-48</lines>
+        <reason>Script existente para configurar logs persistentes. Pode ser integrado ou referenciado no install.sh.</reason>
+      </artifact>
+      <artifact>
+        <path>scripts/system-health.sh</path>
+        <kind>script</kind>
+        <symbol>health monitoring</symbol>
+        <lines>1-465</lines>
+        <reason>Script existente de monitoramento de saúde. Útil para validação pós-instalação.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/prisma/schema.prisma</path>
+        <kind>schema</kind>
+        <symbol>prisma schema</symbol>
+        <reason>Schema Prisma para configurar database. Necessário prisma generate e prisma migrate dev.</reason>
+      </artifact>
+      <artifact>
+        <path>config/icecast.xml</path>
+        <kind>config</kind>
+        <symbol>icecast configuration</symbol>
+        <reason>Arquivo de configuração do Icecast2. O script deve criar/copiar este arquivo para o local correto.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="@prisma/client" version="^6.18.0" />
+        <package name="express" version="^4.21.2" />
+        <package name="socket.io" version="^4.8.1" />
+        <package name="winston" version="^3.18.3" />
+        <package name="cors" version="^2.8.5" />
+        <package name="dotenv" version="^16.6.1" />
+        <package name="react" version="^19.1.1" />
+        <package name="vite" version="^7.1.7" />
+        <package name="tailwindcss" version="^4.1.16" />
+        <package name="prisma" version="^6.18.0" dev="true" />
+        <package name="typescript" version="^5.9.3" dev="true" />
+        <package name="ts-node" version="^10.9.2" dev="true" />
+        <package name="pm2" version="global" />
+      </ecosystem>
+      <system name="apt">
+        <package name="nodejs" version="20.x" source="nodesource" />
+        <package name="npm" />
+        <package name="ffmpeg" />
+        <package name="icecast2" />
+        <package name="alsa-utils" />
+        <package name="sqlite3" />
+        <package name="git" />
+        <package name="curl" />
+        <package name="jq" />
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="target-platform">Raspberry Pi 4B/5 com Raspberry Pi OS 64-bit</constraint>
+    <constraint type="architecture">ARM64</constraint>
+    <constraint type="node-version">Node.js 20.x LTS (via nodesource)</constraint>
+    <constraint type="install-time">Setup completo em menos de 30 minutos</constraint>
+    <constraint type="idempotent">Script deve ser seguro para rodar múltiplas vezes</constraint>
+    <constraint type="error-handling">Falhar com mensagens claras se algo der errado</constraint>
+    <constraint type="non-destructive">Não sobrescrever configurações existentes sem confirmação</constraint>
+    <constraint type="language">Mensagens em português para o usuário</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>PM2 CLI</name>
+      <kind>CLI</kind>
+      <signature>pm2 start ecosystem.config.js / pm2 save / pm2 startup</signature>
+      <path>ecosystem.config.js</path>
+    </interface>
+    <interface>
+      <name>Prisma CLI</name>
+      <kind>CLI</kind>
+      <signature>npx prisma generate / npx prisma migrate dev</signature>
+      <path>backend/prisma/schema.prisma</path>
+    </interface>
+    <interface>
+      <name>npm scripts</name>
+      <kind>CLI</kind>
+      <signature>npm run build / npm run dev / npm start</signature>
+      <path>package.json</path>
+    </interface>
+    <interface>
+      <name>Icecast2 service</name>
+      <kind>systemd</kind>
+      <signature>systemctl enable/start icecast2 ou PM2</signature>
+      <path>config/icecast.xml</path>
+    </interface>
+    <interface>
+      <name>API Health</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /health</signature>
+      <path>backend/src/routes/health.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Bash scripts devem seguir shellcheck standards. Usar set -e para falhar em erros.
+      Cada passo deve ter output visual indicando progresso (checkmarks, spinners).
+      Validação pós-instalação deve usar curl para testar endpoints e pm2 status.
+    </standards>
+    <locations>
+      <location>scripts/install.sh (validações internas)</location>
+      <location>scripts/system-health.sh (validação de saúde)</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Verificar que install.sh existe e é executável</idea>
+      <idea criterionId="AC2">Verificar que node --version retorna 20.x, ffmpeg -version retorna ok, icecast2 instalado</idea>
+      <idea criterionId="AC3">Verificar que node_modules existe em backend/ e frontend/</idea>
+      <idea criterionId="AC4">Verificar que data/vinyl-os.db existe após prisma migrate</idea>
+      <idea criterionId="AC5">Verificar que config/icecast.xml está configurado corretamente</idea>
+      <idea criterionId="AC6">Verificar que pm2 list mostra os apps configurados</idea>
+      <idea criterionId="AC7">Verificar que curl http://localhost:3001/health retorna resposta</idea>
+      <idea criterionId="AC8">Verificar que README.md tem seção de instalação atualizada</idea>
+    </ideas>
+  </tests>
+</story-context>

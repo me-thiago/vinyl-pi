@@ -1,6 +1,6 @@
-import winston from 'winston';
 import prisma from '../prisma/client';
 import { createSubscriptionManager, Destroyable } from '../utils/lifecycle';
+import { createLogger } from '../utils/logger';
 import {
   SilenceDetectedPayload,
   SilenceEndedPayload,
@@ -8,20 +8,7 @@ import {
 } from './event-detector';
 import { SessionManager } from './session-manager';
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] [EventPersistence] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/event-persistence.log' })
-  ]
-});
+const logger = createLogger('EventPersistence');
 
 /**
  * Tipos de eventos que serão persistidos

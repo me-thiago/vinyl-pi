@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import prisma from '../prisma/client';
 import { EventPersistence } from '../services/event-persistence';
 import { createLogger } from '../utils/logger';
+import { validate } from '../middleware/validate';
+import { eventsQuerySchema, EventsQueryInput } from '../schemas';
 
 const logger = createLogger('EventsRouter');
 
@@ -12,17 +14,7 @@ export interface EventsRouterDependencies {
   eventPersistence?: EventPersistence;
 }
 
-/**
- * Query parameters para GET /api/events
- */
-interface EventsQueryParams {
-  session_id?: string;
-  event_type?: string;
-  limit?: string;
-  offset?: string;
-  date_from?: string;
-  date_to?: string;
-}
+// Query params são validados via Zod schema (EventsQueryInput)
 
 /**
  * Resposta do endpoint GET /api/events
@@ -53,7 +45,7 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
   /**
    * GET /api/events
    *
-   * Query params:
+   * Query params (validados via Zod):
    * - session_id: Filtrar por sessão
    * - event_type: Filtrar por tipo de evento
    * - limit: Limite de resultados (default: 100, max: 1000)
@@ -61,35 +53,21 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
    * - date_from: Data início (ISO string)
    * - date_to: Data fim (ISO string)
    */
-  router.get('/events', async (req: Request<{}, {}, {}, EventsQueryParams>, res: Response) => {
+  router.get('/events', validate(eventsQuerySchema, 'query'), async (req: Request, res: Response) => {
     try {
+      // Query já validada e tipada pelo Zod
       const {
         session_id,
         event_type,
-        limit: limitStr,
-        offset: offsetStr,
+        limit: queryLimit,
+        offset: queryOffset,
         date_from,
         date_to
-      } = req.query;
+      } = req.query as EventsQueryInput;
 
-      // Parse e validar limit/offset
-      const limit = Math.min(parseInt(limitStr || '100', 10), 1000);
-      const offset = parseInt(offsetStr || '0', 10);
-
-      // Validar valores numéricos
-      if (isNaN(limit) || limit < 1) {
-        res.status(400).json({
-          error: { message: 'Parâmetro inválido: limit deve ser um número entre 1 e 1000', code: 'VALIDATION_ERROR' }
-        });
-        return;
-      }
-
-      if (isNaN(offset) || offset < 0) {
-        res.status(400).json({
-          error: { message: 'Parâmetro inválido: offset deve ser um número maior ou igual a 0', code: 'VALIDATION_ERROR' }
-        });
-        return;
-      }
+      // Aplicar defaults
+      const limit = Math.min(queryLimit ?? 100, 1000);
+      const offset = queryOffset ?? 0;
 
       // Construir filtro where
       const where: {
@@ -112,27 +90,11 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
       // Filtro de data
       if (date_from || date_to) {
         where.timestamp = {};
-
         if (date_from) {
-          const dateFromParsed = new Date(date_from);
-          if (isNaN(dateFromParsed.getTime())) {
-            res.status(400).json({
-              error: { message: 'Parâmetro inválido: date_from deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
-            });
-            return;
-          }
-          where.timestamp.gte = dateFromParsed;
+          where.timestamp.gte = new Date(date_from);
         }
-
         if (date_to) {
-          const dateToParsed = new Date(date_to);
-          if (isNaN(dateToParsed.getTime())) {
-            res.status(400).json({
-              error: { message: 'Parâmetro inválido: date_to deve ser uma data ISO válida', code: 'VALIDATION_ERROR' }
-            });
-            return;
-          }
-          where.timestamp.lte = dateToParsed;
+          where.timestamp.lte = new Date(date_to);
         }
       }
 

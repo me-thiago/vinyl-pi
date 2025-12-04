@@ -1,0 +1,204 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1</epicId>
+    <storyId>22</storyId>
+    <title>Documentação Básica</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1/v1-22-documentacao-basica.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>usuário</asA>
+    <iWant>ter documentação suficiente para usar o sistema</iWant>
+    <soThat>possa configurar e operar sem ajuda externa</soThat>
+    <tasks>
+      <task id="1">Atualizar README.md com visão geral completa</task>
+      <task id="2">Documentar requisitos de hardware detalhados</task>
+      <task id="3">Melhorar instruções de instalação</task>
+      <task id="4">Adicionar seção "Como usar" (player, dashboard, diagnóstico)</task>
+      <task id="5">Criar seção de troubleshooting comum</task>
+      <task id="6">Adicionar documentação inline (JSDoc/TSDoc) nos arquivos principais</task>
+      <task id="7">Adicionar comentários em configurações importantes</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">README.md atualizado com visão geral do projeto</criterion>
+    <criterion id="AC2">README.md contém requisitos de hardware detalhados</criterion>
+    <criterion id="AC3">README.md contém instruções de instalação claras</criterion>
+    <criterion id="AC4">README.md explica como usar (player, dashboard, diagnóstico)</criterion>
+    <criterion id="AC5">README.md tem seção de troubleshooting comum</criterion>
+    <criterion id="AC6">Documentação inline (JSDoc/TSDoc) nos serviços principais</criterion>
+    <criterion id="AC7">Comentários em configurações importantes</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>Todo o documento</section>
+        <snippet>Documento completo de requisitos com todas especificações técnicas, arquitetura, configurações, KPIs e guias. Fonte principal para documentação.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>4. Requisitos de Hardware</section>
+        <snippet>Requisitos mínimos: Pi 4B/5 (4GB), MicroSD 32GB Class 10, interface USB áudio (Behringer UCA222), toca-discos com saída LINE, fonte oficial, Ethernet recomendado.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>10.1 Quick Start</section>
+        <snippet>Processo de instalação em 30 minutos: apt update, Node.js 20, FFmpeg, Icecast2, clone, npm install, build, configurar Icecast, PM2.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>10.3 Troubleshooting Comum</section>
+        <snippet>Tabela com problemas e soluções: Device not found (verificar arecord -l), Permission denied (adicionar user ao grupo audio), Stream cortando (aumentar buffer).</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd-v3.md</path>
+        <title>PRD — Vinyl-OS (Pi)</title>
+        <section>5.1.3-5.1.5</section>
+        <snippet>Funcionalidades V1: Reconhecimento sonoro (silêncio, clipping, troca de faixa), EventBus Core, Interface Web (Player, Dashboard, Diagnóstico, Histórico, Settings).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Estrutura do Projeto</section>
+        <snippet>Estrutura de diretórios completa: backend/, frontend/, config/, data/, scripts/, docs/. Cada diretório com sua função específica.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Padrões de Implementação</section>
+        <snippet>Padrões de nomenclatura, estrutura de arquivos, formato de API responses, logging, date handling. Referência para documentação de código.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Vinyl-OS - Epic Breakdown</title>
+        <section>Story V1.22</section>
+        <snippet>Documentação básica: README atualizado, requisitos de hardware, instalação, como usar, troubleshooting, JSDoc/TSDoc, comentários em configs.</snippet>
+      </doc>
+      <doc>
+        <path>README.md</path>
+        <title>README existente</title>
+        <section>Todo</section>
+        <snippet>README atual já possui estrutura básica com stack, instalação, PM2 commands. Precisa ser expandido com hardware, como usar, troubleshooting.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>README.md</path>
+        <kind>documentation</kind>
+        <symbol>main readme</symbol>
+        <lines>1-302</lines>
+        <reason>Arquivo principal de documentação a ser atualizado/expandido.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/audio-manager.ts</path>
+        <kind>service</kind>
+        <symbol>AudioManager</symbol>
+        <reason>Serviço principal de gerenciamento de áudio. Precisa JSDoc documentando métodos públicos.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/event-detector.ts</path>
+        <kind>service</kind>
+        <symbol>EventDetector</symbol>
+        <reason>Serviço de detecção de eventos sonoros. Precisa JSDoc documentando lógica de detecção.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/services/session-manager.ts</path>
+        <kind>service</kind>
+        <symbol>SessionManager</symbol>
+        <reason>Gerenciamento de sessões de escuta. Precisa JSDoc.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/src/utils/event-bus.ts</path>
+        <kind>utility</kind>
+        <symbol>EventBus</symbol>
+        <reason>Sistema pub/sub de eventos. Já tem alguma documentação, pode precisar de expansão.</reason>
+      </artifact>
+      <artifact>
+        <path>config/icecast.xml</path>
+        <kind>config</kind>
+        <symbol>icecast configuration</symbol>
+        <reason>Configuração do Icecast2. Precisa comentários explicando cada seção importante.</reason>
+      </artifact>
+      <artifact>
+        <path>ecosystem.config.js</path>
+        <kind>config</kind>
+        <symbol>PM2 config</symbol>
+        <reason>Configuração PM2. Precisa comentários explicando cada app e suas opções.</reason>
+      </artifact>
+      <artifact>
+        <path>backend/.env.example</path>
+        <kind>config</kind>
+        <symbol>environment variables</symbol>
+        <reason>Template de variáveis de ambiente. Precisa comentários explicando cada variável.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="documentation">
+        <package name="JSDoc" context="padrão TypeScript" />
+        <package name="TSDoc" context="padrão TypeScript" />
+        <package name="Markdown" context="formato de documentação" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="language">Documentação em Português BR</constraint>
+    <constraint type="audience">Usuários não-técnicos devem conseguir usar após ler README</constraint>
+    <constraint type="completeness">README deve ser auto-suficiente para instalação e uso básico</constraint>
+    <constraint type="maintainability">JSDoc/TSDoc devem facilitar manutenção futura do código</constraint>
+    <constraint type="format">Markdown válido, compatível com GitHub rendering</constraint>
+    <constraint type="consistency">Seguir padrões de nomenclatura definidos em architecture.md</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>README Sections</name>
+      <kind>documentation structure</kind>
+      <signature>Visão Geral, Hardware, Instalação, Como Usar, Troubleshooting</signature>
+      <path>README.md</path>
+    </interface>
+    <interface>
+      <name>JSDoc Format</name>
+      <kind>code documentation</kind>
+      <signature>@description, @param, @returns, @throws, @example</signature>
+      <path>backend/src/**/*.ts</path>
+    </interface>
+    <interface>
+      <name>XML Comments</name>
+      <kind>config documentation</kind>
+      <signature>comentários com explicações</signature>
+      <path>config/icecast.xml</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Documentação deve ser revisada por usuário não-técnico para validar clareza.
+      JSDoc deve permitir geração de documentação via typedoc (opcional).
+      Links internos do README devem funcionar no GitHub.
+    </standards>
+    <locations>
+      <location>README.md (revisão manual)</location>
+      <location>backend/src/**/*.ts (verificar JSDoc via IDE)</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Verificar que README tem seção "Visão Geral" com descrição clara do projeto</idea>
+      <idea criterionId="AC2">Verificar que README lista todos os requisitos de hardware do PRD seção 4</idea>
+      <idea criterionId="AC3">Verificar que instruções de instalação podem ser seguidas do zero em Pi limpo</idea>
+      <idea criterionId="AC4">Verificar que há seção explicando cada página da UI (Player, Dashboard, Diagnostics, Sessions, Settings)</idea>
+      <idea criterionId="AC5">Verificar que tabela de troubleshooting do PRD está presente</idea>
+      <idea criterionId="AC6">Verificar que serviços principais têm JSDoc com @description, @param, @returns</idea>
+      <idea criterionId="AC7">Verificar que config/icecast.xml e ecosystem.config.js têm comentários explicativos</idea>
+    </ideas>
+  </tests>
+</story-context>

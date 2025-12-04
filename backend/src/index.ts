@@ -19,6 +19,7 @@ import prisma from './prisma/client';
 import { eventBus } from './utils/event-bus';
 import { createLogger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { corsOriginCallback } from './utils/cors-validator';
 
 const logger = createLogger('Server');
 
@@ -28,9 +29,11 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
-// CORS para permitir frontend em porta diferente (local e rede)
+// CORS restrito para rede local
+// Apenas localhost, 127.0.0.1 e IPs privados (192.168.x.x, 10.x.x.x, 172.16-31.x.x) são permitidos
+// Origens adicionais podem ser configuradas via ALLOWED_ORIGINS no .env
 app.use(cors({
-  origin: true, // Aceita qualquer origem (rede local)
+  origin: corsOriginCallback,
   credentials: true
 }));
 

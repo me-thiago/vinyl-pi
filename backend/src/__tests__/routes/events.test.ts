@@ -123,14 +123,12 @@ describe('Events Router', () => {
         );
       });
 
-      it('should cap limit at 1000', async () => {
-        await request(app).get('/api/events?limit=5000');
+      it('should reject limit above 1000', async () => {
+        const response = await request(app).get('/api/events?limit=5000');
 
-        expect(mockFindMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            take: 1000
-          })
-        );
+        expect(response.status).toBe(400);
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('limit');
       });
 
       it('should respect offset', async () => {
@@ -177,14 +175,16 @@ describe('Events Router', () => {
         const response = await request(app).get('/api/events?limit=invalid');
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe('Parâmetro inválido');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('limit');
       });
 
       it('should reject negative offset', async () => {
         const response = await request(app).get('/api/events?offset=-1');
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toBe('Parâmetro inválido');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('offset');
       });
     });
 
@@ -278,14 +278,16 @@ describe('Events Router', () => {
         const response = await request(app).get('/api/events?date_from=invalid');
 
         expect(response.status).toBe(400);
-        expect(response.body.message).toContain('date_from');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('date_from');
       });
 
       it('should reject invalid date_to', async () => {
         const response = await request(app).get('/api/events?date_to=invalid');
 
         expect(response.status).toBe(400);
-        expect(response.body.message).toContain('date_to');
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+        expect(response.body.error.details[0].campo).toBe('date_to');
       });
     });
 
@@ -308,8 +310,8 @@ describe('Events Router', () => {
         const response = await request(app).get('/api/events');
 
         expect(response.status).toBe(500);
-        expect(response.body.error).toBe('Erro ao buscar eventos');
-        expect(response.body.message).toBe('Database connection failed');
+        expect(response.body.error.message).toBe('Erro ao buscar eventos');
+        expect(response.body.error.code).toBe('EVENTS_FETCH_ERROR');
       });
     });
   });
@@ -347,7 +349,7 @@ describe('Events Router', () => {
       const response = await request(appWithoutPersistence).get('/api/events/stats');
 
       expect(response.status).toBe(503);
-      expect(response.body.error).toBe('Serviço indisponível');
+      expect(response.body.error.message).toBe('Serviço indisponível: EventPersistence não está configurado');
     });
   });
 });

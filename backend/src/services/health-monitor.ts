@@ -1,25 +1,12 @@
 import { EventEmitter } from 'events';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import winston from 'winston';
+import { createLogger } from '../utils/logger';
 import { AudioManager, StreamingConfig } from './audio-manager';
 
 const execAsync = promisify(exec);
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/health-monitor.log' })
-  ]
-});
+const logger = createLogger('HealthMonitor');
 
 /**
  * Configuração do Health Monitor

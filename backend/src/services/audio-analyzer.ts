@@ -1,21 +1,8 @@
 import Meyda from 'meyda';
-import winston from 'winston';
 import { eventBus } from '../utils/event-bus';
+import { createLogger } from '../utils/logger';
 
-// Configurar logger Winston
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] [AudioAnalyzer] ${message}`;
-    })
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/audio-analyzer.log' })
-  ]
-});
+const logger = createLogger('AudioAnalyzer');
 
 /**
  * Configuração do AudioAnalyzer

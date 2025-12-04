@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { SettingsService } from '../services/settings-service';
 import { createLogger } from '../utils/logger';
+import { validate } from '../middleware/validate';
+import { settingsUpdateSchema, settingKeyParamSchema } from '../schemas';
 
 const logger = createLogger('SettingsRouter');
 
@@ -42,12 +44,13 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
    *
    * Body: { "silence.threshold": -45, "silence.duration": 15 }
    */
-  router.patch('/settings', async (req: Request, res: Response) => {
+  router.patch('/settings', validate(settingsUpdateSchema, 'body'), async (req: Request, res: Response) => {
     try {
       const updates = req.body;
 
-      if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-        res.status(400).json({ error: { message: 'O corpo da requisição deve ser um objeto com configurações para atualizar', code: 'VALIDATION_ERROR' } });
+      // Validação de objeto vazio (Zod permite objeto vazio se todos os campos são opcionais)
+      if (Object.keys(updates).length === 0) {
+        res.status(400).json({ error: { message: 'O corpo da requisição deve conter pelo menos uma configuração para atualizar', code: 'VALIDATION_ERROR' } });
         return;
       }
 
@@ -92,7 +95,7 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
    * POST /api/settings/:key/reset
    * Reseta uma setting específica para o valor default
    */
-  router.post('/settings/:key/reset', async (req: Request, res: Response) => {
+  router.post('/settings/:key/reset', validate(settingKeyParamSchema, 'params'), async (req: Request, res: Response) => {
     try {
       const { key } = req.params;
 
