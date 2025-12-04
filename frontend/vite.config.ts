@@ -17,8 +17,8 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         ws: false,
-        configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, _req, _res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
             // Adicionar headers CORS se necessário
             proxyReq.setHeader('Accept', 'audio/mpeg, audio/*');
           });
@@ -28,8 +28,8 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         ws: false,
-        configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, _req, _res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
             proxyReq.setHeader('Accept', 'audio/wav, audio/*');
           });
         },

@@ -70,7 +70,6 @@ describe('ErrorBoundary', () => {
   });
 
   it('deve mostrar detalhes do erro em desenvolvimento', () => {
-    const originalEnv = process.env.NODE_ENV;
     // Em vitest, process.env.NODE_ENV é 'test' por padrão, que não é 'production'
     // então os detalhes devem aparecer
 

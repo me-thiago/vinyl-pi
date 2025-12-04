@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 // Mock Web Audio API
-(globalThis as any).AudioContext = class MockAudioContext {
+class MockAudioContext {
   state = 'running';
   currentTime = 0;
   sampleRate = 44100;
@@ -29,13 +29,22 @@ afterEach(() => {
     };
   }
 
-  decodeAudioData(_buffer: ArrayBuffer): Promise<AudioBuffer> {
+  createAnalyser() {
+    return {
+      fftSize: 2048,
+      smoothingTimeConstant: 0.8,
+      connect: () => {},
+    };
+  }
+
+  decodeAudioData(): Promise<AudioBuffer> {
     return Promise.resolve({
       duration: 0.1,
       sampleRate: 44100,
       numberOfChannels: 2,
       length: 4410,
-    } as AudioBuffer);
+      getChannelData: () => new Float32Array(4410),
+    } as unknown as AudioBuffer);
   }
 
   resume() {
@@ -45,22 +54,28 @@ afterEach(() => {
   close() {
     return Promise.resolve();
   }
-} as any;
+}
+
+(globalThis as unknown as { AudioContext: typeof MockAudioContext }).AudioContext = MockAudioContext;
 
 // Mock ReadableStream
-(globalThis as any).ReadableStream = class MockReadableStream {
+class MockReadableStream {
   getReader() {
     return {
       read: () => Promise.resolve({ done: true, value: undefined }),
       cancel: () => Promise.resolve(),
     };
   }
-} as any;
+}
+
+(globalThis as unknown as { ReadableStream: typeof MockReadableStream }).ReadableStream = MockReadableStream;
 
 // Mock ResizeObserver
-(globalThis as any).ResizeObserver = class MockResizeObserver {
+class MockResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
-} as any;
+}
+
+(globalThis as unknown as { ResizeObserver: typeof MockResizeObserver }).ResizeObserver = MockResizeObserver;
 

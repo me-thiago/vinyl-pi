@@ -48,7 +48,7 @@ export function useAudioStream({
 
   // Verificar suporte Web Audio API
   const checkWebAudioSupport = useCallback(() => {
-    return !!(window.AudioContext || (window as any).webkitAudioContext);
+    return !!(window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
   }, []);
 
   // Inicializar AudioContext
@@ -62,7 +62,7 @@ export function useAudioStream({
     }
 
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) {
         throw new Error('Web Audio API not supported');
       }
