@@ -78,7 +78,7 @@ development_status:
   v1.5-12-sentry-errors: done               # Baixo
   v1.5-13-estrutura-i18n: ready-for-dev    # Baixo
   v1.5-14-testes-e2e: ready-for-dev        # Baixo
-  v1.5-15-contributing-changelog: ready-for-dev  # Baixo
+  v1.5-15-contributing-changelog: done            # Baixo
   epic-v1.5-retrospective: optional
 
   # Epic V2 - Coleção & Reconhecimento Musical

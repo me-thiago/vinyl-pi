@@ -482,7 +482,11 @@ Para mais informações, consulte a pasta `docs/`:
 
 ## 🤝 Contribuindo
 
-(Em desenvolvimento)
+Contribuições são bem-vindas! Veja [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre como começar.
+
+## 📋 Changelog
+
+Veja [CHANGELOG.md](CHANGELOG.md) para histórico de versões e mudanças.
 
 ## 📝 Licença
 
