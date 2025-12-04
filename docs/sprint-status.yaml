@@ -73,8 +73,8 @@ development_status:
   v1.5-7-icecast-listeners: done           # Alto
   v1.5-8-testes-frontend: done              # Medio
   v1.5-9-swagger-openapi: ready-for-dev    # Medio
-  v1.5-10-code-splitting: ready-for-dev    # Medio
-  v1.5-11-enum-eventtype: ready-for-dev    # Medio
+  v1.5-10-code-splitting: done             # Medio
+  v1.5-11-enum-eventtype: done               # Medio
   v1.5-12-sentry-errors: ready-for-dev     # Baixo
   v1.5-13-estrutura-i18n: ready-for-dev    # Baixo
   v1.5-14-testes-e2e: ready-for-dev        # Baixo

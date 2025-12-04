@@ -1,4 +1,6 @@
 import prisma from '../prisma/client';
+import { EventType } from '@prisma/client';
+export { EventType } from '@prisma/client';
 import { createSubscriptionManager, Destroyable } from '../utils/lifecycle';
 import { createLogger } from '../utils/logger';
 import {
@@ -11,15 +13,9 @@ import { SessionManager } from './session-manager';
 const logger = createLogger('EventPersistence');
 
 /**
- * Tipos de eventos que serão persistidos
+ * Tipos de eventos que serão persistidos (re-exporta do Prisma)
  */
-export type PersistableEventType =
-  | 'silence.detected'
-  | 'silence.ended'
-  | 'clipping.detected'
-  | 'session.started'
-  | 'session.ended'
-  | 'track.change.detected';
+export type PersistableEventType = EventType;
 
 /**
  * EventPersistence - Persiste eventos do EventBus no banco de dados
@@ -105,7 +101,7 @@ export class EventPersistence implements Destroyable {
    */
   private async handleSilenceDetected(payload: Record<string, unknown>): Promise<void> {
     const data = payload as unknown as SilenceDetectedPayload;
-    await this.persistEvent('silence.detected', {
+    await this.persistEvent(EventType.silence_detected, {
       levelDb: data.levelDb,
       duration: data.duration,
       threshold: data.threshold
@@ -117,7 +113,7 @@ export class EventPersistence implements Destroyable {
    */
   private async handleSilenceEnded(payload: Record<string, unknown>): Promise<void> {
     const data = payload as unknown as SilenceEndedPayload;
-    await this.persistEvent('silence.ended', {
+    await this.persistEvent(EventType.silence_ended, {
       levelDb: data.levelDb,
       silenceDuration: data.silenceDuration
     });
@@ -128,7 +124,7 @@ export class EventPersistence implements Destroyable {
    */
   private async handleClippingDetected(payload: Record<string, unknown>): Promise<void> {
     const data = payload as unknown as ClippingDetectedPayload;
-    await this.persistEvent('clipping.detected', {
+    await this.persistEvent(EventType.clipping_detected, {
       levelDb: data.levelDb,
       threshold: data.threshold,
       count: data.count
@@ -145,7 +141,7 @@ export class EventPersistence implements Destroyable {
       this.currentSessionId = sessionId;
       logger.info(`Session started: ${sessionId}`);
     }
-    await this.persistEvent('session.started', payload);
+    await this.persistEvent(EventType.session_started, payload);
   }
 
   /**
@@ -153,7 +149,7 @@ export class EventPersistence implements Destroyable {
    * Limpa o sessionId atual
    */
   private async handleSessionEnded(payload: Record<string, unknown>): Promise<void> {
-    await this.persistEvent('session.ended', payload);
+    await this.persistEvent(EventType.session_ended, payload);
     this.currentSessionId = null;
     logger.info('Session ended');
   }
@@ -162,7 +158,7 @@ export class EventPersistence implements Destroyable {
    * Handler para track.change.detected
    */
   private async handleTrackChange(payload: Record<string, unknown>): Promise<void> {
-    await this.persistEvent('track.change.detected', payload);
+    await this.persistEvent(EventType.track_change_detected, payload);
   }
 
   /**

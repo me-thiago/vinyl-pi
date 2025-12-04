@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../prisma/client';
+import { EventType } from '@prisma/client';
 import { EventPersistence } from '../services/event-persistence';
 import { createLogger } from '../utils/logger';
 import { validate } from '../middleware/validate';
@@ -72,7 +73,7 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
       // Construir filtro where
       const where: {
         sessionId?: string;
-        eventType?: string;
+        eventType?: EventType;
         timestamp?: {
           gte?: Date;
           lte?: Date;
@@ -84,7 +85,8 @@ export function createEventsRouter(deps?: EventsRouterDependencies): Router {
       }
 
       if (event_type) {
-        where.eventType = event_type;
+        // Validar que o event_type é um valor válido do enum
+        where.eventType = event_type as EventType;
       }
 
       // Filtro de data

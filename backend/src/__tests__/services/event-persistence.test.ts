@@ -142,7 +142,7 @@ describe('EventPersistence', () => {
 
       expect(mockCreate).toHaveBeenCalledWith({
         data: {
-          eventType: 'silence.detected',
+          eventType: 'silence_detected', // Enum value stored in DB
           sessionId: null,
           metadata: {
             levelDb: -60,
@@ -164,7 +164,7 @@ describe('EventPersistence', () => {
 
       expect(mockCreate).toHaveBeenCalledWith({
         data: {
-          eventType: 'silence.ended',
+          eventType: 'silence_ended', // Enum value stored in DB
           sessionId: null,
           metadata: {
             levelDb: -30,
@@ -186,7 +186,7 @@ describe('EventPersistence', () => {
 
       expect(mockCreate).toHaveBeenCalledWith({
         data: {
-          eventType: 'clipping.detected',
+          eventType: 'clipping_detected', // Enum value stored in DB
           sessionId: null,
           metadata: {
             levelDb: -0.5,
@@ -233,9 +233,9 @@ describe('EventPersistence', () => {
 
       await eventBus.publish('silence.detected', { levelDb: -60, duration: 10, threshold: -50 });
 
-      // Segunda chamada (silence.detected) deve ter sessionId
+      // Segunda chamada (silence_detected) deve ter sessionId
       const silenceCall = mockCreate.mock.calls.find(
-        call => call[0].data.eventType === 'silence.detected'
+        call => call[0].data.eventType === 'silence_detected'
       );
 
       expect(silenceCall[0].data.sessionId).toBe('test-session-456');
@@ -313,7 +313,7 @@ describe('EventPersistence', () => {
 
       expect(mockCreate).toHaveBeenCalledWith({
         data: {
-          eventType: 'track.change.detected',
+          eventType: 'track_change_detected', // Enum value stored in DB
           sessionId: null,
           metadata: {
             timestamp: '2025-01-01T00:00:00.000Z',

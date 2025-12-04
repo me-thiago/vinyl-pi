@@ -11,6 +11,27 @@ datasource db {
 }
 
 // ============================================
+// V1 Enums
+// ============================================
+
+/// Event types supported by the audio monitoring system.
+/// Note: SQLite stores these as string values (e.g., "silence_detected").
+/// The EventBus still uses dot notation internally (e.g., "silence.detected").
+enum EventType {
+  audio_start
+  audio_stop
+  audio_level
+  silence_detected
+  silence_ended
+  turntable_idle
+  turntable_active
+  track_change_detected
+  session_started
+  session_ended
+  clipping_detected
+}
+
+// ============================================
 // V1 Models - Foundation Core
 // ============================================
 
@@ -28,11 +49,11 @@ model Session {
 }
 
 model AudioEvent {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   sessionId   String?
-  session     Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  eventType   String
-  timestamp   DateTime @default(now())
+  session     Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  eventType   EventType
+  timestamp   DateTime  @default(now())
   metadata    Json?
 
   @@index([sessionId, timestamp])
