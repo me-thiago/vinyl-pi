@@ -47,12 +47,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install dependencies
         run: |
-          npm ci --include=optional
-          npm rebuild @rollup/rollup-linux-x64-gnu || npm install @rollup/rollup-linux-x64-gnu --save-optional
+          rm -rf node_modules package-lock.json
+          npm install --include=optional
 
       - name: Lint
         run: npm run lint -w frontend
