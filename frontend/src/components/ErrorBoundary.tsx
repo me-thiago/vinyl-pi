@@ -1,4 +1,5 @@
 import React, { Component, type ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -57,7 +58,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   /**
-   * Log do erro para debugging e potencial envio para serviço de monitoramento
+   * Log do erro para debugging e envio para Sentry
    */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     this.setState({ errorInfo });
@@ -66,10 +67,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error('ErrorBoundary capturou um erro:', error);
     console.error('Stack de componentes:', errorInfo.componentStack);
 
-    // TODO: Enviar para serviço de monitoramento de erros (Sentry, etc.)
-    // if (process.env.NODE_ENV === 'production') {
-    //   errorTrackingService.captureException(error, { extra: errorInfo });
-    // }
+    // Enviar para Sentry
+    Sentry.captureException(error, {
+      extra: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
   }
 
   /**

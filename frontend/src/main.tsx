@@ -1,7 +1,27 @@
 import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import * as Sentry from '@sentry/react'
 import './index.css'
+
+// Inicializar Sentry para error tracking
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  environment: import.meta.env.MODE,
+  enabled: !!import.meta.env.VITE_SENTRY_DSN, // Só habilita se DSN configurado
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration({
+      maskAllText: false,
+      blockAllMedia: false,
+    }),
+  ],
+  // Performance Monitoring - 10% das transações
+  tracesSampleRate: 0.1,
+  // Session Replay - 10% normal, 100% quando há erro
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+})
 
 // Componentes compartilhados
 import { ThemeProvider } from './components/theme-provider'
