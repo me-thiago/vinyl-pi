@@ -1,0 +1,132 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1.5</epicId>
+    <storyId>15</storyId>
+    <title>Criar CONTRIBUTING.md e CHANGELOG.md</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-15-contributing-changelog.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>contribuidor</asA>
+    <iWant>ter documentação clara sobre como contribuir e histórico de mudanças</iWant>
+    <soThat>possa participar do projeto de forma organizada</soThat>
+    <tasks>
+      <task id="1">Criar CONTRIBUTING.md
+        <subtask>Seção: Pré-requisitos</subtask>
+        <subtask>Seção: Configuração do ambiente</subtask>
+        <subtask>Seção: Estrutura do projeto</subtask>
+        <subtask>Seção: Convenções de código</subtask>
+        <subtask>Seção: Como submeter PRs</subtask>
+        <subtask>Seção: Processo de review</subtask>
+      </task>
+      <task id="2">Criar CHANGELOG.md
+        <subtask>Cabeçalho com formato e links</subtask>
+        <subtask>Seção [Unreleased]</subtask>
+        <subtask>Seção [1.0.0] - MVP</subtask>
+        <subtask>Documentar principais features</subtask>
+      </task>
+      <task id="3">Atualizar README.md
+        <subtask>Adicionar link para CONTRIBUTING.md</subtask>
+        <subtask>Adicionar link para CHANGELOG.md</subtask>
+        <subtask>Adicionar seção "Contribuindo"</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">CONTRIBUTING.md criado com guia de contribuição</criterion>
+    <criterion id="AC2">CHANGELOG.md criado seguindo formato keepachangelog.com</criterion>
+    <criterion id="AC3">Seções claras: Como configurar ambiente, como submeter PRs</criterion>
+    <criterion id="AC4">Convenções de código documentadas</criterion>
+    <criterion id="AC5">Processo de review documentado</criterion>
+    <criterion id="AC6">Histórico das versões até agora documentado</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>README.md</path>
+        <title>Vinyl-OS README</title>
+        <section>Contribuindo</section>
+        <snippet>Seção "Contribuindo" atualmente mostra "(Em desenvolvimento)". Deve ser atualizada com link para CONTRIBUTING.md.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Estrutura do Projeto, Padrões</section>
+        <snippet>Documenta padrões de nomenclatura, estrutura de código, convenções TypeScript/React que devem ser referenciados no CONTRIBUTING.md.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>README.md</path>
+        <kind>documentation</kind>
+        <lines>483-486</lines>
+        <reason>README existente que deve ter seção "Contribuindo" atualizada com links para CONTRIBUTING.md e CHANGELOG.md.</reason>
+      </file>
+      <file>
+        <path>package.json</path>
+        <kind>config</kind>
+        <reason>Package.json raiz com scripts de desenvolvimento que devem ser documentados no CONTRIBUTING.md.</reason>
+      </file>
+      <file>
+        <path>backend/package.json</path>
+        <kind>config</kind>
+        <reason>Scripts do backend que devem ser documentados.</reason>
+      </file>
+      <file>
+        <path>frontend/package.json</path>
+        <kind>config</kind>
+        <reason>Scripts do frontend que devem ser documentados.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <note>Esta story não adiciona dependências de código, apenas documentação.</note>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>CONTRIBUTING.md deve estar em português BR</constraint>
+    <constraint>CHANGELOG.md deve seguir formato Keep a Changelog (keepachangelog.com)</constraint>
+    <constraint>Usar Conventional Commits (feat:, fix:, docs:, etc.)</constraint>
+    <constraint>Links no CHANGELOG devem apontar para releases no GitHub</constraint>
+    <constraint>Documentação deve refletir stack atual (Node 20, React 19, Vite 7, etc.)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Keep a Changelog format</name>
+      <kind>Documentation standard</kind>
+      <signature># Changelog\n## [Unreleased]\n### Added\n### Changed\n### Deprecated\n### Removed\n### Fixed\n### Security</signature>
+      <path>CHANGELOG.md</path>
+    </interface>
+    <interface>
+      <name>Conventional Commits</name>
+      <kind>Git convention</kind>
+      <signature>type(scope): description\n\nfeat: | fix: | docs: | style: | refactor: | test: | chore:</signature>
+      <path>CONTRIBUTING.md</path>
+    </interface>
+    <interface>
+      <name>GitHub Compare Links</name>
+      <kind>URL format</kind>
+      <signature>[Unreleased]: https://github.com/user/repo/compare/v1.0.0...HEAD\n[1.0.0]: https://github.com/user/repo/releases/tag/v1.0.0</signature>
+      <path>CHANGELOG.md</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Esta story é de documentação, não requer testes de código. Validação é manual (review do conteúdo).</standards>
+    <locations>
+      <location>N/A - documentação apenas</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Verificar que CONTRIBUTING.md cobre todos os passos de setup</idea>
+      <idea criterionId="AC2">Verificar que CHANGELOG.md segue formato keepachangelog</idea>
+      <idea criterionId="AC3">Testar que comandos documentados funcionam</idea>
+      <idea criterionId="AC6">Verificar que histórico de versões está correto</idea>
+    </ideas>
+  </tests>
+</story-context>

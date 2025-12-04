@@ -1,0 +1,198 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1.5</epicId>
+    <storyId>12</storyId>
+    <title>Adicionar Sentry para Error Tracking</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-12-sentry-errors.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que erros de produção sejam enviados para um serviço de monitoramento</iWant>
+    <soThat>possa identificar e corrigir problemas rapidamente</soThat>
+    <tasks>
+      <task id="1">Criar projeto no Sentry
+        <subtask>Criar projeto React no Sentry.io</subtask>
+        <subtask>Obter DSN</subtask>
+        <subtask>Criar projeto Node.js (opcional)</subtask>
+      </task>
+      <task id="2">Instalar e configurar Sentry no Frontend
+        <subtask>Instalar @sentry/react</subtask>
+        <subtask>Configurar inicialização em main.tsx</subtask>
+        <subtask>Integrar com ErrorBoundary existente</subtask>
+      </task>
+      <task id="3">Configurar source maps
+        <subtask>Instalar @sentry/vite-plugin</subtask>
+        <subtask>Configurar upload de source maps no build</subtask>
+        <subtask>Verificar que source maps não são públicos</subtask>
+      </task>
+      <task id="4">Instalar e configurar Sentry no Backend (opcional)
+        <subtask>Instalar @sentry/node</subtask>
+        <subtask>Configurar inicialização em index.ts</subtask>
+        <subtask>Integrar com error-handler middleware</subtask>
+      </task>
+      <task id="5">Adicionar contexto aos erros
+        <subtask>Informação de sessão ativa</subtask>
+        <subtask>Status do streaming</subtask>
+        <subtask>Versão da aplicação</subtask>
+      </task>
+      <task id="6">Testar integração
+        <subtask>Forçar erro no frontend</subtask>
+        <subtask>Verificar no dashboard Sentry</subtask>
+        <subtask>Verificar source maps funcionando</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Sentry SDK instalado no frontend</criterion>
+    <criterion id="AC2">Sentry SDK instalado no backend (opcional)</criterion>
+    <criterion id="AC3">ErrorBoundary integrado com Sentry</criterion>
+    <criterion id="AC4">Source maps enviados para Sentry</criterion>
+    <criterion id="AC5">Variáveis de ambiente para DSN configuradas</criterion>
+    <criterion id="AC6">Erros capturados incluem contexto (usuário, sessão, etc.)</criterion>
+    <criterion id="AC7">Performance monitoring básico (opcional)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Error Recovery, Frontend</section>
+        <snippet>Frontend: Error boundaries para React errors, toast notifications para API errors. Backend: try-catch em todos async operations, log + resposta HTTP adequada.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>frontend/src/components/ErrorBoundary.tsx</path>
+        <kind>component</kind>
+        <symbol>ErrorBoundary</symbol>
+        <lines>1-163</lines>
+        <reason>ErrorBoundary existente com TODO para integração com Sentry. componentDidCatch deve chamar Sentry.captureException.</reason>
+      </file>
+      <file>
+        <path>frontend/src/main.tsx</path>
+        <kind>entry-point</kind>
+        <symbol>createRoot</symbol>
+        <lines>1-31</lines>
+        <reason>Entry point onde Sentry.init() deve ser chamado antes de qualquer renderização React.</reason>
+      </file>
+      <file>
+        <path>frontend/vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-40</lines>
+        <reason>Configuração do Vite onde @sentry/vite-plugin deve ser adicionado para upload de source maps.</reason>
+      </file>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>server</kind>
+        <symbol>express, app</symbol>
+        <lines>1-50</lines>
+        <reason>Entry point do backend onde Sentry.init() deve ser chamado e Sentry.expressErrorHandler() adicionado.</reason>
+      </file>
+      <file>
+        <path>backend/src/middleware/error-handler.ts</path>
+        <kind>middleware</kind>
+        <symbol>errorHandler, notFoundHandler</symbol>
+        <reason>Error handler middleware que deve integrar com Sentry para capturar erros do backend.</reason>
+      </file>
+      <file>
+        <path>backend/.env.example</path>
+        <kind>config</kind>
+        <reason>Arquivo de exemplo de variáveis de ambiente onde SENTRY_DSN deve ser documentado.</reason>
+      </file>
+      <file>
+        <path>frontend/src/__tests__/ErrorBoundary.test.tsx</path>
+        <kind>test</kind>
+        <symbol>ErrorBoundary tests</symbol>
+        <reason>Testes do ErrorBoundary que devem ser atualizados para mockar Sentry.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>vite</package>
+        <version>^7.1.7</version>
+      </node>
+      <node>
+        <package>express</package>
+        <version>^4.21.2</version>
+      </node>
+      <node note="A ser adicionado no frontend">
+        <package>@sentry/react</package>
+        <version>latest</version>
+      </node>
+      <node note="A ser adicionado no frontend">
+        <package>@sentry/vite-plugin</package>
+        <version>latest</version>
+      </node>
+      <node note="A ser adicionado no backend (opcional)">
+        <package>@sentry/node</package>
+        <version>latest</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Sentry DSN deve ser configurado via variáveis de ambiente (nunca hardcoded)</constraint>
+    <constraint>Source maps não devem ser públicos (deletar após upload)</constraint>
+    <constraint>SENTRY_AUTH_TOKEN necessário para upload de source maps (CI/CD)</constraint>
+    <constraint>Sentry gratuito tem limite de 5K errors/mês</constraint>
+    <constraint>Para uso local/pessoal, integração pode ser opcional (verificar VITE_SENTRY_DSN antes de init)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Sentry.init (React)</name>
+      <kind>SDK initialization</kind>
+      <signature>Sentry.init({ dsn, environment, release, integrations, tracesSampleRate, replaysSessionSampleRate })</signature>
+      <path>frontend/src/main.tsx</path>
+    </interface>
+    <interface>
+      <name>Sentry.captureException</name>
+      <kind>Error capture</kind>
+      <signature>Sentry.captureException(error, { extra: { componentStack } })</signature>
+      <path>frontend/src/components/ErrorBoundary.tsx</path>
+    </interface>
+    <interface>
+      <name>sentryVitePlugin</name>
+      <kind>Vite plugin</kind>
+      <signature>sentryVitePlugin({ org, project, authToken, sourcemaps: { filesToDeleteAfterUpload } })</signature>
+      <path>frontend/vite.config.ts</path>
+    </interface>
+    <interface>
+      <name>Sentry.expressErrorHandler</name>
+      <kind>Express middleware</kind>
+      <signature>app.use(Sentry.expressErrorHandler())</signature>
+      <path>backend/src/index.ts</path>
+    </interface>
+    <interface>
+      <name>Environment variables</name>
+      <kind>Config</kind>
+      <signature>VITE_SENTRY_DSN, VITE_APP_VERSION, SENTRY_DSN, SENTRY_AUTH_TOKEN</signature>
+      <path>.env, .env.example</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Frontend usa Vitest, Backend usa Jest. Sentry deve ser mockado nos testes para não enviar erros reais.</standards>
+    <locations>
+      <location>frontend/src/__tests__/*.test.tsx</location>
+      <location>backend/src/__tests__/middleware/*.test.ts</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Verificar que Sentry.init é chamado no startup</idea>
+      <idea criterionId="AC3">Testar que ErrorBoundary chama Sentry.captureException quando erro ocorre</idea>
+      <idea criterionId="AC5">Verificar que variáveis de ambiente são lidas corretamente</idea>
+      <idea criterionId="AC6">Testar que contexto (sessão, streaming status) é incluído nos erros</idea>
+    </ideas>
+  </tests>
+</story-context>

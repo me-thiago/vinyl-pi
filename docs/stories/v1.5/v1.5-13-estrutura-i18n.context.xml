@@ -1,0 +1,191 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1.5</epicId>
+    <storyId>13</storyId>
+    <title>Preparar Estrutura para Internacionalização (i18n)</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-13-estrutura-i18n.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>que o frontend tenha estrutura preparada para internacionalização</iWant>
+    <soThat>futuramente possa suportar múltiplos idiomas facilmente</soThat>
+    <tasks>
+      <task id="1">Instalar e configurar i18next
+        <subtask>Instalar i18next e react-i18next</subtask>
+        <subtask>Criar configuração em src/i18n/index.ts</subtask>
+        <subtask>Inicializar em main.tsx</subtask>
+      </task>
+      <task id="2">Criar arquivos de tradução
+        <subtask>Criar src/i18n/locales/pt-BR.json</subtask>
+        <subtask>Criar src/i18n/locales/en.json (placeholder)</subtask>
+        <subtask>Estruturar namespaces (common, player, settings, etc.)</subtask>
+      </task>
+      <task id="3">Migrar strings hardcoded
+        <subtask>Migrar Player component</subtask>
+        <subtask>Migrar Dashboard component</subtask>
+        <subtask>Migrar Settings component</subtask>
+        <subtask>Migrar ErrorBoundary</subtask>
+        <subtask>Migrar Navigation/Menu</subtask>
+      </task>
+      <task id="4">Configurar detecção de idioma
+        <subtask>Detectar idioma do navegador</subtask>
+        <subtask>Persistir preferência em localStorage</subtask>
+        <subtask>Adicionar seletor de idioma em Settings (opcional)</subtask>
+      </task>
+      <task id="5">Validar cobertura
+        <subtask>Verificar console para chaves faltantes</subtask>
+        <subtask>Criar script para detectar strings não traduzidas</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">react-i18next instalado e configurado</criterion>
+    <criterion id="AC2">Arquivo de traduções para português BR criado</criterion>
+    <criterion id="AC3">Principais componentes migrados para usar i18n</criterion>
+    <criterion id="AC4">Detecção automática de idioma do navegador</criterion>
+    <criterion id="AC5">Fallback para português quando tradução não existe</criterion>
+    <criterion id="AC6">Hook useTranslation disponível em todos componentes</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Frontend, User-Facing Errors</section>
+        <snippet>Mensagens em português BR. UI Date Formatting com date-fns locale pt-BR. React 19 + Vite 7 + shadcn/ui.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>frontend/src/main.tsx</path>
+        <kind>entry-point</kind>
+        <symbol>createRoot</symbol>
+        <lines>1-31</lines>
+        <reason>Entry point onde i18n deve ser importado antes do App para inicializar as traduções.</reason>
+      </file>
+      <file>
+        <path>frontend/src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-267</lines>
+        <reason>Componente principal com diversas strings hardcoded em português que devem ser migradas para i18n.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Dashboard.tsx</path>
+        <kind>page</kind>
+        <symbol>Dashboard</symbol>
+        <reason>Página com strings hardcoded que devem usar useTranslation.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Settings.tsx</path>
+        <kind>page</kind>
+        <symbol>Settings</symbol>
+        <reason>Página de configurações com labels hardcoded que devem ser traduzidas.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Sessions.tsx</path>
+        <kind>page</kind>
+        <symbol>Sessions</symbol>
+        <reason>Página de sessões com strings hardcoded.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Diagnostics.tsx</path>
+        <kind>page</kind>
+        <symbol>Diagnostics</symbol>
+        <reason>Página de diagnóstico com labels hardcoded.</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/ErrorBoundary.tsx</path>
+        <kind>component</kind>
+        <symbol>ErrorBoundary</symbol>
+        <lines>104-155</lines>
+        <reason>Componente com mensagens de erro hardcoded ("Algo deu errado", "Recarregar página").</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/Player/Player.tsx</path>
+        <kind>component</kind>
+        <symbol>Player</symbol>
+        <reason>Player com labels hardcoded (play, pause, volume, etc.).</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>date-fns</package>
+        <version>^4.1.0</version>
+      </node>
+      <node note="A ser adicionado">
+        <package>i18next</package>
+        <version>latest</version>
+      </node>
+      <node note="A ser adicionado">
+        <package>react-i18next</package>
+        <version>latest</version>
+      </node>
+      <node note="A ser adicionado">
+        <package>i18next-browser-languagedetector</package>
+        <version>latest</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Fallback language deve ser pt-BR (idioma principal do projeto)</constraint>
+    <constraint>Arquivo en.json pode ser cópia de pt-BR inicialmente</constraint>
+    <constraint>Usar namespaces se arquivos ficarem muito grandes</constraint>
+    <constraint>Interpolação de valores deve usar sintaxe {{count}}</constraint>
+    <constraint>Pluralização deve seguir convenção do i18next</constraint>
+    <constraint>Não adicionar novos idiomas além de pt-BR nesta story</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>i18n.init</name>
+      <kind>Configuration</kind>
+      <signature>i18n.use(LanguageDetector).use(initReactI18next).init({ resources, fallbackLng, interpolation, detection })</signature>
+      <path>frontend/src/i18n/index.ts</path>
+    </interface>
+    <interface>
+      <name>useTranslation</name>
+      <kind>React Hook</kind>
+      <signature>const { t } = useTranslation()</signature>
+      <path>react-i18next</path>
+    </interface>
+    <interface>
+      <name>t function</name>
+      <kind>Translation function</kind>
+      <signature>t('namespace.key', { interpolationValues })</signature>
+      <path>react-i18next</path>
+    </interface>
+    <interface>
+      <name>Translation file structure</name>
+      <kind>JSON</kind>
+      <signature>{ common: { loading, error, save }, player: { title, play, pause }, settings: { ... } }</signature>
+      <path>frontend/src/i18n/locales/pt-BR.json</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Frontend usa Vitest para testes. Componentes com i18n devem ser wrapped com I18nextProvider nos testes.</standards>
+    <locations>
+      <location>frontend/src/__tests__/*.test.tsx</location>
+      <location>frontend/src/components/**/__tests__/*.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC1">Verificar que i18n é inicializado corretamente no startup</idea>
+      <idea criterionId="AC3">Testar que componentes renderizam texto traduzido</idea>
+      <idea criterionId="AC4">Testar detecção de idioma do navegador</idea>
+      <idea criterionId="AC5">Testar fallback para pt-BR quando chave não existe</idea>
+      <idea criterionId="AC6">Testar que useTranslation funciona em componentes</idea>
+    </ideas>
+  </tests>
+</story-context>

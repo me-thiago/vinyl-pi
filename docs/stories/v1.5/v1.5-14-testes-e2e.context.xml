@@ -1,0 +1,189 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>V1.5</epicId>
+    <storyId>14</storyId>
+    <title>Adicionar Testes End-to-End com Playwright</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/v1.5/v1.5-14-testes-e2e.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>desenvolvedor</asA>
+    <iWant>ter testes end-to-end automatizados</iWant>
+    <soThat>possa validar fluxos completos da aplicação</soThat>
+    <tasks>
+      <task id="1">Instalar e configurar Playwright
+        <subtask>Instalar @playwright/test</subtask>
+        <subtask>Criar playwright.config.ts</subtask>
+        <subtask>Adicionar scripts ao package.json</subtask>
+      </task>
+      <task id="2">Criar testes de navegação
+        <subtask>Teste: Carregar página inicial</subtask>
+        <subtask>Teste: Navegar para Settings</subtask>
+        <subtask>Teste: Navegar para Sessions</subtask>
+        <subtask>Teste: Navegar para Diagnostics</subtask>
+      </task>
+      <task id="3">Criar testes do Player
+        <subtask>Teste: Player renderiza corretamente</subtask>
+        <subtask>Teste: Botão play/pause funciona</subtask>
+        <subtask>Teste: Controle de volume funciona</subtask>
+      </task>
+      <task id="4">Criar testes de Settings
+        <subtask>Teste: Carregar configurações atuais</subtask>
+        <subtask>Teste: Alterar tema</subtask>
+        <subtask>Teste: Salvar configurações</subtask>
+      </task>
+      <task id="5">Integrar com CI
+        <subtask>Adicionar job de E2E no GitHub Actions</subtask>
+        <subtask>Configurar artifacts para screenshots de falha</subtask>
+        <subtask>Configurar sharding se necessário</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Playwright instalado e configurado</criterion>
+    <criterion id="AC2">Testes para fluxo principal: abrir player e verificar streaming</criterion>
+    <criterion id="AC3">Testes para navegação entre páginas</criterion>
+    <criterion id="AC4">Testes para alteração de configurações</criterion>
+    <criterion id="AC5">Testes executáveis no CI</criterion>
+    <criterion id="AC6">Screenshots de falhas para debugging</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Arquitetura de Decisões - Vinyl-OS</title>
+        <section>Test Organization, Frontend</section>
+        <snippet>Test files: *.test.ts co-localizados com source. Integration tests: __tests__/integration/. Frontend: React 19, Vite 7, rotas via React Router.</snippet>
+      </doc>
+      <doc>
+        <path>.github/workflows/ci.yml</path>
+        <title>GitHub Actions CI</title>
+        <section>CI Pipeline</section>
+        <snippet>Workflow de CI existente onde job de E2E deve ser adicionado.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>frontend/src/main.tsx</path>
+        <kind>entry-point</kind>
+        <symbol>Routes</symbol>
+        <lines>14-30</lines>
+        <reason>Define as rotas da aplicação que serão testadas nos testes de navegação.</reason>
+      </file>
+      <file>
+        <path>frontend/src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <reason>Página inicial com Player e navegação que será testada.</reason>
+      </file>
+      <file>
+        <path>frontend/src/pages/Settings.tsx</path>
+        <kind>page</kind>
+        <symbol>Settings</symbol>
+        <reason>Página de configurações que terá testes de alteração de tema e salvamento.</reason>
+      </file>
+      <file>
+        <path>frontend/src/components/Player/Player.tsx</path>
+        <kind>component</kind>
+        <symbol>Player</symbol>
+        <reason>Componente do Player que terá testes de play/pause e volume.</reason>
+      </file>
+      <file>
+        <path>backend/src/index.ts</path>
+        <kind>server</kind>
+        <symbol>express, httpServer</symbol>
+        <lines>459-462</lines>
+        <reason>Backend que deve estar rodando para os testes E2E funcionarem. Expõe /health para verificação.</reason>
+      </file>
+      <file>
+        <path>package.json</path>
+        <kind>config</kind>
+        <reason>Package.json raiz onde scripts de E2E devem ser adicionados.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>^19.1.1</version>
+      </node>
+      <node>
+        <package>react-router-dom</package>
+        <version>^6.30.1</version>
+      </node>
+      <node>
+        <package>vite</package>
+        <version>^7.1.7</version>
+      </node>
+      <node>
+        <package>express</package>
+        <version>^4.21.2</version>
+      </node>
+      <node note="A ser adicionado">
+        <package>@playwright/test</package>
+        <version>latest</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Playwright deve usar webServer para iniciar frontend e backend automaticamente</constraint>
+    <constraint>Testes devem ser idempotentes e independentes</constraint>
+    <constraint>Screenshots de falha devem ser salvos como artifacts no CI</constraint>
+    <constraint>Usar apenas Chromium para testes (suficiente para validação básica)</constraint>
+    <constraint>Testes devem suportar execução local e no CI</constraint>
+    <constraint>Retries devem ser habilitados apenas no CI (2 tentativas)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Playwright Config</name>
+      <kind>Configuration</kind>
+      <signature>defineConfig({ testDir, webServer: [{ command, url }], use: { baseURL, screenshot, trace } })</signature>
+      <path>playwright.config.ts</path>
+    </interface>
+    <interface>
+      <name>Playwright Test</name>
+      <kind>Test API</kind>
+      <signature>test('description', async ({ page }) => { await page.goto('/'); await expect(page).toHaveTitle(/Vinyl/); })</signature>
+      <path>e2e/*.spec.ts</path>
+    </interface>
+    <interface>
+      <name>Page Locators</name>
+      <kind>Playwright API</kind>
+      <signature>page.getByRole('button', { name: /play/i }), page.getByLabel(/volume/i)</signature>
+      <path>e2e/*.spec.ts</path>
+    </interface>
+    <interface>
+      <name>Frontend Routes</name>
+      <kind>React Router</kind>
+      <signature>/, /dashboard, /diagnostics, /sessions, /sessions/:id, /settings</signature>
+      <path>frontend/src/main.tsx</path>
+    </interface>
+    <interface>
+      <name>Backend Health Check</name>
+      <kind>REST Endpoint</kind>
+      <signature>GET /health -> { status: 'ok' }</signature>
+      <path>backend/src/index.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>E2E tests usam Playwright. Arquivos em e2e/*.spec.ts. Configuração em playwright.config.ts na raiz do projeto.</standards>
+    <locations>
+      <location>e2e/*.spec.ts</location>
+      <location>playwright.config.ts</location>
+    </locations>
+    <ideas>
+      <idea criterionId="AC2">Testar que player renderiza e botões funcionam</idea>
+      <idea criterionId="AC3">Testar navegação para todas as rotas principais</idea>
+      <idea criterionId="AC4">Testar alteração de tema em Settings</idea>
+      <idea criterionId="AC5">Verificar que testes passam no CI com webServer</idea>
+      <idea criterionId="AC6">Configurar screenshot: 'only-on-failure' para debugging</idea>
+    </ideas>
+  </tests>
+</story-context>
