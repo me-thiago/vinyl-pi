@@ -668,10 +668,106 @@ O Epic V1.5 foi criado após auditoria de código para endereçar gaps de segura
 | V1.5-11 | Enum EventType |
 | V1.5-12 | Sentry Error Tracking |
 | V1.5-13 | react-i18next i18n |
+| V2-04 | Discogs Collection Sync - Merge Strategy |
 | V3-02 | (Parcialmente adiantado em V1-06) |
 
 ---
 
-**Última revisão:** 2025-12-04
-**Próxima revisão:** Quando implementar V2 ou V3
+## Discogs Collection Sync - Merge Strategy
+
+### Decisão: Sincronização aditiva (apenas adicionar, nunca deletar)
+
+**Data:** 2025-12-05
+**Contexto:** Story V2-04 (Integração Discogs) - Importação em lote da coleção
+**Status:** ✅ Implementado
+
+### Problema
+
+Ao implementar a sincronização automática da coleção do Discogs, surgiu a questão: o que fazer com álbuns que existem localmente mas não estão na coleção do Discogs?
+
+**Cenários considerados:**
+
+1. **Usuário remove álbum do Discogs mas ainda possui fisicamente:** Não deve ser deletado localmente
+2. **Usuário cadastra álbum manualmente (sem discogsId):** Nunca deve ser afetado pela sync
+3. **Álbum no Discogs foi removido pelo uploader:** Dados locais devem ser preservados
+
+### Solução
+
+**Merge Strategy: ADDITIVE ONLY (apenas adicionar)**
+
+```typescript
+// Endpoint: POST /api/albums/import-collection
+for (const albumData of discogsAlbums) {
+  // Verificar se já existe pelo discogsId
+  const existing = await prisma.album.findUnique({
+    where: { discogsId: albumData.discogsId },
+  });
+
+  if (existing) {
+    results.skipped++;  // ✅ NÃO atualiza, apenas pula
+    continue;
+  }
+
+  // Criar novo álbum
+  await prisma.album.create({ ... });
+  results.imported++;
+}
+// ⚠️ NUNCA deleta álbuns locais
+```
+
+### Regras Implementadas
+
+| Cenário | Ação |
+|---------|------|
+| Álbum existe no Discogs, não existe localmente | ✅ Criar |
+| Álbum existe no Discogs, já existe localmente | ⏭️ Ignorar (skip) |
+| Álbum não existe no Discogs, existe localmente | ⏭️ Preservar (nenhuma ação) |
+| Álbum local sem discogsId | ⏭️ Preservar (nunca tocado) |
+
+### Justificativa
+
+**Por que não sincronizar bidirecional (two-way sync)?**
+- Aumenta complexidade significativamente
+- Risco de perda de dados em caso de erro
+- Usuário pode ter edições locais que quer preservar
+- Discogs é fonte de metadados, não fonte de verdade
+
+**Por que não atualizar álbuns existentes?**
+- Usuário pode ter feito edições manuais (notas, tags, condição)
+- Evita sobrescrever dados locais acidentalmente
+- Se quiser atualizar, use o endpoint `POST /api/albums/:id/sync-discogs`
+
+### Configuração
+
+```bash
+# .env
+DISCOGS_USERNAME=thiagocastroneves  # Username da coleção a importar
+DISCOGS_CONSUMER_KEY=xxx
+DISCOGS_CONSUMER_SECRET=xxx
+```
+
+### UI
+
+- **Botão:** IconButton com ícone `RefreshCw` ao lado de "Import from Discogs"
+- **Confirmação:** AlertDialog explicando que apenas novos álbuns serão importados
+- **Feedback:** Mensagem com contagem de importados/ignorados/erros
+
+### Rate Limiting
+
+A API do Discogs tem limite de 60 req/min. Para coleções grandes:
+- Throttling de 1.1s entre requests já implementado em `discogs.ts`
+- 100 álbuns ≈ 2 minutos (1 request por item na listagem paginada)
+- 500 álbuns ≈ 9 minutos
+
+### Referências
+
+- Endpoint: `backend/src/routes/albums.ts` → `POST /albums/import-collection`
+- Service: `backend/src/services/discogs.ts` → `getCollectionReleases()`
+- UI: `frontend/src/pages/Collection.tsx`
+- Story: `docs/stories/v2/v2-04-integracao-discogs.md`
+
+---
+
+**Última revisão:** 2025-12-05
+**Próxima revisão:** Quando implementar V3
 

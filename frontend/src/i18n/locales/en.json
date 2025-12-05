@@ -286,5 +286,33 @@
       "discogs_unavailable": "This album has been removed from Discogs. Local data has been preserved.",
       "archived": "Archived"
     }
+  },
+  "discogs": {
+    "import_title": "Import from Discogs",
+    "import_description": "Search albums on Discogs by catalog number or barcode",
+    "search_by": "Search by",
+    "catalog_number": "Catalog number",
+    "barcode": "Barcode",
+    "catalog_placeholder": "E.g.: MOVLP-1234",
+    "barcode_placeholder": "E.g.: 0889854882617",
+    "results_found": "{{count}} results found",
+    "back_to_search": "New search",
+    "view_on_discogs": "View on Discogs",
+    "import_selected": "Import Selected",
+    "importing": "Importing...",
+    "error_empty_search": "Enter a value to search",
+    "error_not_found": "No results found on Discogs",
+    "error_already_exists": "This album already exists in your collection",
+    "error_rate_limit": "Too many requests. Wait a few seconds and try again.",
+    "error_timeout": "Request timeout. Please try again.",
+    "error_not_configured": "Discogs integration not configured",
+    "error_generic": "Error communicating with Discogs",
+    "sync_collection": "Sync Collection",
+    "sync_collection_title": "Import Discogs Collection?",
+    "sync_collection_description": "This will import all albums from your Discogs collection. Already existing albums will be skipped. This operation may take a few minutes.",
+    "sync_collection_confirm": "Import Collection",
+    "sync_collection_success": "Import complete! {{imported}} imported, {{skipped}} already existed, {{errors}} errors.",
+    "syncing": "Syncing...",
+    "sync_error": "Error syncing with Discogs"
   }
 }

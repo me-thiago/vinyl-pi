@@ -62,6 +62,21 @@ function findMatches(
 - V2-02 - CRUD de Álbuns (Backend) - para ter álbuns no banco
 - V2-05 - Reconhecimento Musical - para integrar
 
+## Notas de Implementação (V2-05)
+
+**Status após V2-05:** A estrutura base está pronta. O endpoint `POST /api/recognize` e `POST /api/recognize/confirm` já existem, mas:
+
+1. **`albumMatch` é sempre `null`** - V2-05 não implementou o matching
+2. **`POST /api/recognize/confirm`** já funciona - atualiza `Track.albumId`
+3. **Evento `track.recognized`** inclui campo `albumMatch: null`
+
+**O que V2-06 precisa fazer:**
+1. Criar `collection-matcher.ts` com algoritmo Levenshtein
+2. Instalar dependência `fastest-levenshtein`
+3. Integrar CollectionMatcher na função `recognize()` em `services/recognition.ts`
+4. Atualizar resposta para incluir `albumMatch` com dados reais
+5. Atualizar evento WebSocket `track_recognized` com `albumMatch` preenchido
+
 ## Referências
 
 - [Tech Spec V2](../tech-spec-epic-v2.md) - Seção Collection Matcher, Workflow 5

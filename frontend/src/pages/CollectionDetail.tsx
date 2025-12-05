@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Disc,
   Music,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +90,8 @@ export default function CollectionDetail() {
   // Estado
   const [formOpen, setFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
 
   // Hooks
   const { album, loading, error, refresh } = useAlbum(id);
@@ -123,6 +126,39 @@ export default function CollectionDetail() {
       navigate('/collection');
     }
   }, [album, deleteAlbum, navigate]);
+
+  const handleSyncDiscogs = useCallback(async () => {
+    if (!album?.discogsId) return;
+
+    setSyncing(true);
+    setSyncWarning(null);
+
+    try {
+      const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
+      const response = await fetch(`${API_HOST}/api/albums/${album.id}/sync-discogs`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || t('discogs.error_generic'));
+      }
+
+      // Verificar se houve warning (álbum não encontrado no Discogs)
+      if (data.warning) {
+        setSyncWarning(data.warning);
+      }
+
+      // Atualizar dados
+      refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('discogs.error_generic');
+      setSyncWarning(message);
+    } finally {
+      setSyncing(false);
+    }
+  }, [album, refresh, t]);
 
   // Loading state
   if (loading) {
@@ -307,11 +343,24 @@ export default function CollectionDetail() {
                     {t('collection.detail.view_discogs')}
                   </a>
                 </Button>
-                <Button variant="outline" disabled title={t('collection.detail.sync_discogs_disabled')}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
+                <Button variant="outline" onClick={handleSyncDiscogs} disabled={syncing}>
+                  {syncing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
                   {t('collection.detail.sync_discogs')}
                 </Button>
               </div>
+              {/* Sync warning */}
+              {syncWarning && (
+                <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">{syncWarning}</p>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

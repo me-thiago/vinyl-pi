@@ -675,14 +675,13 @@ describe('Albums Router', () => {
   });
 
   describe('POST /api/albums/:id/sync-discogs', () => {
-    it('deve retornar 501 Not Implemented (stub para V2-04)', async () => {
+    it('deve retornar 400 quando Discogs não está configurado', async () => {
       const response = await request(app).post(
         '/api/albums/550e8400-e29b-41d4-a716-446655440000/sync-discogs'
       );
 
-      expect(response.status).toBe(501);
-      expect(response.body.error.code).toBe('NOT_IMPLEMENTED');
-      expect(response.body.error.message).toContain('V2-04');
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('DISCOGS_NOT_CONFIGURED');
     });
   });
 

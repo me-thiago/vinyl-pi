@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Download, Loader2 } from 'lucide-react';
+import { Plus, Download, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -18,6 +18,7 @@ import {
   AlbumForm,
   CollectionFilters,
   CollectionEmpty,
+  DiscogsImport,
 } from '@/components/Collection';
 import { useAlbums, type Album, type AlbumFilters, type AlbumCreateInput, type AlbumUpdateInput } from '@/hooks/useAlbums';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,19 @@ export default function Collection() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
 
+  // Estado do modal de importação Discogs
+  const [discogsImportOpen, setDiscogsImportOpen] = useState(false);
+
+  // Estado do dialog de sincronização de coleção
+  const [syncCollectionOpen, setSyncCollectionOpen] = useState(false);
+  const [syncingCollection, setSyncingCollection] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    imported: number;
+    skipped: number;
+    errors: number;
+    total: number;
+  } | null>(null);
+
   // Hook de álbuns
   const {
     albums,
@@ -62,6 +76,7 @@ export default function Collection() {
     deleteAlbum,
     archiveAlbum,
     clearError,
+    refresh,
   } = useAlbums();
 
   // Handlers
@@ -104,6 +119,46 @@ export default function Collection() {
     }
   }, [editingAlbum, createAlbum, updateAlbum]);
 
+  const handleDiscogsImportSuccess = useCallback(() => {
+    // Recarrega a lista para incluir o álbum importado
+    refresh();
+  }, [refresh]);
+
+  // URL base da API
+  const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
+
+  const handleSyncCollection = useCallback(async () => {
+    setSyncingCollection(true);
+    setSyncResult(null);
+
+    try {
+      const response = await fetch(`${API_HOST}/api/albums/import-collection`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || t('discogs.sync_error'));
+      }
+
+      if (data.success) {
+        setSyncResult(data.results);
+        refresh();
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar coleção:', error);
+      // Manter dialog aberto para mostrar erro
+    } finally {
+      setSyncingCollection(false);
+    }
+  }, [API_HOST, refresh, t]);
+
+  const handleCloseSyncDialog = useCallback(() => {
+    setSyncCollectionOpen(false);
+    setSyncResult(null);
+  }, []);
+
   // Verifica se há filtros ativos
   const hasActiveFilters = !!(filters.search || filters.format || filters.condition || filters.archived);
 
@@ -120,9 +175,17 @@ export default function Collection() {
             <Plus className="mr-2 h-4 w-4" />
             {t('collection.add_album')}
           </Button>
-          <Button variant="outline" disabled title={t('collection.import_discogs_disabled')}>
+          <Button variant="outline" onClick={() => setDiscogsImportOpen(true)}>
             <Download className="mr-2 h-4 w-4" />
             {t('collection.import_discogs')}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSyncCollectionOpen(true)}
+            title={t('discogs.sync_collection')}
+          >
+            <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -244,6 +307,61 @@ export default function Collection() {
             >
               {t('collection.actions.delete')}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de Importação Discogs */}
+      <DiscogsImport
+        open={discogsImportOpen}
+        onOpenChange={setDiscogsImportOpen}
+        onImportSuccess={handleDiscogsImportSuccess}
+      />
+
+      {/* Dialog de Sincronização de Coleção */}
+      <AlertDialog open={syncCollectionOpen} onOpenChange={handleCloseSyncDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('discogs.sync_collection_title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {syncResult ? (
+                <span className="text-foreground">
+                  {t('discogs.sync_collection_success', {
+                    imported: syncResult.imported,
+                    skipped: syncResult.skipped,
+                    errors: syncResult.errors,
+                  })}
+                </span>
+              ) : (
+                t('discogs.sync_collection_description')
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {syncResult ? (
+              <AlertDialogAction onClick={handleCloseSyncDialog}>
+                {t('common.close')}
+              </AlertDialogAction>
+            ) : (
+              <>
+                <AlertDialogCancel disabled={syncingCollection}>
+                  {t('common.cancel')}
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleSyncCollection}
+                  disabled={syncingCollection}
+                >
+                  {syncingCollection ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t('discogs.syncing')}
+                    </>
+                  ) : (
+                    t('discogs.sync_collection_confirm')
+                  )}
+                </AlertDialogAction>
+              </>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

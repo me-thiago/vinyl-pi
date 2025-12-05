@@ -15,6 +15,7 @@ import { createEventsRouter } from './routes/events';
 import { createSessionsRouter } from './routes/sessions';
 import { createSettingsRouter } from './routes/settings';
 import { createAlbumsRouter } from './routes/albums';
+import { createRecognitionRouter } from './routes/recognition';
 import { SettingsService } from './services/settings-service';
 import prisma from './prisma/client';
 import { eventBus } from './utils/event-bus';
@@ -281,6 +282,10 @@ app.use('/api', createSettingsRouter({
 }));
 
 app.use('/api', createAlbumsRouter());
+
+app.use('/api', createRecognitionRouter({
+  sessionManager
+}));
 
 // Swagger UI e documentação OpenAPI
 // Acessível em /api/docs e /api/docs.json

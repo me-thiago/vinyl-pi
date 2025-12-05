@@ -286,5 +286,33 @@
       "discogs_unavailable": "Este álbum foi removido do Discogs. Os dados locais foram preservados.",
       "archived": "Arquivado"
     }
+  },
+  "discogs": {
+    "import_title": "Importar do Discogs",
+    "import_description": "Busque álbuns no Discogs por número de catálogo ou código de barras",
+    "search_by": "Buscar por",
+    "catalog_number": "Número de catálogo",
+    "barcode": "Código de barras",
+    "catalog_placeholder": "Ex: MOVLP-1234",
+    "barcode_placeholder": "Ex: 0889854882617",
+    "results_found": "{{count}} resultados encontrados",
+    "back_to_search": "Nova busca",
+    "view_on_discogs": "Ver no Discogs",
+    "import_selected": "Importar Selecionado",
+    "importing": "Importando...",
+    "error_empty_search": "Digite um valor para buscar",
+    "error_not_found": "Nenhum resultado encontrado no Discogs",
+    "error_already_exists": "Este álbum já existe na sua coleção",
+    "error_rate_limit": "Muitas requisições. Aguarde alguns segundos e tente novamente.",
+    "error_timeout": "Timeout na requisição. Tente novamente.",
+    "error_not_configured": "Integração com Discogs não configurada",
+    "error_generic": "Erro ao comunicar com o Discogs",
+    "sync_collection": "Sincronizar Coleção",
+    "sync_collection_title": "Importar Coleção do Discogs?",
+    "sync_collection_description": "Isso irá importar todos os álbuns da sua coleção no Discogs. Álbuns já existentes serão ignorados. Esta operação pode levar alguns minutos.",
+    "sync_collection_confirm": "Importar Coleção",
+    "sync_collection_success": "Importação concluída! {{imported}} importados, {{skipped}} já existentes, {{errors}} erros.",
+    "syncing": "Sincronizando...",
+    "sync_error": "Erro ao sincronizar com Discogs"
   }
 }

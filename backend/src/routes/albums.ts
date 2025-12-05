@@ -8,12 +8,29 @@ import {
   albumArchiveSchema,
   albumQuerySchema,
   albumIdParamSchema,
+  discogsImportSchema,
+  discogsSelectSchema,
   AlbumCreateInput,
   AlbumUpdateInput,
   AlbumArchiveInput,
   AlbumQueryInput,
   AlbumIdParam,
+  DiscogsImportInput,
+  DiscogsSelectInput,
 } from '../schemas';
+import {
+  importAlbum,
+  getRelease,
+  releaseToAlbumData,
+  getCollectionReleases,
+  isConfigured as isDiscogsConfigured,
+  isUsernameConfigured,
+  getConfiguredUsername,
+  DiscogsNotFoundError,
+  DiscogsRateLimitError,
+  DiscogsTimeoutError,
+  DiscogsSearchResult,
+} from '../services/discogs';
 import { Prisma } from '@prisma/client';
 
 const logger = createLogger('AlbumsRouter');
@@ -692,12 +709,311 @@ export function createAlbumsRouter(): Router {
 
   /**
    * @openapi
-   * /api/albums/{id}/sync-discogs:
+   * /api/albums/import-discogs:
    *   post:
-   *     summary: Sincroniza álbum com Discogs (Stub)
-   *     description: Endpoint reservado para V2-04. Atualmente retorna 501 Not Implemented.
+   *     summary: Importa álbum do Discogs
+   *     description: Busca álbum no Discogs por catálogo, barcode ou ID e importa metadados
    *     tags:
    *       - Albums
+   *       - Discogs
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               catalogNumber:
+   *                 type: string
+   *                 description: Número de catálogo do disco
+   *               barcode:
+   *                 type: string
+   *                 description: Código de barras do disco
+   *               releaseId:
+   *                 type: integer
+   *                 description: ID do release no Discogs
+   *     responses:
+   *       201:
+   *         description: Álbum importado com sucesso
+   *       200:
+   *         description: Múltiplos resultados encontrados, seleção necessária
+   *       400:
+   *         description: Dados de entrada inválidos ou Discogs não configurado
+   *       404:
+   *         description: Nenhum resultado encontrado
+   *       409:
+   *         description: Álbum com mesmo discogsId já existe
+   *       429:
+   *         description: Rate limit do Discogs excedido
+   *       504:
+   *         description: Timeout na requisição ao Discogs
+   */
+  router.post(
+    '/albums/import-discogs',
+    validate(discogsImportSchema, 'body'),
+    async (req: Request, res: Response) => {
+      try {
+        // Verificar se Discogs está configurado
+        if (!isDiscogsConfigured()) {
+          res.status(400).json({
+            error: {
+              message: 'Integração com Discogs não configurada. Configure DISCOGS_CONSUMER_KEY e DISCOGS_CONSUMER_SECRET.',
+              code: 'DISCOGS_NOT_CONFIGURED',
+            },
+          });
+          return;
+        }
+
+        const input = req.body as DiscogsImportInput;
+
+        // Buscar no Discogs
+        const result = await importAlbum(input);
+
+        // Se múltiplos resultados, retornar lista para seleção
+        if ('results' in result) {
+          logger.info('Múltiplos resultados Discogs', { count: result.results.length });
+          res.status(200).json({
+            multiple: true,
+            results: result.results.map((r: DiscogsSearchResult) => ({
+              releaseId: r.id,
+              title: r.title,
+              year: r.year,
+              format: r.format,
+              label: r.label,
+              thumb: r.thumb,
+              country: r.country,
+            })),
+          });
+          return;
+        }
+
+        // Único resultado - verificar se discogsId já existe
+        const existing = await prisma.album.findUnique({
+          where: { discogsId: result.album.discogsId },
+        });
+
+        if (existing) {
+          res.status(409).json({
+            error: {
+              message: `Já existe um álbum com o Discogs ID ${result.album.discogsId}`,
+              code: 'DISCOGS_ID_EXISTS',
+              existingAlbumId: existing.id,
+            },
+          });
+          return;
+        }
+
+        // Criar álbum
+        const album = await prisma.album.create({
+          data: {
+            title: result.album.title,
+            artist: result.album.artist,
+            year: result.album.year,
+            label: result.album.label,
+            format: result.album.format as Prisma.AlbumCreateInput['format'],
+            coverUrl: result.album.coverUrl,
+            discogsId: result.album.discogsId,
+            discogsAvailable: true,
+          },
+        });
+
+        logger.info('Álbum importado do Discogs', {
+          id: album.id,
+          discogsId: album.discogsId,
+          title: album.title,
+        });
+
+        res.status(201).json({
+          data: formatAlbumResponse(album),
+          source: 'discogs',
+          discogsUrl: result.album.discogsUrl,
+        });
+      } catch (error) {
+        if (error instanceof DiscogsNotFoundError) {
+          res.status(404).json({
+            error: {
+              message: 'Nenhum resultado encontrado no Discogs',
+              code: 'DISCOGS_NOT_FOUND',
+            },
+          });
+          return;
+        }
+
+        if (error instanceof DiscogsRateLimitError) {
+          res.status(429).json({
+            error: {
+              message: 'Rate limit do Discogs excedido. Tente novamente em alguns segundos.',
+              code: 'DISCOGS_RATE_LIMIT',
+            },
+          });
+          return;
+        }
+
+        if (error instanceof DiscogsTimeoutError) {
+          res.status(504).json({
+            error: {
+              message: 'Timeout na requisição ao Discogs. Tente novamente.',
+              code: 'DISCOGS_TIMEOUT',
+            },
+          });
+          return;
+        }
+
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao importar do Discogs', { error: errorMsg });
+        res.status(500).json({
+          error: {
+            message: 'Erro ao importar do Discogs',
+            code: 'DISCOGS_IMPORT_ERROR',
+          },
+        });
+      }
+    }
+  );
+
+  /**
+   * @openapi
+   * /api/albums/import-discogs/select:
+   *   post:
+   *     summary: Seleciona e importa um release específico
+   *     description: Após busca retornar múltiplos resultados, seleciona um para importar
+   *     tags:
+   *       - Albums
+   *       - Discogs
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - releaseId
+   *             properties:
+   *               releaseId:
+   *                 type: integer
+   *                 description: ID do release selecionado
+   *     responses:
+   *       201:
+   *         description: Álbum importado com sucesso
+   *       404:
+   *         description: Release não encontrado
+   *       409:
+   *         description: Álbum com mesmo discogsId já existe
+   */
+  router.post(
+    '/albums/import-discogs/select',
+    validate(discogsSelectSchema, 'body'),
+    async (req: Request, res: Response) => {
+      try {
+        if (!isDiscogsConfigured()) {
+          res.status(400).json({
+            error: {
+              message: 'Integração com Discogs não configurada',
+              code: 'DISCOGS_NOT_CONFIGURED',
+            },
+          });
+          return;
+        }
+
+        const { releaseId } = req.body as DiscogsSelectInput;
+
+        // Verificar se já existe
+        const existing = await prisma.album.findUnique({
+          where: { discogsId: releaseId },
+        });
+
+        if (existing) {
+          res.status(409).json({
+            error: {
+              message: `Já existe um álbum com o Discogs ID ${releaseId}`,
+              code: 'DISCOGS_ID_EXISTS',
+              existingAlbumId: existing.id,
+            },
+          });
+          return;
+        }
+
+        // Buscar release completo
+        const release = await getRelease(releaseId);
+        const albumData = releaseToAlbumData(release);
+
+        // Criar álbum
+        const album = await prisma.album.create({
+          data: {
+            title: albumData.title,
+            artist: albumData.artist,
+            year: albumData.year,
+            label: albumData.label,
+            format: albumData.format as Prisma.AlbumCreateInput['format'],
+            coverUrl: albumData.coverUrl,
+            discogsId: albumData.discogsId,
+            discogsAvailable: true,
+          },
+        });
+
+        logger.info('Álbum importado do Discogs (seleção)', {
+          id: album.id,
+          discogsId: album.discogsId,
+          title: album.title,
+        });
+
+        res.status(201).json({
+          data: formatAlbumResponse(album),
+          source: 'discogs',
+          discogsUrl: albumData.discogsUrl,
+        });
+      } catch (error) {
+        if (error instanceof DiscogsNotFoundError) {
+          res.status(404).json({
+            error: {
+              message: 'Release não encontrado no Discogs',
+              code: 'DISCOGS_NOT_FOUND',
+            },
+          });
+          return;
+        }
+
+        if (error instanceof DiscogsRateLimitError) {
+          res.status(429).json({
+            error: {
+              message: 'Rate limit do Discogs excedido',
+              code: 'DISCOGS_RATE_LIMIT',
+            },
+          });
+          return;
+        }
+
+        if (error instanceof DiscogsTimeoutError) {
+          res.status(504).json({
+            error: {
+              message: 'Timeout na requisição ao Discogs',
+              code: 'DISCOGS_TIMEOUT',
+            },
+          });
+          return;
+        }
+
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao importar release do Discogs', { error: errorMsg });
+        res.status(500).json({
+          error: {
+            message: 'Erro ao importar do Discogs',
+            code: 'DISCOGS_IMPORT_ERROR',
+          },
+        });
+      }
+    }
+  );
+
+  /**
+   * @openapi
+   * /api/albums/{id}/sync-discogs:
+   *   post:
+   *     summary: Re-sincroniza álbum com Discogs
+   *     description: Atualiza campos vazios do álbum com dados atualizados do Discogs
+   *     tags:
+   *       - Albums
+   *       - Discogs
    *     parameters:
    *       - in: path
    *         name: id
@@ -707,21 +1023,323 @@ export function createAlbumsRouter(): Router {
    *           format: uuid
    *         description: ID do álbum
    *     responses:
-   *       501:
-   *         description: Funcionalidade não implementada
+   *       200:
+   *         description: Álbum sincronizado com sucesso
+   *       400:
+   *         description: Álbum não possui discogsId
+   *       404:
+   *         description: Álbum não encontrado
    */
   router.post(
     '/albums/:id/sync-discogs',
     validate(albumIdParamSchema, 'params'),
     async (req: Request<AlbumIdParam>, res: Response) => {
-      res.status(501).json({
+      try {
+        if (!isDiscogsConfigured()) {
+          res.status(400).json({
+            error: {
+              message: 'Integração com Discogs não configurada',
+              code: 'DISCOGS_NOT_CONFIGURED',
+            },
+          });
+          return;
+        }
+
+        const { id } = req.params;
+
+        // Buscar álbum
+        const album = await prisma.album.findUnique({
+          where: { id },
+        });
+
+        if (!album) {
+          res.status(404).json({
+            error: {
+              message: `Álbum não encontrado: nenhum álbum com id '${id}'`,
+              code: 'ALBUM_NOT_FOUND',
+            },
+          });
+          return;
+        }
+
+        // Verificar se tem discogsId
+        if (!album.discogsId) {
+          res.status(400).json({
+            error: {
+              message: 'Este álbum não possui vínculo com o Discogs',
+              code: 'NO_DISCOGS_LINK',
+            },
+          });
+          return;
+        }
+
+        try {
+          // Buscar release atual no Discogs
+          const release = await getRelease(album.discogsId);
+          const discogsData = releaseToAlbumData(release);
+
+          // Atualizar APENAS campos vazios (preservar edições do usuário)
+          const updateData: Prisma.AlbumUpdateInput = {
+            discogsAvailable: true,
+          };
+
+          // Campos vazios localmente são atualizados
+          if (!album.year && discogsData.year) updateData.year = discogsData.year;
+          if (!album.label && discogsData.label) updateData.label = discogsData.label;
+          if (!album.format && discogsData.format) updateData.format = discogsData.format as Prisma.AlbumUpdateInput['format'];
+
+          // coverUrl: atualizar se maior resolução disponível ou se vazio
+          if (!album.coverUrl && discogsData.coverUrl) {
+            updateData.coverUrl = discogsData.coverUrl;
+          }
+
+          const updatedAlbum = await prisma.album.update({
+            where: { id },
+            data: updateData,
+          });
+
+          logger.info('Álbum sincronizado com Discogs', {
+            id: updatedAlbum.id,
+            discogsId: updatedAlbum.discogsId,
+          });
+
+          res.json({
+            data: formatAlbumResponse(updatedAlbum),
+            synced: true,
+          });
+        } catch (error) {
+          // Discogs não encontrou o release (removido ou erro)
+          if (error instanceof DiscogsNotFoundError) {
+            // Marcar como indisponível mas preservar dados
+            const updatedAlbum = await prisma.album.update({
+              where: { id },
+              data: { discogsAvailable: false },
+            });
+
+            logger.warn('Álbum não encontrado no Discogs', {
+              id: album.id,
+              discogsId: album.discogsId,
+            });
+
+            res.json({
+              data: formatAlbumResponse(updatedAlbum),
+              synced: false,
+              warning: 'Álbum não encontrado no Discogs. Dados locais preservados.',
+            });
+            return;
+          }
+
+          throw error;
+        }
+      } catch (error) {
+        if (error instanceof DiscogsRateLimitError) {
+          res.status(429).json({
+            error: {
+              message: 'Rate limit do Discogs excedido',
+              code: 'DISCOGS_RATE_LIMIT',
+            },
+          });
+          return;
+        }
+
+        if (error instanceof DiscogsTimeoutError) {
+          res.status(504).json({
+            error: {
+              message: 'Timeout na requisição ao Discogs',
+              code: 'DISCOGS_TIMEOUT',
+            },
+          });
+          return;
+        }
+
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao sincronizar com Discogs', {
+          id: req.params.id,
+          error: errorMsg,
+        });
+        res.status(500).json({
+          error: {
+            message: 'Erro ao sincronizar com Discogs',
+            code: 'DISCOGS_SYNC_ERROR',
+          },
+        });
+      }
+    }
+  );
+
+  /**
+   * @openapi
+   * /api/albums/import-collection:
+   *   post:
+   *     summary: Importa coleção completa do Discogs
+   *     description: |
+   *       Importa todos os álbuns da coleção do usuário configurado no Discogs.
+   *       Álbuns que já existem (mesmo discogsId) são ignorados.
+   *       Esta operação NÃO deleta álbuns locais que não existem no Discogs.
+   *       Requer DISCOGS_USERNAME configurado nas variáveis de ambiente.
+   *     tags:
+   *       - Albums
+   *       - Discogs
+   *     responses:
+   *       200:
+   *         description: Importação concluída
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 results:
+   *                   type: object
+   *                   properties:
+   *                     imported:
+   *                       type: integer
+   *                       description: Número de álbuns importados
+   *                     skipped:
+   *                       type: integer
+   *                       description: Número de álbuns já existentes
+   *                     errors:
+   *                       type: integer
+   *                       description: Número de erros durante importação
+   *                     total:
+   *                       type: integer
+   *                       description: Total de álbuns na coleção Discogs
+   *                 message:
+   *                   type: string
+   *       400:
+   *         description: Discogs não configurado
+   *       404:
+   *         description: Usuário não encontrado ou coleção privada
+   *       429:
+   *         description: Rate limit do Discogs excedido
+   *       504:
+   *         description: Timeout na requisição ao Discogs
+   */
+  router.post('/albums/import-collection', async (req: Request, res: Response) => {
+    try {
+      // Verificar se Discogs está configurado
+      if (!isDiscogsConfigured()) {
+        res.status(400).json({
+          error: {
+            message: 'Integração com Discogs não configurada. Configure DISCOGS_CONSUMER_KEY e DISCOGS_CONSUMER_SECRET.',
+            code: 'DISCOGS_NOT_CONFIGURED',
+          },
+        });
+        return;
+      }
+
+      // Verificar se username está configurado
+      if (!isUsernameConfigured()) {
+        res.status(400).json({
+          error: {
+            message: 'Username do Discogs não configurado. Configure DISCOGS_USERNAME.',
+            code: 'DISCOGS_USERNAME_NOT_CONFIGURED',
+          },
+        });
+        return;
+      }
+
+      const username = getConfiguredUsername()!;
+      logger.info('Iniciando importação da coleção Discogs', { username });
+
+      // Buscar todos os álbuns da coleção
+      const discogsAlbums = await getCollectionReleases(username);
+
+      // Resultados da importação
+      const results = {
+        imported: 0,
+        skipped: 0,
+        errors: 0,
+        total: discogsAlbums.length,
+      };
+
+      // Para cada álbum, verificar se já existe e importar se não
+      for (const albumData of discogsAlbums) {
+        try {
+          // Verificar se já existe
+          const existing = await prisma.album.findUnique({
+            where: { discogsId: albumData.discogsId },
+          });
+
+          if (existing) {
+            results.skipped++;
+            continue;
+          }
+
+          // Criar álbum
+          await prisma.album.create({
+            data: {
+              title: albumData.title,
+              artist: albumData.artist,
+              year: albumData.year,
+              label: albumData.label,
+              format: albumData.format as Prisma.AlbumCreateInput['format'],
+              coverUrl: albumData.coverUrl,
+              discogsId: albumData.discogsId,
+              discogsAvailable: true,
+            },
+          });
+
+          results.imported++;
+        } catch (error) {
+          logger.error('Erro ao importar álbum individual', {
+            discogsId: albumData.discogsId,
+            title: albumData.title,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          results.errors++;
+        }
+      }
+
+      logger.info('Importação da coleção concluída', results);
+
+      res.json({
+        success: true,
+        results,
+        message: `Importação concluída! ${results.imported} importados, ${results.skipped} já existentes, ${results.errors} erros.`,
+      });
+    } catch (error) {
+      if (error instanceof DiscogsNotFoundError) {
+        res.status(404).json({
+          error: {
+            message: error.message,
+            code: 'DISCOGS_USER_NOT_FOUND',
+          },
+        });
+        return;
+      }
+
+      if (error instanceof DiscogsRateLimitError) {
+        res.status(429).json({
+          error: {
+            message: 'Rate limit do Discogs excedido. Tente novamente mais tarde.',
+            code: 'DISCOGS_RATE_LIMIT',
+          },
+        });
+        return;
+      }
+
+      if (error instanceof DiscogsTimeoutError) {
+        res.status(504).json({
+          error: {
+            message: 'Timeout na requisição ao Discogs',
+            code: 'DISCOGS_TIMEOUT',
+          },
+        });
+        return;
+      }
+
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('Erro ao importar coleção', { error: errorMsg });
+      res.status(500).json({
         error: {
-          message: 'Sincronização com Discogs será implementada na story V2-04',
-          code: 'NOT_IMPLEMENTED',
+          message: 'Erro ao importar coleção do Discogs',
+          code: 'DISCOGS_COLLECTION_IMPORT_ERROR',
         },
       });
     }
-  );
+  });
 
   return router;
 }

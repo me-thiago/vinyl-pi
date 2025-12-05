@@ -151,9 +151,50 @@ export const albumIdParamSchema = z.object({
     .uuid({ message: 'ID do álbum deve ser um UUID válido' }),
 });
 
+/**
+ * Schema para importação do Discogs
+ * POST /api/albums/import-discogs
+ *
+ * Pelo menos um dos campos deve ser fornecido: catalogNumber, barcode ou releaseId
+ */
+export const discogsImportSchema = z
+  .object({
+    catalogNumber: z
+      .string()
+      .min(1, { message: 'Número de catálogo não pode estar vazio' })
+      .max(100, { message: 'Número de catálogo deve ter no máximo 100 caracteres' })
+      .optional(),
+    barcode: z
+      .string()
+      .min(1, { message: 'Código de barras não pode estar vazio' })
+      .max(50, { message: 'Código de barras deve ter no máximo 50 caracteres' })
+      .optional(),
+    releaseId: z.coerce
+      .number()
+      .int({ message: 'ID do release deve ser um número inteiro' })
+      .positive({ message: 'ID do release deve ser positivo' })
+      .optional(),
+  })
+  .refine((data) => data.catalogNumber || data.barcode || data.releaseId, {
+    message: 'Pelo menos um dos campos deve ser fornecido: catalogNumber, barcode ou releaseId',
+  });
+
+/**
+ * Schema para seleção de release após busca
+ * POST /api/albums/import-discogs/select
+ */
+export const discogsSelectSchema = z.object({
+  releaseId: z.coerce
+    .number({ message: 'ID do release é obrigatório' })
+    .int({ message: 'ID do release deve ser um número inteiro' })
+    .positive({ message: 'ID do release deve ser positivo' }),
+});
+
 // Types exportados
 export type AlbumCreateInput = z.infer<typeof albumCreateSchema>;
 export type AlbumUpdateInput = z.infer<typeof albumUpdateSchema>;
 export type AlbumArchiveInput = z.infer<typeof albumArchiveSchema>;
 export type AlbumQueryInput = z.infer<typeof albumQuerySchema>;
 export type AlbumIdParam = z.infer<typeof albumIdParamSchema>;
+export type DiscogsImportInput = z.infer<typeof discogsImportSchema>;
+export type DiscogsSelectInput = z.infer<typeof discogsSelectSchema>;
