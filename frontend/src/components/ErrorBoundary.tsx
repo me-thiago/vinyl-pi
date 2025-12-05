@@ -1,13 +1,14 @@
 import React, { Component, type ReactNode } from 'react';
 import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { withTranslation, type WithTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 /**
  * Props do ErrorBoundary
  */
-interface ErrorBoundaryProps {
+interface ErrorBoundaryProps extends WithTranslation {
   children: ReactNode;
   fallback?: ReactNode;
 }
@@ -37,7 +38,7 @@ interface ErrorBoundaryState {
  *     <MeuComponente />
  *   </ErrorBoundary>
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundaryClass extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -104,6 +105,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       }
 
       // UI de fallback padrão
+      const { t } = this.props;
+
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
           <Card className="w-full max-w-md">
@@ -111,9 +114,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                 <AlertTriangle className="h-6 w-6 text-destructive" />
               </div>
-              <CardTitle className="text-xl">Algo deu errado</CardTitle>
+              <CardTitle className="text-xl">{t('errors.title')}</CardTitle>
               <CardDescription>
-                Ocorreu um erro inesperado na aplicação. Tente recarregar a página.
+                {t('errors.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -126,7 +129,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   {errorInfo && (
                     <details className="mt-2">
                       <summary className="text-xs text-muted-foreground cursor-pointer">
-                        Stack de componentes
+                        {t('errors.componentStack')}
                       </summary>
                       <pre className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap overflow-auto max-h-40">
                         {errorInfo.componentStack}
@@ -142,14 +145,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   className="flex-1"
                   onClick={this.handleRetry}
                 >
-                  Tentar novamente
+                  {t('errors.tryAgain')}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={this.handleReload}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Recarregar página
+                  {t('errors.reloadPage')}
                 </Button>
               </div>
             </CardContent>
@@ -162,4 +165,5 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
+export const ErrorBoundary = withTranslation()(ErrorBoundaryClass);
 export default ErrorBoundary;

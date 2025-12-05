@@ -4,6 +4,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import * as Sentry from '@sentry/react'
 import './index.css'
 
+// Initialize i18n before any component renders
+import './i18n'
+
 // Inicializar Sentry para error tracking
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

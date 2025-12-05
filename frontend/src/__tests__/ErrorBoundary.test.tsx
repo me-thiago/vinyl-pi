@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Componente que lança erro para teste
@@ -39,11 +39,14 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    // Verifica se a UI de erro foi renderizada
-    expect(screen.getByText('Algo deu errado')).toBeInTheDocument();
-    expect(screen.getByText(/Ocorreu um erro inesperado/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Tentar novamente/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Recarregar página/i })).toBeInTheDocument();
+    // i18n: "Algo deu errado" (pt-BR) or "Something went wrong" (en)
+    expect(screen.getByText(/Algo deu errado|Something went wrong/i)).toBeInTheDocument();
+    // i18n: error description
+    expect(screen.getByText(/Ocorreu um erro inesperado|An unexpected error occurred/i)).toBeInTheDocument();
+    // i18n: "Tentar novamente" (pt-BR) or "Try again" (en)
+    expect(screen.getByRole('button', { name: /Tentar novamente|Try again/i })).toBeInTheDocument();
+    // i18n: "Recarregar página" (pt-BR) or "Reload page" (en)
+    expect(screen.getByRole('button', { name: /Recarregar página|Reload page/i })).toBeInTheDocument();
   });
 
   it('deve usar fallback customizado quando fornecido', () => {
@@ -56,7 +59,7 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByText('Fallback customizado')).toBeInTheDocument();
-    expect(screen.queryByText('Algo deu errado')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Algo deu errado|Something went wrong/i)).not.toBeInTheDocument();
   });
 
   it('deve logar erro no console', () => {
@@ -99,14 +102,14 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    // Verifica que está mostrando erro
-    expect(screen.getByText('Algo deu errado')).toBeInTheDocument();
+    // Verifica que está mostrando erro (i18n)
+    expect(screen.getByText(/Algo deu errado|Something went wrong/i)).toBeInTheDocument();
 
     // Simula correção do erro antes de tentar novamente
     shouldThrow = false;
 
-    // Clica em "Tentar novamente"
-    fireEvent.click(screen.getByRole('button', { name: /Tentar novamente/i }));
+    // Clica em "Tentar novamente" (i18n)
+    fireEvent.click(screen.getByRole('button', { name: /Tentar novamente|Try again/i }));
 
     // Re-render para atualizar o componente filho
     rerender(
@@ -136,7 +139,8 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Recarregar página/i }));
+    // i18n: "Recarregar página" (pt-BR) or "Reload page" (en)
+    fireEvent.click(screen.getByRole('button', { name: /Recarregar página|Reload page/i }));
 
     expect(reloadMock).toHaveBeenCalled();
 
@@ -154,8 +158,8 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    // Verifica se o container principal está centralizado
-    const container = screen.getByText('Algo deu errado').closest('.min-h-screen');
+    // Verifica se o container principal está centralizado (i18n)
+    const container = screen.getByText(/Algo deu errado|Something went wrong/i).closest('.min-h-screen');
     expect(container).toBeInTheDocument();
   });
 });

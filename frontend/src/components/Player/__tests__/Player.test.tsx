@@ -127,7 +127,8 @@ describe('Player', () => {
     });
 
     render(<Player />);
-    expect(screen.getByText(/Web Audio API não suportado/i)).toBeInTheDocument();
+    // Web Audio not supported message from i18n
+    expect(screen.getByText(/Web Audio API (não suportado|not supported)/i)).toBeInTheDocument();
   });
 
   it('deve exibir mensagem de erro quando houver erro', () => {
@@ -141,7 +142,8 @@ describe('Player', () => {
     });
 
     render(<Player />);
-    expect(screen.getByText(/Erro de Conexão/i)).toBeInTheDocument();
+    // Connection error title from i18n
+    expect(screen.getByText(/Erro de Conexão|Connection Error/i)).toBeInTheDocument();
     expect(screen.getByText(/Connection failed/i)).toBeInTheDocument();
   });
 
@@ -158,7 +160,8 @@ describe('Player', () => {
     });
 
     render(<Player />);
-    expect(screen.getByText(/Carregando stream/i)).toBeInTheDocument();
+    // Loading stream text from i18n (pt-BR: "Carregando stream...")
+    expect(screen.getByText(/Carregando stream|Loading stream/i)).toBeInTheDocument();
   });
 
   it('deve exibir indicador ON AIR quando tocando', () => {

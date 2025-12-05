@@ -74,7 +74,8 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByText('Configuracoes')).toBeInTheDocument();
+        // i18n: "Configurações" (pt-BR) or "Settings" (en)
+        expect(screen.getByText(/^Configurações$|^Settings$/i)).toBeInTheDocument();
       });
     });
 
@@ -82,9 +83,12 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByText('Player Local (PCM)')).toBeInTheDocument();
-        expect(screen.getByText('Stream MP3 (Icecast)')).toBeInTheDocument();
-        expect(screen.getByText('Sistema')).toBeInTheDocument();
+        // i18n: "Player Local (PCM)" (pt-BR) or "Local Player (PCM)" (en)
+        expect(screen.getByText(/Player Local \(PCM\)|Local Player \(PCM\)/i)).toBeInTheDocument();
+        // i18n: "Stream MP3 (Icecast)" (pt-BR) or "MP3 Stream (Icecast)" (en)
+        expect(screen.getByText(/Stream MP3 \(Icecast\)|MP3 Stream \(Icecast\)/i)).toBeInTheDocument();
+        // i18n: "Sistema" (pt-BR) or "System" (en)
+        expect(screen.getByText(/^Sistema$|^System$/i)).toBeInTheDocument();
       });
     });
 
@@ -103,7 +107,8 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Configuracoes do player web/)).toBeInTheDocument();
+        // i18n: description for local player card
+        expect(screen.getByText(/player web|Web player/i)).toBeInTheDocument();
       });
     });
 
@@ -119,7 +124,8 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByText('Buffer do Player')).toBeInTheDocument();
+        // i18n: "Buffer do Player" (pt-BR) or "Player Buffer" (en)
+        expect(screen.getByText(/Buffer do Player|Player Buffer/i)).toBeInTheDocument();
       });
     });
 
@@ -155,7 +161,8 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByTitle('Copiar URL')).toBeInTheDocument();
+        // i18n: "Copiar URL" (pt-BR) or "Copy URL" (en)
+        expect(screen.getByTitle(/Copiar URL|Copy URL/i)).toBeInTheDocument();
       });
     });
 
@@ -163,7 +170,7 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByTitle('Copiar URL')).toBeInTheDocument();
+        expect(screen.getByTitle(/Copiar URL|Copy URL/i)).toBeInTheDocument();
       });
     });
   });
@@ -183,9 +190,11 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByText('Device ALSA')).toBeInTheDocument();
+        // i18n: "Device ALSA" (pt-BR) or "ALSA Device" (en)
+        expect(screen.getByText(/Device ALSA|ALSA Device/i)).toBeInTheDocument();
         expect(screen.getByText('Sample Rate')).toBeInTheDocument();
-        expect(screen.getByText('Versao')).toBeInTheDocument();
+        // i18n: "Versão" (pt-BR) or "Version" (en)
+        expect(screen.getByText(/Versão|Version/i)).toBeInTheDocument();
       });
     });
   });
@@ -195,7 +204,8 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByTitle('Recarregar')).toBeInTheDocument();
+        // i18n: "Recarregar" (pt-BR) or "Reload" (en)
+        expect(screen.getByTitle(/Recarregar|Reload/i)).toBeInTheDocument();
       });
     });
 
@@ -204,13 +214,13 @@ describe('Settings', () => {
       const user = userEvent.setup();
 
       await waitFor(() => {
-        expect(screen.getByTitle('Recarregar')).toBeInTheDocument();
+        expect(screen.getByTitle(/Recarregar|Reload/i)).toBeInTheDocument();
       });
 
       // Limpar chamadas anteriores
       mockFetch.mockClear();
 
-      const refreshButton = screen.getByTitle('Recarregar');
+      const refreshButton = screen.getByTitle(/Recarregar|Reload/i);
       await user.click(refreshButton);
 
       await waitFor(() => {
@@ -232,8 +242,8 @@ describe('Settings', () => {
   describe('footer', () => {
     it('deve renderizar o footer', async () => {
       renderWithRouter(<Settings />);
-
-      expect(screen.getByText('Vinyl-OS Configuracoes')).toBeInTheDocument();
+      // i18n: Check for Vinyl-OS Settings/Configurações in footer
+      expect(screen.getByText(/Vinyl-OS (Configurações|Settings)/i)).toBeInTheDocument();
     });
   });
 
@@ -258,8 +268,10 @@ describe('Settings', () => {
       renderWithRouter(<Settings />);
 
       await waitFor(() => {
-        expect(screen.getByText('Erro')).toBeInTheDocument();
-        expect(screen.getByText('Falha ao carregar configuracoes')).toBeInTheDocument();
+        // i18n: "Erro" (pt-BR) or "Error" (en)
+        expect(screen.getByText(/^Erro$|^Error$/i)).toBeInTheDocument();
+        // i18n: "Falha ao carregar configurações" (pt-BR) or "Failed to load settings" (en)
+        expect(screen.getByText(/Falha ao carregar configurações|Failed to load settings/i)).toBeInTheDocument();
       });
     });
   });
@@ -275,8 +287,8 @@ describe('Settings', () => {
       );
 
       renderWithRouter(<Settings />);
-
-      expect(screen.getByText('Carregando configuracoes...')).toBeInTheDocument();
+      // i18n: "Carregando configurações..." (pt-BR) or "Loading settings..." (en)
+      expect(screen.getByText(/Carregando configurações|Loading settings/i)).toBeInTheDocument();
 
       // Resolver a promise para limpar
       resolvePromise!({

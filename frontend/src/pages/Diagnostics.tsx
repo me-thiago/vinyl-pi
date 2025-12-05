@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Activity,
@@ -66,17 +67,7 @@ interface SettingsResponse {
   settings: SettingDefinition[]
 }
 
-// Mapa de tradução de eventos
-const EVENT_TRANSLATIONS: Record<string, string> = {
-  'silence.detected': 'Silêncio detectado',
-  'silence.ended': 'Silêncio encerrado',
-  'clipping.detected': 'Clipping detectado',
-  'session.started': 'Sessão iniciada',
-  'session.ended': 'Sessão encerrada',
-  'track.change.detected': 'Troca de faixa',
-  'audio.start': 'Áudio iniciado',
-  'audio.stop': 'Áudio parado'
-}
+// Event translations moved to i18n (events.* keys)
 
 // Mapa de ícones por tipo de setting
 const SETTING_ICONS: Record<string, typeof Settings> = {
@@ -85,10 +76,7 @@ const SETTING_ICONS: Record<string, typeof Settings> = {
   'session': Clock
 }
 
-// Traduzir tipo de evento
-function translateEventType(type: string): string {
-  return EVENT_TRANSLATIONS[type] || type
-}
+// translateEventType now uses i18n - see usage in component
 
 // Cor do badge por tipo de evento
 function getEventBadgeVariant(type: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -126,6 +114,7 @@ function getSliderStep(key: string): number {
 }
 
 export default function Diagnostics() {
+  const { t } = useTranslation()
   const [settings, setSettings] = useState<SettingDefinition[]>([])
   const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({})
   const [events, setEvents] = useState<Array<EventPayload & { id: string }>>([])
@@ -153,31 +142,31 @@ export default function Diagnostics() {
     try {
       setLoading(true)
       const response = await fetch(`${API_BASE}/settings`)
-      if (!response.ok) throw new Error('Falha ao carregar configurações')
+      if (!response.ok) throw new Error(t('diagnostics.loadError'))
       const data: SettingsResponse = await response.json()
       setSettings(data.settings)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   // Buscar eventos iniciais via API
   const fetchInitialEvents = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/events?limit=${MAX_EVENTS}`)
-      if (!response.ok) throw new Error('Falha ao buscar eventos')
+      if (!response.ok) throw new Error(t('diagnostics.loadError'))
       const data = await response.json()
       setEvents(data.events.map((e: EventPayload) => ({
         ...e,
         id: e.id || `evt_${Date.now()}`
       })))
     } catch (err) {
-      console.error('Erro ao buscar eventos iniciais:', err)
+      console.error('Error fetching initial events:', err)
     }
-  }, [])
+  }, [t])
 
   // Carregar settings e eventos no mount
   useEffect(() => {
@@ -202,18 +191,18 @@ export default function Diagnostics() {
         body: JSON.stringify(pendingChanges)
       })
 
-      if (!response.ok) throw new Error('Falha ao salvar configurações')
+      if (!response.ok) throw new Error(t('diagnostics.saveError'))
 
       const data: { settings: SettingDefinition[] } = await response.json()
       setSettings(data.settings)
       setPendingChanges({})
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar')
+      setError(err instanceof Error ? err.message : t('diagnostics.saveError'))
     } finally {
       setSaving(false)
     }
-  }, [pendingChanges])
+  }, [pendingChanges, t])
 
   // Resetar todas as settings
   const resetAll = useCallback(async () => {
@@ -223,18 +212,18 @@ export default function Diagnostics() {
         method: 'POST'
       })
 
-      if (!response.ok) throw new Error('Falha ao resetar configurações')
+      if (!response.ok) throw new Error(t('diagnostics.resetError'))
 
       const data: { settings: SettingDefinition[] } = await response.json()
       setSettings(data.settings)
       setPendingChanges({})
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao resetar')
+      setError(err instanceof Error ? err.message : t('diagnostics.resetError'))
     } finally {
       setSaving(false)
     }
-  }, [])
+  }, [t])
 
   // Obter valor atual de uma setting (pendente ou salvo)
   const getSettingValue = useCallback((key: string): number => {
@@ -277,8 +266,8 @@ export default function Diagnostics() {
               <Disc3 className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Diagnóstico</h1>
-              <p className="text-xs text-muted-foreground">VU Meter e Configurações</p>
+              <h1 className="text-xl font-bold">{t('diagnostics.title')}</h1>
+              <p className="text-xs text-muted-foreground">{t('diagnostics.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -286,7 +275,7 @@ export default function Diagnostics() {
               variant="ghost"
               size="icon"
               onClick={reconnect}
-              title={isConnected ? 'Conectado' : 'Desconectado'}
+              title={isConnected ? t('diagnostics.connected') : t('diagnostics.disconnected')}
             >
               {isConnected ? (
                 <Wifi className="w-4 h-4 text-green-500" />
@@ -305,7 +294,7 @@ export default function Diagnostics() {
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Erro</AlertTitle>
+            <AlertTitle>{t('common.error')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -315,10 +304,10 @@ export default function Diagnostics() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Gauge className="w-5 h-5" />
-              VU Meter
+              {t('diagnostics.vuMeter')}
             </CardTitle>
             <CardDescription>
-              Nível de áudio em tempo real
+              {t('diagnostics.vuMeterDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -334,24 +323,24 @@ export default function Diagnostics() {
               {audioStatus === 'silence' && (
                 <Badge variant="secondary" className="gap-1">
                   <VolumeX className="w-3 h-3" />
-                  Silêncio
+                  {t('dashboard.silence')}
                 </Badge>
               )}
               {audioStatus === 'clipping' && (
                 <Badge variant="destructive" className="gap-1">
                   <Zap className="w-3 h-3" />
-                  Clipping
+                  {t('dashboard.clipping')}
                 </Badge>
               )}
               {audioStatus === 'normal' && (
                 <Badge variant="outline" className="gap-1">
                   <Volume2 className="w-3 h-3" />
-                  Normal
+                  {t('dashboard.normal')}
                 </Badge>
               )}
               {audioStatus === null && (
                 <Badge variant="outline" className="gap-1 text-muted-foreground">
-                  Aguardando sinal...
+                  {t('diagnostics.waitingSignal')}
                 </Badge>
               )}
             </div>
@@ -365,10 +354,10 @@ export default function Diagnostics() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="w-5 h-5" />
-                  Configurações
+                  {t('diagnostics.settings')}
                 </CardTitle>
                 <CardDescription>
-                  Ajuste os thresholds de detecção
+                  {t('diagnostics.settingsDesc')}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -379,7 +368,7 @@ export default function Diagnostics() {
                   disabled={saving}
                 >
                   <RotateCcw className="w-4 h-4 mr-1" />
-                  Resetar
+                  {t('diagnostics.reset')}
                 </Button>
                 <Button
                   variant="outline"
@@ -388,7 +377,7 @@ export default function Diagnostics() {
                   disabled={loading}
                 >
                   <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-                  Recarregar
+                  {t('diagnostics.reloadSettings')}
                 </Button>
               </div>
             </div>
@@ -396,7 +385,7 @@ export default function Diagnostics() {
           <CardContent className="space-y-6">
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">
-                Carregando configurações...
+                {t('diagnostics.loadingSettings')}
               </div>
             ) : (
               <>
@@ -414,7 +403,7 @@ export default function Diagnostics() {
                           {setting.label}
                           {hasChange && (
                             <Badge variant="secondary" className="text-xs">
-                              Modificado
+                              {t('diagnostics.modified')}
                             </Badge>
                           )}
                         </Label>
@@ -450,7 +439,7 @@ export default function Diagnostics() {
                       disabled={saving}
                       className="w-full"
                     >
-                      {saving ? 'Salvando...' : 'Salvar Alterações'}
+                      {saving ? t('settings.saving') : t('diagnostics.saveChanges')}
                     </Button>
                   </div>
                 )}
@@ -468,7 +457,7 @@ export default function Diagnostics() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="w-5 h-5" />
-                  Log de Eventos
+                  {t('diagnostics.eventLog')}
                   {events.length > 0 && (
                     <Badge variant="outline" className="ml-2">
                       {events.length}
@@ -476,12 +465,12 @@ export default function Diagnostics() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Últimos {MAX_EVENTS} eventos detectados em tempo real
+                  {t('diagnostics.lastEvents', { count: MAX_EVENTS })}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="auto-update" className="text-sm text-muted-foreground">
-                  {autoScroll ? 'Ao vivo' : 'Pausado'}
+                  {autoScroll ? t('diagnostics.live') : t('diagnostics.paused')}
                 </Label>
                 <Switch
                   id="auto-update"
@@ -495,8 +484,8 @@ export default function Diagnostics() {
             {events.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhum evento registrado ainda</p>
-                <p className="text-sm">Eventos aparecerão aqui em tempo real</p>
+                <p>{t('diagnostics.noEventsYet')}</p>
+                <p className="text-sm">{t('diagnostics.eventsRealtime')}</p>
               </div>
             ) : (
               <ScrollArea className="h-96">
@@ -508,7 +497,7 @@ export default function Diagnostics() {
                     >
                       <div className="flex items-center gap-3">
                         <Badge variant={getEventBadgeVariant(event.eventType)}>
-                          {translateEventType(event.eventType)}
+                          {t(`events.${event.eventType}`, { defaultValue: event.eventType })}
                         </Badge>
                         {event.metadata && Object.keys(event.metadata).length > 0 && (
                           <span className="text-xs text-muted-foreground hidden sm:inline font-mono">
@@ -540,7 +529,7 @@ export default function Diagnostics() {
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
           <p>
-            Vinyl-OS Diagnóstico • {isConnected ? 'Conectado via WebSocket' : 'Reconectando...'}
+            {t('footer.diagnostics')} • {isConnected ? t('diagnostics.connectedWebSocket') : t('dashboard.reconnecting')}
           </p>
         </div>
       </footer>

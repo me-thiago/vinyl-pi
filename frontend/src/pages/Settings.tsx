@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Volume2,
@@ -67,6 +68,7 @@ const BITRATE_OPTIONS = [
 ]
 
 export default function Settings() {
+  const { t } = useTranslation()
   const [settings, setSettings] = useState<SettingDefinition[]>([])
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -89,8 +91,8 @@ export default function Settings() {
         fetch(`${API_BASE}/system/info`)
       ])
 
-      if (!settingsRes.ok) throw new Error('Falha ao carregar configuracoes')
-      if (!systemRes.ok) throw new Error('Falha ao carregar info do sistema')
+      if (!settingsRes.ok) throw new Error(t('settings.loadError'))
+      if (!systemRes.ok) throw new Error(t('settings.systemInfoError'))
 
       const settingsData = await settingsRes.json()
       const systemData = await systemRes.json()
@@ -99,11 +101,11 @@ export default function Settings() {
       setSystemInfo(systemData)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     fetchSettings()
@@ -135,19 +137,19 @@ export default function Settings() {
         body: JSON.stringify({ 'player.buffer_ms': pendingBuffer })
       })
 
-      if (!response.ok) throw new Error('Falha ao salvar')
+      if (!response.ok) throw new Error(t('settings.saveError'))
 
       const data = await response.json()
       setSettings(data.settings)
       setPendingBuffer(null)
-      setSuccessMessage('Buffer atualizado! Reconecte o player para aplicar.')
+      setSuccessMessage(t('settings.bufferUpdated'))
       setTimeout(() => setSuccessMessage(null), 5000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar')
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
     } finally {
       setSaving(false)
     }
-  }, [pendingBuffer])
+  }, [pendingBuffer, t])
 
   // Salvar bitrate e reiniciar stream
   const saveBitrateAndRestart = useCallback(async () => {
@@ -173,21 +175,21 @@ export default function Settings() {
 
       if (!restartRes.ok) {
         const errorData = await restartRes.json()
-        throw new Error(errorData.error || 'Falha ao reiniciar stream')
+        throw new Error(errorData.error || t('settings.restartError'))
       }
 
       const data = await saveRes.json()
       setSettings(data.settings)
       setPendingBitrate(null)
-      setSuccessMessage('Bitrate atualizado! Stream reiniciado.')
+      setSuccessMessage(t('settings.bitrateUpdated'))
       setTimeout(() => setSuccessMessage(null), 5000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar')
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
     } finally {
       setSaving(false)
       setRestarting(false)
     }
-  }, [pendingBitrate])
+  }, [pendingBitrate, t])
 
   // Copiar URL
   const copyUrl = useCallback(async () => {
@@ -198,9 +200,9 @@ export default function Settings() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      setError('Falha ao copiar URL')
+      setError(t('settings.copyError'))
     }
-  }, [systemInfo?.icecastUrl])
+  }, [systemInfo?.icecastUrl, t])
 
   return (
     <div className="min-h-screen bg-background">
@@ -217,8 +219,8 @@ export default function Settings() {
               <Disc3 className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Configuracoes</h1>
-              <p className="text-xs text-muted-foreground">Streaming e Sistema</p>
+              <h1 className="text-xl font-bold">{t('settings.title')}</h1>
+              <p className="text-xs text-muted-foreground">{t('settings.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -227,7 +229,7 @@ export default function Settings() {
               size="icon"
               onClick={fetchSettings}
               disabled={loading}
-              title="Recarregar"
+              title={t('settings.reload')}
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
@@ -242,7 +244,7 @@ export default function Settings() {
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Erro</AlertTitle>
+            <AlertTitle>{t('common.error')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -251,14 +253,14 @@ export default function Settings() {
         {successMessage && (
           <Alert className="border-green-500 bg-green-500/10">
             <Check className="h-4 w-4 text-green-500" />
-            <AlertTitle className="text-green-500">Sucesso</AlertTitle>
+            <AlertTitle className="text-green-500">{t('common.success')}</AlertTitle>
             <AlertDescription>{successMessage}</AlertDescription>
           </Alert>
         )}
 
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
-            Carregando configuracoes...
+            {t('settings.loadingSettings')}
           </div>
         ) : (
           <>
@@ -267,16 +269,16 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Volume2 className="w-5 h-5" />
-                  Player Local (PCM)
+                  {t('settings.localPlayer')}
                 </CardTitle>
                 <CardDescription>
-                  Configuracoes do player web em :3000/stream.wav
+                  {t('settings.localPlayerDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label>Buffer do Player</Label>
+                    <Label>{t('settings.playerBuffer')}</Label>
                     <span className="font-mono text-sm tabular-nums">
                       {currentBuffer} ms
                     </span>
@@ -290,13 +292,13 @@ export default function Settings() {
                     className="w-full"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Buffer antes de iniciar reproducao. Menor = menos latencia, maior = mais estabilidade.
+                    {t('settings.bufferDesc')}
                   </p>
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">
-                    Latencia estimada: <span className="font-mono">~{currentBuffer}ms</span>
+                    {t('settings.estimatedLatency')}: <span className="font-mono">~{currentBuffer}ms</span>
                   </p>
                 </div>
 
@@ -306,7 +308,7 @@ export default function Settings() {
                     disabled={saving}
                     className="w-full"
                   >
-                    {saving ? 'Salvando...' : 'Salvar Buffer'}
+                    {saving ? t('settings.saving') : t('settings.saveBuffer')}
                   </Button>
                 )}
               </CardContent>
@@ -317,21 +319,21 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Radio className="w-5 h-5" />
-                  Stream MP3 (Icecast)
+                  {t('settings.mp3Stream')}
                 </CardTitle>
                 <CardDescription>
-                  Configuracoes do stream em :8000/stream
+                  {t('settings.mp3StreamDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  <Label>Bitrate</Label>
+                  <Label>{t('settings.bitrate')}</Label>
                   <Select
                     value={currentBitrate}
                     onValueChange={(value: string) => setPendingBitrate(value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o bitrate" />
+                      <SelectValue placeholder={t('settings.selectBitrate')} />
                     </SelectTrigger>
                     <SelectContent>
                       {BITRATE_OPTIONS.map((option) => (
@@ -352,14 +354,14 @@ export default function Settings() {
                   <Alert className="border-yellow-500 bg-yellow-500/10">
                     <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-                      Alterar o bitrate reinicia o stream (~2s de silencio)
+                      {t('settings.bitrateChangeWarning')}
                     </AlertDescription>
                   </Alert>
                 )}
 
                 {/* URL do Stream */}
                 <div className="space-y-2">
-                  <Label>URL do Stream</Label>
+                  <Label>{t('settings.streamUrl')}</Label>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono truncate">
                       {systemInfo?.icecastUrl || 'http://localhost:8000/stream'}
@@ -368,7 +370,7 @@ export default function Settings() {
                       variant="outline"
                       size="icon"
                       onClick={copyUrl}
-                      title="Copiar URL"
+                      title={t('settings.copyUrl')}
                     >
                       {copied ? (
                         <Check className="w-4 h-4 text-green-500" />
@@ -386,7 +388,7 @@ export default function Settings() {
                     variant="destructive"
                     className="w-full"
                   >
-                    {restarting ? 'Reiniciando stream...' : saving ? 'Salvando...' : 'Salvar e Reiniciar Stream'}
+                    {restarting ? t('settings.restartingStream') : saving ? t('settings.saving') : t('settings.saveAndRestart')}
                   </Button>
                 )}
               </CardContent>
@@ -397,24 +399,24 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Cpu className="w-5 h-5" />
-                  Sistema
+                  {t('settings.system')}
                 </CardTitle>
                 <CardDescription>
-                  Informacoes do sistema (somente leitura)
+                  {t('settings.systemDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
                   <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <span className="text-sm text-muted-foreground">Device ALSA</span>
+                    <span className="text-sm text-muted-foreground">{t('settings.alsaDevice')}</span>
                     <code className="font-mono text-sm">{systemInfo?.device || '-'}</code>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <span className="text-sm text-muted-foreground">Sample Rate</span>
+                    <span className="text-sm text-muted-foreground">{t('settings.sampleRate')}</span>
                     <code className="font-mono text-sm">{systemInfo?.sampleRate || '-'} Hz</code>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <span className="text-sm text-muted-foreground">Versao</span>
+                    <span className="text-sm text-muted-foreground">{t('settings.version')}</span>
                     <code className="font-mono text-sm">Vinyl-OS {systemInfo?.version || '-'}</code>
                   </div>
                 </div>
@@ -427,7 +429,7 @@ export default function Settings() {
       {/* Footer */}
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
-          <p>Vinyl-OS Configuracoes</p>
+          <p>{t('footer.settings')}</p>
         </div>
       </footer>
     </div>

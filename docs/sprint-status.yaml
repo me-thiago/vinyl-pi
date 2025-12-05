@@ -76,10 +76,10 @@ development_status:
   v1.5-10-code-splitting: done             # Medio
   v1.5-11-enum-eventtype: done               # Medio
   v1.5-12-sentry-errors: done               # Baixo
-  v1.5-13-estrutura-i18n: ready-for-dev    # Baixo
-  v1.5-14-testes-e2e: ready-for-dev        # Baixo
+  v1.5-13-estrutura-i18n: in-progress    # Baixo
+  v1.5-14-testes-e2e: deferred             # Baixo - Adiado para V3 (decisão retrospectiva 2025-12-04)
   v1.5-15-contributing-changelog: done            # Baixo
-  epic-v1.5-retrospective: optional
+  epic-v1.5-retrospective: completed
 
   # Epic V2 - Coleção & Reconhecimento Musical
   epic-v2: backlog

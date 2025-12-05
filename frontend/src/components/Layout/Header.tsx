@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Disc3, LayoutDashboard, Calendar, Settings, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -6,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 export function Header() {
   const location = useLocation();
+  const { t } = useTranslation();
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -15,10 +17,10 @@ export function Header() {
   };
 
   const navItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/sessions', icon: Calendar, label: 'Sessões' },
-    { path: '/diagnostics', icon: Settings, label: 'Diagnóstico' },
-    { path: '/settings', icon: SlidersHorizontal, label: 'Configurações' },
+    { path: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { path: '/sessions', icon: Calendar, label: t('nav.sessions') },
+    { path: '/diagnostics', icon: Settings, label: t('nav.diagnostics') },
+    { path: '/settings', icon: SlidersHorizontal, label: t('nav.settings') },
   ];
 
   return (

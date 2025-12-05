@@ -1,4 +1,5 @@
 import { useOutletContext } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { VinylVisualizer } from '@/components/VinylVisualizer/VinylVisualizer';
 import { Badge } from '@/components/ui/badge';
 import { Radio } from 'lucide-react';
@@ -6,6 +7,7 @@ import type { LayoutContext } from '@/components/Layout';
 
 export default function Home() {
   const { analyser, isPlaying } = useOutletContext<LayoutContext>();
+  const { t } = useTranslation();
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
@@ -18,7 +20,7 @@ export default function Home() {
       <div className="mt-8 text-center">
         <h1 className="text-2xl font-bold flex items-center gap-3 justify-center">
           <Radio className="w-6 h-6" />
-          Live Vinyl Visualizer
+          {t('home.title')}
         </h1>
         <Badge
           variant={isPlaying ? 'default' : 'secondary'}
@@ -29,7 +31,7 @@ export default function Home() {
               isPlaying ? 'bg-green-300' : 'bg-gray-400'
             }`}
           />
-          {isPlaying ? 'ON AIR' : 'Offline'}
+          {isPlaying ? t('home.onAir') : t('home.offline')}
         </Badge>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Radio,
   Activity,
@@ -73,20 +74,8 @@ function formatRelativeTime(isoString: string): string {
   return date.toLocaleDateString('pt-BR')
 }
 
-// Traduzir tipo de evento
-function translateEventType(type: string): string {
-  const translations: Record<string, string> = {
-    'silence.detected': 'Silêncio detectado',
-    'silence.ended': 'Silêncio encerrado',
-    'clipping.detected': 'Clipping detectado',
-    'session.started': 'Sessão iniciada',
-    'session.ended': 'Sessão encerrada',
-    'track.change.detected': 'Troca de faixa',
-    'audio.start': 'Áudio iniciado',
-    'audio.stop': 'Áudio parado'
-  }
-  return translations[type] || type
-}
+// Traduzir tipo de evento - agora usa i18n
+// A função é chamada com t() passado como parâmetro
 
 // Cor do badge por tipo de evento
 function getEventBadgeVariant(type: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -100,6 +89,7 @@ function getEventBadgeVariant(type: string): 'default' | 'secondary' | 'destruct
 const MAX_EVENTS = 10
 
 export default function Dashboard() {
+  const { t } = useTranslation()
   const [events, setEvents] = useState<EventItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -189,8 +179,8 @@ export default function Dashboard() {
               <Disc3 className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Dashboard</h1>
-              <p className="text-xs text-muted-foreground">Monitoramento em tempo real</p>
+              <h1 className="text-xl font-bold">{t('dashboard.title')}</h1>
+              <p className="text-xs text-muted-foreground">{t('dashboard.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -199,7 +189,7 @@ export default function Dashboard() {
               variant="ghost"
               size="icon"
               onClick={reconnect}
-              title={isConnected ? 'Conectado via WebSocket' : 'Desconectado - clique para reconectar'}
+              title={isConnected ? t('dashboard.connected') : t('dashboard.disconnected')}
             >
               {isConnected ? (
                 <Wifi className="w-4 h-4 text-green-500" />
@@ -216,7 +206,7 @@ export default function Dashboard() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Badge variant={isConnected ? 'outline' : 'secondary'} className="hidden sm:flex">
-              {isConnected ? 'Ao vivo' : formatRelativeTime(lastUpdate.toISOString())}
+              {isConnected ? t('dashboard.live') : formatRelativeTime(lastUpdate.toISOString())}
             </Badge>
             <ThemeToggle />
           </div>
@@ -244,7 +234,7 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Radio className="w-4 h-4" />
-                Streaming
+                {t('dashboard.streaming')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -255,7 +245,7 @@ export default function Dashboard() {
                     : 'bg-muted'
                 }`} />
                 <span className="text-2xl font-bold">
-                  {currentStatus?.streaming.active ? 'ON' : 'OFF'}
+                  {currentStatus?.streaming.active ? t('dashboard.on') : t('dashboard.off')}
                 </span>
               </div>
               {currentStatus?.streaming.active && (
@@ -266,7 +256,7 @@ export default function Dashboard() {
                   {currentStatus.streaming.listeners !== undefined && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Headphones className="w-3 h-3" />
-                      {currentStatus.streaming.listeners} {currentStatus.streaming.listeners === 1 ? 'ouvinte' : 'ouvintes'}
+                      {t('dashboard.listener', { count: currentStatus.streaming.listeners })}
                     </p>
                   )}
                 </div>
@@ -279,7 +269,7 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Activity className="w-4 h-4" />
-                Sessão
+                {t('dashboard.session')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -290,12 +280,12 @@ export default function Dashboard() {
                     : 'bg-muted'
                 }`} />
                 <span className="text-2xl font-bold">
-                  {currentStatus?.session ? 'Ativa' : 'Inativa'}
+                  {currentStatus?.session ? t('dashboard.sessionActive') : t('dashboard.sessionInactive')}
                 </span>
               </div>
               {currentStatus?.session && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {currentStatus.session.event_count} eventos
+                  {currentStatus.session.event_count} {t('dashboard.events')}
                 </p>
               )}
             </CardContent>
@@ -306,7 +296,7 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                Duração
+                {t('dashboard.duration')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -318,7 +308,7 @@ export default function Dashboard() {
               </span>
               {currentStatus?.session && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Iniciada {formatRelativeTime(currentStatus.session.started_at)}
+                  {t('dashboard.started')} {formatRelativeTime(currentStatus.session.started_at)}
                 </p>
               )}
             </CardContent>
@@ -332,30 +322,30 @@ export default function Dashboard() {
                   ? <VolumeX className="w-4 h-4" />
                   : <Volume2 className="w-4 h-4" />
                 }
-                Áudio
+                {t('dashboard.audio')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 {currentStatus?.audio.clipping_detected && (
                   <Badge variant="destructive" className="text-xs">
-                    Clipping
+                    {t('dashboard.clipping')}
                   </Badge>
                 )}
                 {currentStatus?.audio.silence_detected && (
                   <Badge variant="secondary" className="text-xs">
-                    Silêncio
+                    {t('dashboard.silence')}
                   </Badge>
                 )}
                 {!currentStatus?.audio.clipping_detected && !currentStatus?.audio.silence_detected && (
                   <Badge variant="outline" className="text-xs">
-                    Normal
+                    {t('dashboard.normal')}
                   </Badge>
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Nível: {currentStatus?.audio.level_db?.toFixed(1) ?? '--'} dB
-                {currentStatus?.audio.clipping_count ? ` • ${currentStatus.audio.clipping_count} clips` : ''}
+                {t('dashboard.level')}: {currentStatus?.audio.level_db?.toFixed(1) ?? '--'} dB
+                {currentStatus?.audio.clipping_count ? ` • ${currentStatus.audio.clipping_count} ${t('dashboard.clips')}` : ''}
               </p>
             </CardContent>
           </Card>
@@ -368,23 +358,23 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              Últimos Eventos
+              {t('dashboard.recentEvents')}
               {lastEvent && (
                 <Badge variant="outline" className="ml-2 animate-pulse">
-                  Novo
+                  {t('dashboard.newEvent')}
                 </Badge>
               )}
             </CardTitle>
             <CardDescription>
-              Os {MAX_EVENTS} eventos mais recentes detectados pelo sistema
+              {t('dashboard.recentEventsDesc', { count: MAX_EVENTS })}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {events.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhum evento registrado ainda</p>
-                <p className="text-sm">Eventos aparecerão aqui quando forem detectados</p>
+                <p>{t('dashboard.noEventsYet')}</p>
+                <p className="text-sm">{t('dashboard.eventsWillAppear')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -397,7 +387,7 @@ export default function Dashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant={getEventBadgeVariant(event.eventType)}>
-                        {translateEventType(event.eventType)}
+                        {t(`events.${event.eventType}`, { defaultValue: event.eventType })}
                       </Badge>
                       {event.metadata && Object.keys(event.metadata).length > 0 && (
                         <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -425,7 +415,7 @@ export default function Dashboard() {
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
           <p>
-            Vinyl-OS Dashboard • {isConnected ? 'Atualizações em tempo real via WebSocket' : 'Reconectando...'}
+            {t('footer.dashboard')} • {isConnected ? t('dashboard.realtimeUpdates') : t('dashboard.reconnecting')}
           </p>
         </div>
       </footer>

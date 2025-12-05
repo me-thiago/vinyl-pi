@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Clock,
@@ -82,6 +83,7 @@ function formatDateTime(isoString: string): string {
 }
 
 export default function Sessions() {
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [sessions, setSessions] = useState<SessionItem[]>([])
   const [activeSession, setActiveSession] = useState<ActiveSessionResponse['session']>(null)
@@ -140,17 +142,17 @@ export default function Sessions() {
       }
 
       const response = await fetch(`${API_BASE}/sessions?${params}`)
-      if (!response.ok) throw new Error('Falha ao buscar sessões')
+      if (!response.ok) throw new Error(t('sessions.fetchError'))
 
       const data: SessionsResponse = await response.json()
       setSessions(data.sessions)
       setTotal(data.total)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
     } finally {
       setLoading(false)
     }
-  }, [page, dateFrom, dateTo])
+  }, [page, dateFrom, dateTo, t])
 
   // Buscar dados no mount e quando filtros mudarem
   useEffect(() => {
@@ -202,16 +204,16 @@ export default function Sessions() {
               <Disc3 className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Sessões</h1>
-              <p className="text-xs text-muted-foreground">Histórico de sessões de escuta</p>
+              <h1 className="text-xl font-bold">{t('sessions.title')}</h1>
+              <p className="text-xs text-muted-foreground">{t('sessions.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/dashboard">
-              <Button variant="ghost" size="sm">Dashboard</Button>
+              <Button variant="ghost" size="sm">{t('nav.dashboard')}</Button>
             </Link>
             <Link to="/diagnostics">
-              <Button variant="ghost" size="sm">Diagnóstico</Button>
+              <Button variant="ghost" size="sm">{t('nav.diagnostics')}</Button>
             </Link>
             <ThemeToggle />
           </div>
@@ -226,14 +228,14 @@ export default function Sessions() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-success">
                 <Radio className="w-5 h-5 animate-pulse" />
-                Sessão Ativa
+                {t('sessions.activeSession')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">
-                    Iniciada em {formatDateTime(activeSession.startedAt)}
+                    {t('sessions.startedAt')} {formatDateTime(activeSession.startedAt)}
                   </p>
                   <div className="flex items-center gap-4">
                     <span className="flex items-center gap-1 text-sm">
@@ -242,13 +244,13 @@ export default function Sessions() {
                     </span>
                     <span className="flex items-center gap-1 text-sm">
                       <Activity className="w-4 h-4" />
-                      {activeSession.eventCount} eventos
+                      {activeSession.eventCount} {t('dashboard.events')}
                     </span>
                   </div>
                 </div>
                 <Link to={`/sessions/${activeSession.id}`}>
                   <Button variant="outline" size="sm">
-                    Ver detalhes
+                    {t('common.details')}
                   </Button>
                 </Link>
               </div>
@@ -261,10 +263,10 @@ export default function Sessions() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Filter className="w-4 h-4" />
-              Filtros
+              {t('sessions.filters')}
               {hasFilters && (
                 <Badge variant="secondary" className="ml-2">
-                  Ativos
+                  {t('common.active')}
                 </Badge>
               )}
             </CardTitle>
@@ -272,7 +274,7 @@ export default function Sessions() {
           <CardContent>
             <div className="flex flex-wrap items-end gap-4">
               <div className="space-y-2">
-                <Label htmlFor="date_from" className="text-sm">De</Label>
+                <Label htmlFor="date_from" className="text-sm">{t('common.from')}</Label>
                 <Input
                   type="date"
                   id="date_from"
@@ -282,7 +284,7 @@ export default function Sessions() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date_to" className="text-sm">Até</Label>
+                <Label htmlFor="date_to" className="text-sm">{t('common.to')}</Label>
                 <Input
                   type="date"
                   id="date_to"
@@ -292,12 +294,12 @@ export default function Sessions() {
                 />
               </div>
               <Button onClick={applyFilters} size="sm">
-                Filtrar
+                {t('common.filter')}
               </Button>
               {hasFilters && (
                 <Button onClick={clearFilters} variant="ghost" size="sm">
                   <X className="w-4 h-4 mr-1" />
-                  Limpar
+                  {t('common.clear')}
                 </Button>
               )}
             </div>
@@ -309,17 +311,17 @@ export default function Sessions() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              Histórico
+              {t('sessions.history')}
               {total > 0 && (
                 <Badge variant="outline" className="ml-2">
-                  {total} {total === 1 ? 'sessão' : 'sessões'}
+                  {t('sessions.session', { count: total })}
                 </Badge>
               )}
             </CardTitle>
             <CardDescription>
               {hasFilters
-                ? `Sessões filtradas por período`
-                : 'Todas as sessões de escuta registradas'
+                ? t('sessions.filteredByPeriod')
+                : t('sessions.allSessions')
               }
             </CardDescription>
           </CardHeader>
@@ -333,24 +335,24 @@ export default function Sessions() {
                   className="mt-2"
                   onClick={fetchSessions}
                 >
-                  Tentar novamente
+                  {t('common.retry')}
                 </Button>
               </div>
             )}
 
             {loading && !error && (
               <div className="text-center py-8 text-muted-foreground">
-                Carregando sessões...
+                {t('sessions.loadingSessions')}
               </div>
             )}
 
             {!loading && !error && sessions.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma sessão encontrada</p>
+                <p>{t('sessions.noSessionsFound')}</p>
                 {hasFilters && (
                   <p className="text-sm mt-1">
-                    Tente ajustar os filtros de data
+                    {t('sessions.adjustFilters')}
                   </p>
                 )}
               </div>
@@ -379,11 +381,11 @@ export default function Sessions() {
                             </span>
                             {isActive ? (
                               <Badge variant="default" className="bg-success text-success-foreground">
-                                Ativa
+                                {t('sessions.active')}
                               </Badge>
                             ) : (
                               <Badge variant="secondary">
-                                Encerrada
+                                {t('sessions.ended')}
                               </Badge>
                             )}
                           </div>
@@ -394,11 +396,11 @@ export default function Sessions() {
                             </span>
                             <span className="flex items-center gap-1">
                               <Activity className="w-3 h-3" />
-                              {session.eventCount} eventos
+                              {session.eventCount} {t('dashboard.events')}
                             </span>
                             {session.endedAt && (
                               <span className="hidden sm:inline">
-                                Encerrada: {formatDateTime(session.endedAt)}
+                                {t('sessions.endedAt')} {formatDateTime(session.endedAt)}
                               </span>
                             )}
                           </div>
@@ -415,7 +417,7 @@ export default function Sessions() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-6 pt-4 border-t">
                 <p className="text-sm text-muted-foreground">
-                  Página {page} de {totalPages}
+                  {t('sessions.page', { current: page, total: totalPages })}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -425,7 +427,7 @@ export default function Sessions() {
                     disabled={page <= 1}
                   >
                     <ChevronLeft className="w-4 h-4 mr-1" />
-                    Anterior
+                    {t('sessions.previous')}
                   </Button>
                   <Button
                     variant="outline"
@@ -433,7 +435,7 @@ export default function Sessions() {
                     onClick={() => goToPage(page + 1)}
                     disabled={page >= totalPages}
                   >
-                    Próxima
+                    {t('sessions.next')}
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
@@ -446,7 +448,7 @@ export default function Sessions() {
       {/* Footer */}
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
-          <p>Vinyl-OS Sessions</p>
+          <p>{t('footer.sessions')}</p>
         </div>
       </footer>
     </div>

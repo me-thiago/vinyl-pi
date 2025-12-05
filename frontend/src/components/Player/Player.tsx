@@ -1,4 +1,5 @@
 import { Play, Pause, Volume2, Radio, Power, PowerOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -19,6 +20,7 @@ interface PlayerProps {
 }
 
 export function Player({ streamUrl = 'http://localhost:8000/stream', className }: PlayerProps) {
+  const { t } = useTranslation();
   const [bufferMs, setBufferMs] = useState(150); // Default, will be updated from settings
 
   // Fetch buffer setting from API
@@ -100,10 +102,10 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
           <div>
             <CardTitle className="flex items-center gap-2">
               <Radio className="w-5 h-5" />
-              Live Vinyl Visualizer
+              {t('player.title')}
             </CardTitle>
             <CardDescription className="mt-1">
-              Real-time frequency visualization with rotating vinyl
+              {t('player.description')}
             </CardDescription>
           </div>
           <Badge
@@ -119,7 +121,7 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
                 isStreamingActive ? 'bg-green-500' : 'bg-gray-400'
               )}
             />
-            {isStreamingActive ? 'ON AIR' : 'Inactive'}
+            {isStreamingActive ? t('player.onAir') : t('player.inactive')}
           </Badge>
         </div>
       </CardHeader>
@@ -132,9 +134,9 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
         {/* Controles de Streaming do Backend */}
         <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border">
           <div className="flex-1">
-            <p className="text-sm font-medium mb-1">Backend Streaming</p>
+            <p className="text-sm font-medium mb-1">{t('player.backendStreaming')}</p>
             <p className="text-xs text-muted-foreground">
-              {backendStreaming ? 'FFmpeg capturando áudio' : 'Streaming parado'}
+              {backendStreaming ? t('player.ffmpegCapturing') : t('player.streamingStopped')}
             </p>
           </div>
           <Button
@@ -147,17 +149,17 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
             {streamingLoading ? (
               <>
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                {backendStreaming ? 'Parando...' : 'Iniciando...'}
+                {backendStreaming ? t('player.stopping') : t('player.starting')}
               </>
             ) : backendStreaming ? (
               <>
                 <PowerOff className="w-4 h-4 mr-2" />
-                Parar
+                {t('player.stop')}
               </>
             ) : (
               <>
                 <Power className="w-4 h-4 mr-2" />
-                Iniciar
+                {t('player.start')}
               </>
             )}
           </Button>
@@ -166,7 +168,7 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
         {/* Erro de streaming do backend */}
         {streamingError && (
           <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-            <p className="text-sm text-destructive font-medium">Erro no Backend</p>
+            <p className="text-sm text-destructive font-medium">{t('player.backendError')}</p>
             <p className="text-xs text-destructive/80 mt-1">{streamingError}</p>
           </div>
         )}
@@ -183,12 +185,12 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
             {playing ? (
               <>
                 <Pause className="w-5 h-5 mr-2" />
-                Pause
+                {t('player.pause')}
               </>
             ) : (
               <>
                 <Play className="w-5 h-5 mr-2" />
-                Play
+                {t('player.play')}
               </>
             )}
           </Button>
@@ -196,7 +198,7 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <Volume2 className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Volume</span>
+              <span className="text-sm text-muted-foreground">{t('player.volume')}</span>
               <span className="text-sm font-medium ml-auto">
                 {Math.round(volume * 100)}%
               </span>
@@ -219,7 +221,7 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
         {/* Mensagens de erro */}
         {error && (
           <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-            <p className="text-sm text-destructive font-medium">Erro de Conexão</p>
+            <p className="text-sm text-destructive font-medium">{t('player.connectionError')}</p>
             <p className="text-xs text-destructive/80 mt-1">{error}</p>
           </div>
         )}
@@ -228,7 +230,7 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
         {buffering && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <span>Carregando stream...</span>
+            <span>{t('player.loadingStream')}</span>
           </div>
         )}
 
@@ -236,10 +238,10 @@ export function Player({ streamUrl = 'http://localhost:8000/stream', className }
         {!webAudioSupported && (
           <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3">
             <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
-              Web Audio API não suportado
+              {t('player.webAudioNotSupported')}
             </p>
             <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
-              Este navegador não suporta Web Audio API. Funcionalidade limitada.
+              {t('player.webAudioNotSupportedDesc')}
             </p>
           </div>
         )}

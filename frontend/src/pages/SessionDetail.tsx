@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Clock,
@@ -42,17 +43,7 @@ interface SessionDetail {
   events: EventItem[]
 }
 
-// Mapa de tradução de eventos
-const EVENT_TRANSLATIONS: Record<string, string> = {
-  'silence.detected': 'Silêncio detectado',
-  'silence.ended': 'Silêncio encerrado',
-  'clipping.detected': 'Clipping detectado',
-  'session.started': 'Sessão iniciada',
-  'session.ended': 'Sessão encerrada',
-  'track.change.detected': 'Troca de faixa',
-  'audio.start': 'Áudio iniciado',
-  'audio.stop': 'Áudio parado'
-}
+// Event translations moved to i18n (events.* keys)
 
 // Formatar duração em HH:MM:SS
 function formatDuration(seconds: number): string {
@@ -89,10 +80,7 @@ function formatTime(isoString: string): string {
   })
 }
 
-// Traduzir tipo de evento
-function translateEventType(type: string): string {
-  return EVENT_TRANSLATIONS[type] || type
-}
+// translateEventType now uses i18n - see usage in component
 
 // Cor do badge por tipo de evento
 function getEventBadgeVariant(type: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -103,6 +91,7 @@ function getEventBadgeVariant(type: string): 'default' | 'secondary' | 'destruct
 }
 
 export default function SessionDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const [session, setSession] = useState<SessionDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -119,20 +108,20 @@ export default function SessionDetailPage() {
       const response = await fetch(`${API_BASE}/sessions/${id}`)
 
       if (response.status === 404) {
-        setError('Sessão não encontrada')
+        setError(t('sessionDetail.sessionNotFound'))
         return
       }
 
-      if (!response.ok) throw new Error('Falha ao buscar sessão')
+      if (!response.ok) throw new Error(t('sessionDetail.fetchError'))
 
       const data: SessionDetail = await response.json()
       setSession(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, t])
 
   // Buscar dados no mount
   useEffect(() => {
@@ -156,18 +145,18 @@ export default function SessionDetailPage() {
               <Disc3 className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Detalhes da Sessão</h1>
+              <h1 className="text-xl font-bold">{t('sessionDetail.title')}</h1>
               <p className="text-xs text-muted-foreground font-mono">
-                {id ? `${id.slice(0, 8)}...` : 'Carregando...'}
+                {id ? `${id.slice(0, 8)}...` : t('sessionDetail.loading')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/sessions">
-              <Button variant="ghost" size="sm">Sessões</Button>
+              <Button variant="ghost" size="sm">{t('nav.sessions')}</Button>
             </Link>
             <Link to="/dashboard">
-              <Button variant="ghost" size="sm">Dashboard</Button>
+              <Button variant="ghost" size="sm">{t('nav.dashboard')}</Button>
             </Link>
             <ThemeToggle />
           </div>
@@ -185,11 +174,11 @@ export default function SessionDetailPage() {
                 <p className="text-destructive font-medium">{error}</p>
                 <div className="flex items-center justify-center gap-2 mt-4">
                   <Button variant="outline" size="sm" onClick={fetchSession}>
-                    Tentar novamente
+                    {t('common.retry')}
                   </Button>
                   <Link to="/sessions">
                     <Button variant="ghost" size="sm">
-                      Voltar para lista
+                      {t('common.backToList')}
                     </Button>
                   </Link>
                 </div>
@@ -203,7 +192,7 @@ export default function SessionDetailPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-center py-8 text-muted-foreground">
-                Carregando detalhes da sessão...
+                {t('sessionDetail.loadingDetails')}
               </div>
             </CardContent>
           </Card>
@@ -219,12 +208,12 @@ export default function SessionDetailPage() {
                   {isActive ? (
                     <>
                       <Radio className="w-5 h-5 text-success animate-pulse" />
-                      Sessão Ativa
+                      {t('sessionDetail.activeSession')}
                     </>
                   ) : (
                     <>
                       <Calendar className="w-5 h-5" />
-                      Resumo da Sessão
+                      {t('sessionDetail.sessionSummary')}
                     </>
                   )}
                 </CardTitle>
@@ -233,25 +222,25 @@ export default function SessionDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Início */}
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Início</p>
+                    <p className="text-sm text-muted-foreground">{t('sessionDetail.start')}</p>
                     <p className="font-medium">{formatDateTime(session.startedAt)}</p>
                   </div>
 
                   {/* Fim */}
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Fim</p>
+                    <p className="text-sm text-muted-foreground">{t('sessionDetail.end')}</p>
                     <p className="font-medium">
                       {session.endedAt ? (
                         formatDateTime(session.endedAt)
                       ) : (
-                        <span className="text-success">Em andamento</span>
+                        <span className="text-success">{t('sessionDetail.inProgress')}</span>
                       )}
                     </p>
                   </div>
 
                   {/* Duração */}
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Duração</p>
+                    <p className="text-sm text-muted-foreground">{t('sessionDetail.duration')}</p>
                     <p className="font-medium font-mono flex items-center gap-1">
                       <Clock className="w-4 h-4" />
                       {formatDuration(session.durationSeconds)}
@@ -260,7 +249,7 @@ export default function SessionDetailPage() {
 
                   {/* Eventos */}
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Eventos</p>
+                    <p className="text-sm text-muted-foreground">{t('sessionDetail.events')}</p>
                     <p className="font-medium flex items-center gap-1">
                       <Activity className="w-4 h-4" />
                       {session.eventCount}
@@ -275,20 +264,20 @@ export default function SessionDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="w-5 h-5" />
-                  Timeline de Eventos
+                  {t('sessionDetail.eventTimeline')}
                   <Badge variant="outline" className="ml-2">
                     {session.events.length}
                   </Badge>
                 </CardTitle>
                 <CardDescription>
-                  Eventos registrados durante esta sessão (ordem cronológica)
+                  {t('sessionDetail.eventTimelineDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {session.events.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Nenhum evento registrado nesta sessão</p>
+                    <p>{t('sessionDetail.noEventsInSession')}</p>
                   </div>
                 ) : (
                   <ScrollArea className="h-[400px]">
@@ -316,7 +305,7 @@ export default function SessionDetailPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <Badge variant={getEventBadgeVariant(event.eventType)}>
-                                {translateEventType(event.eventType)}
+                                {t(`events.${event.eventType}`, { defaultValue: event.eventType })}
                               </Badge>
                               <span className="text-xs text-muted-foreground font-mono">
                                 {formatTime(event.timestamp)}
@@ -328,12 +317,12 @@ export default function SessionDetailPage() {
                               <div className="mt-2 text-xs text-muted-foreground font-mono">
                                 {event.metadata.levelDb !== undefined && (
                                   <span className="mr-3">
-                                    Nível: {(event.metadata.levelDb as number).toFixed(1)} dB
+                                    {t('sessionDetail.levelDb')}: {(event.metadata.levelDb as number).toFixed(1)} dB
                                   </span>
                                 )}
                                 {event.metadata.duration !== undefined && (
                                   <span className="mr-3">
-                                    Duração: {formatDuration(event.metadata.duration as number)}
+                                    {t('sessionDetail.eventDuration')}: {formatDuration(event.metadata.duration as number)}
                                   </span>
                                 )}
                                 {event.metadata.count !== undefined && (
@@ -358,7 +347,7 @@ export default function SessionDetailPage() {
       {/* Footer */}
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
-          <p>Vinyl-OS Session Detail</p>
+          <p>{t('footer.sessionDetail')}</p>
         </div>
       </footer>
     </div>
