@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 /**
  * Formato físico do disco
@@ -120,16 +120,23 @@ const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostn
 export function useAlbums(initialFilters?: AlbumFilters) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start true for initial load
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<AlbumFilters>(initialFilters ?? {});
   const [offset, setOffset] = useState(0);
   const limit = 20;
 
+  // Ref to prevent concurrent fetches
+  const isFetching = useRef(false);
+
   /**
    * Busca álbuns com filtros
    */
   const fetchAlbums = useCallback(async (newOffset = 0, append = false) => {
+    // Prevent concurrent fetches
+    if (isFetching.current) return;
+    isFetching.current = true;
+
     setLoading(true);
     setError(null);
 
@@ -167,6 +174,7 @@ export function useAlbums(initialFilters?: AlbumFilters) {
       setError(message);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   }, [filters, limit]);
 
@@ -363,10 +371,14 @@ export function useAlbums(initialFilters?: AlbumFilters) {
     setError(null);
   }, []);
 
-  // Carrega álbuns quando filtros mudam
+  // Serializa filtros para comparação estável
+  const filtersKey = JSON.stringify(filters);
+
+  // Carrega álbuns na montagem e quando filtros mudam
   useEffect(() => {
     fetchAlbums(0, false);
-  }, [fetchAlbums]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
 
   return {
     // Estado
