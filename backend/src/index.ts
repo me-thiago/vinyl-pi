@@ -284,7 +284,8 @@ app.use('/api', createSettingsRouter({
 app.use('/api', createAlbumsRouter());
 
 app.use('/api', createRecognitionRouter({
-  sessionManager
+  sessionManager,
+  audioManager
 }));
 
 // Swagger UI e documentação OpenAPI

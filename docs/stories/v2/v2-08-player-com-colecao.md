@@ -1,6 +1,7 @@
 # Story V2.8: Link Reconhecimento → Coleção no Player
 
 **Epic:** V2 - Coleção & Reconhecimento Musical
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  

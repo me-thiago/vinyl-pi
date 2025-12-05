@@ -1,12 +1,12 @@
 /**
- * Testes unitários para Recognition Service (V2-05)
+ * Testes unitários para Recognition Service (V2-05, V2-06)
  *
  * Testa:
  * - Verificação de configuração
  * - Erros conhecidos
  * - Confirm track album
  *
- * Nota: Testes de captura FFmpeg e chamadas ACRCloud reais são
+ * Nota: Testes de captura FFmpeg e chamadas AudD reais são
  * integration tests - aqui mockamos as dependências externas.
  */
 
@@ -16,7 +16,8 @@ import {
   RecognitionError,
   NotConfiguredError,
   CaptureError,
-  ACRCloudError,
+  AudDError,
+  ACRCloudError, // Legacy alias
   NoSessionError,
 } from '../../services/recognition';
 
@@ -59,42 +60,20 @@ describe('Recognition Service', () => {
       process.env = originalEnv;
     });
 
-    it('deve retornar true quando todas as variáveis estão configuradas', () => {
-      process.env.ACRCLOUD_HOST = 'test.acrcloud.com';
-      process.env.ACRCLOUD_ACCESS_KEY = 'test-key';
-      process.env.ACRCLOUD_ACCESS_SECRET = 'test-secret';
+    it('deve retornar true quando AUDD_API_KEY está configurada', () => {
+      process.env.AUDD_API_KEY = 'test-api-key';
 
       expect(isConfigured()).toBe(true);
     });
 
-    it('deve retornar false quando ACRCLOUD_HOST falta', () => {
-      delete process.env.ACRCLOUD_HOST;
-      process.env.ACRCLOUD_ACCESS_KEY = 'test-key';
-      process.env.ACRCLOUD_ACCESS_SECRET = 'test-secret';
+    it('deve retornar false quando AUDD_API_KEY falta', () => {
+      delete process.env.AUDD_API_KEY;
 
       expect(isConfigured()).toBe(false);
     });
 
-    it('deve retornar false quando ACRCLOUD_ACCESS_KEY falta', () => {
-      process.env.ACRCLOUD_HOST = 'test.acrcloud.com';
-      delete process.env.ACRCLOUD_ACCESS_KEY;
-      process.env.ACRCLOUD_ACCESS_SECRET = 'test-secret';
-
-      expect(isConfigured()).toBe(false);
-    });
-
-    it('deve retornar false quando ACRCLOUD_ACCESS_SECRET falta', () => {
-      process.env.ACRCLOUD_HOST = 'test.acrcloud.com';
-      process.env.ACRCLOUD_ACCESS_KEY = 'test-key';
-      delete process.env.ACRCLOUD_ACCESS_SECRET;
-
-      expect(isConfigured()).toBe(false);
-    });
-
-    it('deve retornar false quando nenhuma variável está configurada', () => {
-      delete process.env.ACRCLOUD_HOST;
-      delete process.env.ACRCLOUD_ACCESS_KEY;
-      delete process.env.ACRCLOUD_ACCESS_SECRET;
+    it('deve retornar false quando AUDD_API_KEY está vazia', () => {
+      process.env.AUDD_API_KEY = '';
 
       expect(isConfigured()).toBe(false);
     });
@@ -214,11 +193,19 @@ describe('Recognition Service', () => {
       });
     });
 
-    describe('ACRCloudError', () => {
-      it('deve ter nome ACRCloudError', () => {
-        const error = new ACRCloudError('Timeout', 'ACRCLOUD_TIMEOUT');
-        expect(error.name).toBe('ACRCloudError');
-        expect(error.code).toBe('ACRCLOUD_TIMEOUT');
+    describe('AudDError', () => {
+      it('deve ter nome AudDError', () => {
+        const error = new AudDError('Timeout', 'AUDD_TIMEOUT');
+        expect(error.name).toBe('AudDError');
+        expect(error.code).toBe('AUDD_TIMEOUT');
+      });
+    });
+
+    describe('ACRCloudError (legacy alias)', () => {
+      it('deve ser alias para AudDError', () => {
+        const error = new ACRCloudError('Timeout', 'AUDD_TIMEOUT');
+        expect(error.name).toBe('AudDError');
+        expect(error.code).toBe('AUDD_TIMEOUT');
       });
     });
 
@@ -226,7 +213,7 @@ describe('Recognition Service', () => {
       it('deve ter código RECOGNITION_NOT_CONFIGURED', () => {
         const error = new NotConfiguredError();
         expect(error.code).toBe('RECOGNITION_NOT_CONFIGURED');
-        expect(error.message).toContain('ACRCLOUD');
+        expect(error.message).toContain('AUDD_API_KEY');
       });
     });
   });

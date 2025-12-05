@@ -23,6 +23,6 @@ Confirme seu entendimento respondendo:
 
 - **Usuário:** Thiago
 - **Idioma:** Português BR
-- **Próximo épico:** V2 (Coleção & Reconhecimento)
+- **Épico Atual:** V2 (Coleção & Reconhecimento)
 
 Leia os documentos agora e apresente o resumo.

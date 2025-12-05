@@ -88,13 +88,13 @@ development_status:
   v2-3-ui-gestao-colecao: done
   v2-4-integracao-discogs: done
   v2-5-reconhecimento-musical: done
-  v2-6-validacao-colecao: drafted
-  v2-7-ui-matching-confirmacao: drafted
-  v2-8-player-com-colecao: drafted
-  v2-9-historico-escuta-expandido: drafted
-  v2-10-estatisticas-colecao: drafted
-  v2-11-export-dados: drafted
-  v2-12-configuracoes-reconhecimento: drafted  # Substituiu background-recognition-worker (adiado V3)
+  v2-6-validacao-colecao: done
+  v2-7-ui-matching-confirmacao: ready-for-dev
+  v2-8-player-com-colecao: ready-for-dev
+  v2-9-historico-escuta-expandido: ready-for-dev
+  v2-10-estatisticas-colecao: ready-for-dev
+  v2-11-export-dados: ready-for-dev
+  v2-12-configuracoes-reconhecimento: ready-for-dev  # Substituiu background-recognition-worker (adiado V3)
   epic-v2-retrospective: optional
 
   # Epic V3 - Gravação & Análise

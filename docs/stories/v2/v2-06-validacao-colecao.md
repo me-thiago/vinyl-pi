@@ -1,7 +1,7 @@
 # Story V2-06: Validação Contra Coleção (Fuzzy Matching)
 
 **Epic:** V2 - Coleção & Reconhecimento Musical
-**Status:** drafted
+**Status:** done
 
 **User Story:**
 Como usuário,
@@ -77,8 +77,66 @@ function findMatches(
 4. Atualizar resposta para incluir `albumMatch` com dados reais
 5. Atualizar evento WebSocket `track_recognized` com `albumMatch` preenchido
 
+## Notas de Implementação Final
+
+**Implementado em:** 2025-12-05
+
+### Arquitetura de Captura de Áudio
+
+Implementamos um **terceiro processo FFmpeg** com **Ring Buffer circular de 20 segundos**:
+
+```
+ALSA → FFmpeg #1 (main) → stdout (Express) + FIFO1 (MP3) + FIFO2 (Recognition)
+                                ↓                              ↓
+                          Frontend stream              FFmpeg #3 → Ring Buffer
+                                                                      ↓
+                                                            Recognition Service
+                                                                      ↓
+                                                              WAV → AudD API
+```
+
+**Benefícios do Ring Buffer:**
+- **Captura instantânea**: Zero latência - áudio já disponível
+- **Pré-roll**: Captura áudio de ANTES do trigger (útil para início de músicas)
+- **Sem race conditions**: Buffer sempre populado quando streaming ativo
+
+### Migração ACRCloud → AudD
+
+Migramos de ACRCloud para **AudD** por problemas de autenticação com ACRCloud.
+
+**AudD vantagens:**
+- API mais simples (apenas API key, sem HMAC-SHA1)
+- Boa cobertura de catálogo musical
+- Retorna metadados Spotify/Apple Music/Deezer
+
+**Implementação técnica:**
+- Usamos **axios** em vez de fetch nativo (resolve problema de FormData com Node.js)
+- Arquivo temporário WAV mono 44100Hz (convertido de PCM 48000Hz stereo)
+
+### Arquivos Criados/Modificados
+
+- `backend/src/utils/ring-buffer.ts` - Buffer circular de 20s
+- `backend/src/services/collection-matcher.ts` - Fuzzy matching Levenshtein
+- `backend/src/services/recognition.ts` - Migrado para AudD + captura do Ring Buffer
+- `backend/src/services/audio-manager.ts` - FFmpeg #3 + integração Ring Buffer
+- `backend/src/routes/recognition.ts` - Endpoint `/api/recognize/buffer-status`
+
+### Configuração Necessária
+
+```env
+# backend/.env
+AUDD_API_KEY=sua-api-key-aqui
+```
+
+### Testes
+
+- 27 testes unitários para collection-matcher
+- Teste manual confirmou reconhecimento de "Those Sweet Words" - Norah Jones
+- Fuzzy matching vinculou automaticamente ao álbum "Feels Like Home" (100% confidence)
+
 ## Referências
 
 - [Tech Spec V2](../tech-spec-epic-v2.md) - Seção Collection Matcher, Workflow 5
 - [PRD v3.0](../prd-v3.md) - Seção 5.2.2
+- [Technical Decisions](../../technical-decisions.md) - TD-016: Migração para AudD
 

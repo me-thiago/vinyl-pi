@@ -21,6 +21,7 @@ import {
   NotConfiguredError,
 } from '../services/recognition';
 import { SessionManager } from '../services/session-manager';
+import { AudioManager } from '../services/audio-manager';
 import { Prisma } from '@prisma/client';
 
 const logger = createLogger('RecognitionRouter');
@@ -30,6 +31,7 @@ const logger = createLogger('RecognitionRouter');
  */
 export interface RecognitionRouterDeps {
   sessionManager: SessionManager;
+  audioManager: AudioManager;
 }
 
 /**
@@ -93,7 +95,7 @@ function formatTrackResponse(track: {
  */
 export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
   const router = Router();
-  const { sessionManager } = deps;
+  const { sessionManager, audioManager } = deps;
 
   /**
    * @openapi
@@ -168,6 +170,7 @@ export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
           trigger: input.trigger,
           sampleDuration: input.sampleDuration,
           sessionId: activeSession.id,
+          audioManager,
         });
 
         if (result.success) {
@@ -424,6 +427,50 @@ export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
       }
     }
   );
+
+  /**
+   * @openapi
+   * /api/recognize/buffer-status:
+   *   get:
+   *     summary: Status do Ring Buffer de reconhecimento
+   *     description: Retorna estatísticas do buffer circular usado para captura de áudio
+   *     tags:
+   *       - Recognition
+   *     responses:
+   *       200:
+   *         description: Status do buffer
+   */
+  router.get('/recognize/buffer-status', (_req: Request, res: Response) => {
+    try {
+      const stats = audioManager.getRecognitionBufferStats();
+      const availableSeconds = audioManager.getAvailableAudioSeconds();
+      const streamingStatus = audioManager.getStreamingStatus();
+
+      res.json({
+        buffer: {
+          capacityBytes: stats.capacity,
+          filledBytes: stats.filled,
+          fillPercent: stats.fillPercent.toFixed(1) + '%',
+          availableSeconds: availableSeconds.toFixed(1),
+          totalWrittenMB: (stats.totalWritten / 1024 / 1024).toFixed(2),
+          totalReadMB: (stats.totalRead / 1024 / 1024).toFixed(2),
+        },
+        streaming: {
+          active: streamingStatus.active,
+        },
+        ready: availableSeconds >= 5, // Pronto para captura se tiver pelo menos 5s
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('Erro ao obter status do buffer', { error: errorMsg });
+      res.status(500).json({
+        error: {
+          message: 'Erro ao obter status do buffer',
+          code: 'BUFFER_STATUS_ERROR',
+        },
+      });
+    }
+  });
 
   return router;
 }

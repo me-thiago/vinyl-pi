@@ -1,6 +1,7 @@
 # Story V2.7: UI de Matching/Confirmação
 
 **Epic:** V2 - Coleção & Reconhecimento Musical
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  

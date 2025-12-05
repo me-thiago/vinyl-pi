@@ -669,6 +669,7 @@ O Epic V1.5 foi criado após auditoria de código para endereçar gaps de segura
 | V1.5-12 | Sentry Error Tracking |
 | V1.5-13 | react-i18next i18n |
 | V2-04 | Discogs Collection Sync - Merge Strategy |
+| V2-06 | Migração ACRCloud → AudD, Ring Buffer, axios vs fetch |
 | V3-02 | (Parcialmente adiantado em V1-06) |
 
 ---
@@ -765,6 +766,96 @@ A API do Discogs tem limite de 60 req/min. Para coleções grandes:
 - Service: `backend/src/services/discogs.ts` → `getCollectionReleases()`
 - UI: `frontend/src/pages/Collection.tsx`
 - Story: `docs/stories/v2/v2-04-integracao-discogs.md`
+
+---
+
+## Migração ACRCloud → AudD para Reconhecimento Musical
+
+### Decisão: Usar AudD em vez de ACRCloud
+
+**Data:** 2025-12-05
+**Contexto:** Story V2-06 (Validação Contra Coleção)
+**Status:** ✅ Implementado
+
+### Problema
+
+Durante implementação do reconhecimento musical, ACRCloud apresentou problemas persistentes de autenticação:
+
+- **Erro:** `3001 - Missing/Invalid Access Key`
+- **Causa:** Autenticação HMAC-SHA1 falhava mesmo com credenciais corretas
+- **Tentativas:** Múltiplas chaves/projetos testados sem sucesso
+
+### Solução
+
+Migramos para **AudD** (https://audd.io/) como serviço de reconhecimento.
+
+### Comparação
+
+| Aspecto | ACRCloud | AudD |
+|---------|----------|------|
+| Autenticação | HMAC-SHA1 (complexa) | API Key simples |
+| Formato de envio | FormData + assinatura | FormData básico |
+| Metadados | Spotify, Deezer, etc | Spotify, Apple Music, Deezer |
+| Preço | Freemium | Freemium (300 req/dia) |
+| Latência | ~1-2s | ~2-3s |
+| Cobertura | Ampla | Ampla |
+
+### Implementação Técnica
+
+**Por que axios em vez de fetch?**
+
+O fetch nativo do Node.js tem problemas com FormData de bibliotecas externas (`form-data`). O axios resolve isso automaticamente:
+
+```typescript
+// ❌ Não funciona - fetch + form-data
+const response = await fetch(url, {
+  body: form as unknown as FormData,  // Erro: "you haven't sent a file"
+  headers: form.getHeaders(),
+});
+
+// ✅ Funciona - axios + form-data
+const response = await axios.post(url, form, {
+  headers: form.getHeaders(),
+  timeout: 15000,
+});
+```
+
+### Configuração
+
+```bash
+# .env
+AUDD_API_KEY=sua-api-key-aqui
+```
+
+### Ring Buffer para Captura
+
+Implementamos um **terceiro processo FFmpeg** com Ring Buffer circular de 20 segundos:
+
+```
+ALSA → FFmpeg #1 → stdout + FIFO1 + FIFO2
+                            ↓           ↓
+                          MP3→Icecast  FFmpeg #3 → Ring Buffer (20s)
+                                                          ↓
+                                                  Recognition Service
+```
+
+**Benefícios:**
+- Captura instantânea (zero latência)
+- Pré-roll: captura áudio de ANTES do trigger
+- Buffer sempre populado quando streaming ativo
+
+### Arquivos Modificados
+
+- `backend/src/services/recognition.ts` - Migrado para AudD + axios
+- `backend/src/services/audio-manager.ts` - FFmpeg #3 + Ring Buffer
+- `backend/src/utils/ring-buffer.ts` - Buffer circular de 20s
+- `backend/.env` - `AUDD_API_KEY` em vez de `ACRCLOUD_*`
+
+### Referências
+
+- Story: `docs/stories/v2/v2-06-validacao-colecao.md`
+- Projeto anterior (referência): `~/vinyl-player/backend/services/advancedRecognition.js`
+- AudD API: https://docs.audd.io/
 
 ---
 

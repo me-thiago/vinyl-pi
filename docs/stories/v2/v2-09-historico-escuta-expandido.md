@@ -1,6 +1,7 @@
 # Story V2.9: Histórico de Escuta Expandido
 
 **Epic:** V2 - Coleção & Reconhecimento Musical
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  

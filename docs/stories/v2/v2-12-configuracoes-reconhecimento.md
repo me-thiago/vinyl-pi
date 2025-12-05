@@ -1,7 +1,7 @@
 # Story V2-12: Configurações de Reconhecimento
 
 **Epic:** V2 - Coleção & Reconhecimento Musical
-**Status:** drafted
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,

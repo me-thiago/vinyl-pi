@@ -4,6 +4,11 @@ import { unlink, access } from 'fs';
 import { promisify } from 'util';
 import { createLogger } from '../utils/logger';
 import { getListenerCount } from './icecast-stats';
+import {
+  AudioRingBuffer,
+  DEFAULT_RING_BUFFER_CONFIG,
+  RingBufferStats,
+} from '../utils/ring-buffer';
 
 const execAsync = promisify(exec);
 const unlinkAsync = promisify(unlink);
@@ -108,6 +113,7 @@ export interface AudioCaptureStatus {
 export class AudioManager extends EventEmitter {
   private ffmpegProcess: ChildProcess | null = null;
   private ffmpegMp3Process: ChildProcess | null = null; // Segundo FFmpeg para MP3
+  private ffmpegRecognitionProcess: ChildProcess | null = null; // Terceiro FFmpeg para recognition (passthrough)
   private config: AudioConfig;
   private streamingConfig?: StreamingConfig;
   private isCapturing: boolean = false;
@@ -115,10 +121,14 @@ export class AudioManager extends EventEmitter {
   private currentError?: string;
   private levelDb?: number;
   private fifoPath: string = '/tmp/vinyl-audio.fifo';
+  private recognitionFifoPath: string = '/tmp/vinyl-recognition.fifo';
   private logRateLimiter = new Map<string, number>();
   private LOG_RATE_LIMIT_MS = 5000; // Log mesmo erro max 1x/5s
   private retryCount = 0;
   private MAX_RETRIES = 3;
+
+  // Ring Buffer para captura instantânea de áudio (recognition)
+  private recognitionBuffer: AudioRingBuffer;
 
   /**
    * Cria uma instância do AudioManager
@@ -140,6 +150,13 @@ export class AudioManager extends EventEmitter {
     if (this.config.bufferSize < 512 || this.config.bufferSize > 2048) {
       throw new Error(`Buffer size must be between 512 and 2048 samples, got ${this.config.bufferSize}`);
     }
+
+    // Inicializar Ring Buffer para recognition (20 segundos de histórico)
+    this.recognitionBuffer = new AudioRingBuffer({
+      ...DEFAULT_RING_BUFFER_CONFIG,
+      sampleRate: this.config.sampleRate,
+      channels: this.config.channels,
+    });
 
     logger.info(`AudioManager initialized with device: ${this.config.device}, ` +
                 `sampleRate: ${this.config.sampleRate}Hz, ` +
@@ -269,8 +286,12 @@ export class AudioManager extends EventEmitter {
     this.isStreaming = false;
     this.ffmpegProcess = null;
     this.ffmpegMp3Process = null;
+    this.ffmpegRecognitionProcess = null;
     this.streamingConfig = undefined;
     this.currentError = undefined;
+
+    // Limpar ring buffer
+    this.recognitionBuffer.clear();
 
     // Cleanup FIFO se existir
     this.cleanupFifo().catch(err => {
@@ -346,8 +367,10 @@ export class AudioManager extends EventEmitter {
       logger.info(`Starting main FFmpeg with args: ${mainArgs.join(' ')}`);
       logger.info(`Starting MP3 FFmpeg with args: ${mp3Args.join(' ')}`);
 
-      // Iniciar segundo FFmpeg PRIMEIRO (leitor do FIFO)
-      // IMPORTANTE: Leitor deve estar esperando antes do writer escrever no FIFO
+      // Iniciar leitores dos FIFOs PRIMEIRO
+      // IMPORTANTE: Leitores devem estar esperando antes do writer escrever nos FIFOs
+
+      // 1. Leitor do FIFO MP3 (FFmpeg → Icecast)
       this.ffmpegMp3Process = spawn('ffmpeg', mp3Args, {
         stdio: ['ignore', 'ignore', 'pipe']  // stderr para logs
       });
@@ -355,7 +378,25 @@ export class AudioManager extends EventEmitter {
       // Configurar handlers para processo MP3
       this.setupMp3ProcessHandlers();
 
-      // Aguardar 100ms para garantir que processo MP3 abriu o FIFO
+      // 2. FFmpeg #3: Leitor do FIFO Recognition (passthrough → Ring Buffer)
+      // Este FFmpeg lê continuamente do FIFO e escreve PCM no stdout.
+      // O stdout é lido pelo Node.js e alimenta o Ring Buffer.
+      // Isso garante:
+      // - FIFO sempre tem um leitor (sem bloqueio do FFmpeg principal)
+      // - Ring Buffer sempre tem os últimos 20s de áudio
+      // - Recognition pode capturar instantaneamente do buffer
+      const recognitionArgs = this.buildRecognitionFFmpegArgs();
+      logger.info(`Starting Recognition FFmpeg with args: ${recognitionArgs.join(' ')}`);
+
+      this.ffmpegRecognitionProcess = spawn('ffmpeg', recognitionArgs, {
+        stdio: ['ignore', 'pipe', 'pipe'] // stdout=pipe (PCM para ring buffer), stderr=pipe (logs)
+      });
+
+      // Configurar handlers para alimentar o Ring Buffer
+      this.setupRecognitionProcessHandlers();
+      logger.info('Started recognition FFmpeg passthrough process');
+
+      // Aguardar 100ms para garantir que ambos os leitores abriram os FIFOs
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Iniciar FFmpeg principal (ALSA → stdout + FIFO)
@@ -391,7 +432,7 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Para o streaming (ambos processos FFmpeg)
+   * Para o streaming (todos os processos FFmpeg e auxiliares)
    * @returns Promise que resolve quando streaming parar
    */
   async stopStreaming(): Promise<void> {
@@ -415,7 +456,7 @@ export class AudioManager extends EventEmitter {
           if (mp3ProcessRef && !mp3ProcessRef.killed) {
             logger.warn('MP3 FFmpeg did not stop gracefully, sending SIGKILL');
             mp3ProcessRef.kill('SIGKILL');
-            
+
             // Force kill se SIGKILL não funcionar
             setTimeout(async () => {
               await this.forceKillProcess(mp3ProcessRef, 'FFmpeg MP3');
@@ -433,14 +474,41 @@ export class AudioManager extends EventEmitter {
       });
     }
 
-    // Limpar FIFO
+    // Parar FFmpeg #3 (recognition passthrough)
+    if (this.ffmpegRecognitionProcess && !this.ffmpegRecognitionProcess.killed) {
+      logger.info('Stopping recognition FFmpeg process');
+      const recognitionProcessRef = this.ffmpegRecognitionProcess;
+      recognitionProcessRef.kill('SIGTERM');
+
+      // Aguardar processo terminar com timeout
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(async () => {
+          if (recognitionProcessRef && !recognitionProcessRef.killed) {
+            logger.warn('Recognition FFmpeg did not stop gracefully, sending SIGKILL');
+            recognitionProcessRef.kill('SIGKILL');
+          }
+          resolve();
+        }, 2000);
+
+        recognitionProcessRef?.once('exit', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+    }
+
+    // Limpar Ring Buffer
+    this.recognitionBuffer.clear();
+
+    // Limpar FIFOs
     await this.cleanupFifo();
 
     this.isStreaming = false;
     this.streamingConfig = undefined;
     this.ffmpegMp3Process = null;
+    this.ffmpegRecognitionProcess = null;
 
-    logger.info('Streaming stopped (both processes)');
+    logger.info('Streaming stopped (all processes)');
     this.emit('streaming_stopped');
   }
 
@@ -475,6 +543,54 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
+   * Captura áudio do Ring Buffer para recognition
+   *
+   * Retorna os últimos N segundos de áudio do buffer circular.
+   * Esta operação é INSTANTÂNEA - não precisa esperar captura.
+   *
+   * @param seconds Segundos de áudio para capturar (max: 20s)
+   * @returns Buffer com dados PCM ou null se não houver dados suficientes
+   */
+  captureFromBuffer(seconds: number): Buffer | null {
+    if (!this.isStreaming) {
+      logger.warn('Cannot capture: streaming not active');
+      return null;
+    }
+
+    const maxSeconds = DEFAULT_RING_BUFFER_CONFIG.durationSeconds;
+    if (seconds > maxSeconds) {
+      logger.warn(`Requested ${seconds}s but max is ${maxSeconds}s, clamping`);
+      seconds = maxSeconds;
+    }
+
+    return this.recognitionBuffer.read(seconds);
+  }
+
+  /**
+   * Verifica se há áudio suficiente no buffer para captura
+   *
+   * @param seconds Segundos necessários
+   * @returns true se há dados suficientes
+   */
+  hasEnoughAudioForCapture(seconds: number): boolean {
+    return this.recognitionBuffer.hasEnoughData(seconds);
+  }
+
+  /**
+   * Retorna estatísticas do Ring Buffer
+   */
+  getRecognitionBufferStats(): RingBufferStats {
+    return this.recognitionBuffer.getStats();
+  }
+
+  /**
+   * Retorna quantos segundos de áudio estão disponíveis no buffer
+   */
+  getAvailableAudioSeconds(): number {
+    return this.recognitionBuffer.getAvailableSeconds();
+  }
+
+  /**
    * Retorna o stream WAV (stdout do FFmpeg)
    *
    * Usado pelo endpoint /stream.wav para servir áudio PCM de baixa latência.
@@ -497,44 +613,57 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Cria Named Pipe (FIFO) para compartilhar áudio entre processos
+   * Cria Named Pipes (FIFOs) para compartilhar áudio entre processos
+   *
+   * Dois FIFOs são criados:
+   * 1. vinyl-audio.fifo - Para FFmpeg MP3 → Icecast2
+   * 2. vinyl-recognition.fifo - Para recognition service (captura de samples)
+   *
    * @private
    */
   private async createFifo(): Promise<void> {
-    try {
-      // Verificar se FIFO já existe
-      await accessAsync(this.fifoPath);
-      // Existe, remover primeiro
-      await unlinkAsync(this.fifoPath);
-      logger.info(`Removed existing FIFO at ${this.fifoPath}`);
-    } catch (err) {
-      // Não existe, OK
-    }
+    const fifoPaths = [this.fifoPath, this.recognitionFifoPath];
 
-    try {
-      // Criar FIFO usando comando mkfifo do sistema
-      await execAsync(`mkfifo ${this.fifoPath}`);
-      // Ajustar permissões
-      await execAsync(`chmod 666 ${this.fifoPath}`);
-      logger.info(`Created FIFO at ${this.fifoPath}`);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to create FIFO: ${errorMsg}`);
-      throw new Error(`Failed to create FIFO: ${errorMsg}`);
+    for (const fifoPath of fifoPaths) {
+      try {
+        // Verificar se FIFO já existe
+        await accessAsync(fifoPath);
+        // Existe, remover primeiro
+        await unlinkAsync(fifoPath);
+        logger.info(`Removed existing FIFO at ${fifoPath}`);
+      } catch (err) {
+        // Não existe, OK
+      }
+
+      try {
+        // Criar FIFO usando comando mkfifo do sistema
+        await execAsync(`mkfifo ${fifoPath}`);
+        // Ajustar permissões
+        await execAsync(`chmod 666 ${fifoPath}`);
+        logger.info(`Created FIFO at ${fifoPath}`);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error(`Failed to create FIFO ${fifoPath}: ${errorMsg}`);
+        throw new Error(`Failed to create FIFO ${fifoPath}: ${errorMsg}`);
+      }
     }
   }
 
   /**
-   * Remove Named Pipe (FIFO)
+   * Remove Named Pipes (FIFOs)
    * @private
    */
   private async cleanupFifo(): Promise<void> {
-    try {
-      await unlinkAsync(this.fifoPath);
-      logger.info(`Cleaned up FIFO at ${this.fifoPath}`);
-    } catch (err) {
-      // Ignorar erro se não existir
-      logger.warn(`FIFO cleanup warning (may not exist): ${err}`);
+    const fifoPaths = [this.fifoPath, this.recognitionFifoPath];
+
+    for (const fifoPath of fifoPaths) {
+      try {
+        await unlinkAsync(fifoPath);
+        logger.info(`Cleaned up FIFO at ${fifoPath}`);
+      } catch (err) {
+        // Ignorar erro se não existir
+        logger.debug(`FIFO cleanup (may not exist): ${fifoPath}`);
+      }
     }
   }
 
@@ -598,11 +727,12 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Constrói argumentos para o comando FFmpeg principal (ALSA → stdout + FIFO)
+   * Constrói argumentos para o comando FFmpeg principal (ALSA → stdout + FIFOs)
    *
-   * Usa -map para duplicar output:
+   * Usa -map para triplicar output:
    * 1. Raw PCM → stdout (pipe:1) - baixa latência para Express /stream.wav
-   * 2. Raw PCM → FIFO - para segundo FFmpeg processar MP3 → Icecast2
+   * 2. Raw PCM → FIFO1 - para segundo FFmpeg processar MP3 → Icecast2
+   * 3. Raw PCM → FIFO2 - para recognition service capturar samples
    *
    * @private
    */
@@ -628,12 +758,19 @@ export class AudioManager extends EventEmitter {
     args.push('-f', 's16le');
     args.push('pipe:1');
 
-    // Output 2: Raw PCM para FIFO
+    // Output 2: Raw PCM para FIFO (MP3 → Icecast2)
     // Segundo FFmpeg lerá daqui e enviará MP3 para Icecast2
     args.push('-map', '0:a');
     args.push('-c:a', 'pcm_s16le');
     args.push('-f', 's16le');
     args.push(this.fifoPath);
+
+    // Output 3: Raw PCM para FIFO de Recognition
+    // Recognition service lê daqui quando precisa capturar samples
+    args.push('-map', '0:a');
+    args.push('-c:a', 'pcm_s16le');
+    args.push('-f', 's16le');
+    args.push(this.recognitionFifoPath);
 
     return args;
   }
@@ -668,6 +805,92 @@ export class AudioManager extends EventEmitter {
     args.push(icecastUrl);
 
     return args;
+  }
+
+  /**
+   * Constrói argumentos para FFmpeg #3 (FIFO Recognition → stdout passthrough)
+   *
+   * Este FFmpeg apenas lê do FIFO e escreve PCM no stdout.
+   * Não faz nenhum processamento - apenas passthrough.
+   *
+   * @private
+   */
+  private buildRecognitionFFmpegArgs(): string[] {
+    const args: string[] = [];
+
+    // Sobrescrever arquivos automaticamente sem perguntar
+    args.push('-y');
+
+    // Log apenas erros (reduzir tamanho de logs)
+    args.push('-loglevel', 'error');
+
+    // Input: FIFO com raw PCM
+    args.push('-f', 's16le');
+    args.push('-ar', this.config.sampleRate.toString());
+    args.push('-ac', this.config.channels.toString());
+    args.push('-i', this.recognitionFifoPath);
+
+    // Output: PCM para stdout (passthrough, sem encoding)
+    args.push('-c:a', 'copy'); // Passthrough, sem re-encoding
+    args.push('-f', 's16le');
+    args.push('pipe:1'); // stdout
+
+    return args;
+  }
+
+  /**
+   * Configura handlers para FFmpeg #3 (Recognition passthrough → Ring Buffer)
+   *
+   * O stdout do FFmpeg alimenta continuamente o Ring Buffer.
+   * Isso garante que sempre há áudio disponível para captura instantânea.
+   *
+   * @private
+   */
+  private setupRecognitionProcessHandlers(): void {
+    if (!this.ffmpegRecognitionProcess) return;
+
+    // Handler principal: alimentar Ring Buffer com dados do stdout
+    this.ffmpegRecognitionProcess.stdout?.on('data', (data: Buffer) => {
+      this.recognitionBuffer.write(data);
+    });
+
+    // Monitorar stderr para erros
+    this.ffmpegRecognitionProcess.stderr?.on('data', (data) => {
+      const output = data.toString();
+
+      // Filtrar logs não-críticos
+      if (this.isNonCriticalLog(output)) {
+        return;
+      }
+
+      // Rate limit logs repetidos
+      const logKey = `recognition-stderr-${output.substring(0, 50)}`;
+      if (!this.shouldLog(logKey)) {
+        return;
+      }
+
+      logger.info(`FFmpeg Recognition stderr: ${output}`);
+
+      // Detectar erros
+      if (output.includes('error') || output.includes('Error')) {
+        logger.error(`FFmpeg Recognition ERROR: ${output}`);
+      }
+    });
+
+    // Handler de saída
+    this.ffmpegRecognitionProcess.on('exit', (code, signal) => {
+      logger.info(`FFmpeg Recognition process exited with code ${code}, signal ${signal}`);
+
+      // Se saída inesperada (não controlada), logar
+      if (code !== 0 && code !== null && this.isStreaming) {
+        logger.error(`FFmpeg Recognition exited unexpectedly with code ${code}`);
+      }
+    });
+
+    // Handler de erro
+    this.ffmpegRecognitionProcess.on('error', (err) => {
+      logger.error(`FFmpeg Recognition process error: ${err.message}`);
+    });
   }
 
   /**

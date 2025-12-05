@@ -1,6 +1,7 @@
 # Story V2.11: Export de Dados
 
 **Epic:** V2 - Coleção & Reconhecimento Musical
+**Status:** ready-for-dev
 
 **User Story:**
 Como usuário,  
