@@ -32,6 +32,38 @@ enum EventType {
 }
 
 // ============================================
+// V2 Enums - Coleção & Reconhecimento
+// ============================================
+
+/// Formato físico do disco
+enum AlbumFormat {
+  LP          // 12" 33rpm
+  EP          // Extended Play
+  SINGLE_7    // 7" 45rpm
+  SINGLE_12   // 12" 45rpm
+  DOUBLE_LP   // 2xLP
+  BOX_SET     // Box com múltiplos discos
+}
+
+/// Condição física do disco (Goldmine Standard)
+enum AlbumCondition {
+  mint        // Perfeito, nunca tocado
+  near_mint   // Quase perfeito, mínimo uso
+  vg_plus     // Very Good Plus - leve desgaste
+  vg          // Very Good - desgaste audível mas não excessivo
+  good        // Desgaste significativo
+  fair        // Muito desgaste, ainda tocável
+  poor        // Danos severos
+}
+
+/// Fonte do reconhecimento musical
+enum RecognitionSource {
+  acrcloud
+  audd
+  manual
+}
+
+// ============================================
 // V1 Models - Foundation Core
 // ============================================
 
@@ -42,6 +74,7 @@ model Session {
   durationSeconds Int          @default(0)
   eventCount      Int          @default(0)
   audioEvents     AudioEvent[]
+  tracks          Track[]      // V2: Tracks reconhecidos nesta sessão
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -65,4 +98,60 @@ model Setting {
   value     String
   type      String   @default("string")
   updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// V2 Models - Coleção & Reconhecimento Musical
+// ============================================
+
+/// Álbum na coleção física do usuário
+model Album {
+  id               String          @id @default(uuid())
+  title            String
+  artist           String
+  year             Int?
+  label            String?
+  format           AlbumFormat?
+  coverUrl         String?
+  discogsId        Int?            @unique
+  discogsAvailable Boolean         @default(true)  // false se removido do Discogs
+  condition        AlbumCondition?
+  tags             Json?           // Array de strings: ["rock", "80s", "favorite"]
+  notes            String?
+  archived         Boolean         @default(false) // true = usuário não possui mais
+  tracks           Track[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([artist])
+  @@index([title])
+  @@index([year])
+  @@index([archived])
+  @@index([createdAt(sort: Desc)])
+}
+
+/// Track reconhecido durante uma sessão de escuta
+model Track {
+  id                String            @id @default(uuid())
+  sessionId         String
+  session           Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  albumId           String?
+  album             Album?            @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  title             String
+  artist            String
+  albumName         String?           // Nome do álbum retornado pelo serviço (pode diferir do Album vinculado)
+  albumArtUrl       String?
+  year              Int?
+  label             String?
+  isrc              String?
+  durationSeconds   Int?              // Duração da faixa - usado para timing de próximo reconhecimento
+  confidence        Float             @default(0)
+  recognitionSource RecognitionSource @default(manual)
+  recognizedAt      DateTime          @default(now())
+  metadata          Json?             // Dados extras do serviço de reconhecimento
+
+  @@index([sessionId])
+  @@index([albumId])
+  @@index([recognizedAt(sort: Desc)])
+  @@index([artist, title])
 }
