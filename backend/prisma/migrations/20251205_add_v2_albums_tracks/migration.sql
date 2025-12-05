@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS "Album" (
     "discogsId" INTEGER,
     "discogsAvailable" BOOLEAN NOT NULL DEFAULT true,
     "condition" TEXT,
-    "tags" JSONB,
+    "tags" TEXT,
     "notes" TEXT,
     "archived" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS "Track" (
     "confidence" REAL NOT NULL DEFAULT 0,
     "recognitionSource" TEXT NOT NULL DEFAULT 'manual',
     "recognizedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "metadata" JSONB,
+    "metadata" TEXT,
     CONSTRAINT "Track_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "Track_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "Album" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
