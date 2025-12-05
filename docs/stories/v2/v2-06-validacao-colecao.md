@@ -83,7 +83,7 @@ function findMatches(
 
 ### Arquitetura de Captura de Áudio
 
-Implementamos um **terceiro processo FFmpeg** com **Ring Buffer circular de 20 segundos**:
+Implementamos um **terceiro processo FFmpeg** com **Ring Buffer circular de 30 segundos**:
 
 ```
 ALSA → FFmpeg #1 (main) → stdout (Express) + FIFO1 (MP3) + FIFO2 (Recognition)
@@ -115,7 +115,7 @@ Migramos de ACRCloud para **AudD** por problemas de autenticação com ACRCloud.
 
 ### Arquivos Criados/Modificados
 
-- `backend/src/utils/ring-buffer.ts` - Buffer circular de 20s
+- `backend/src/utils/ring-buffer.ts` - Buffer circular de 30s
 - `backend/src/services/collection-matcher.ts` - Fuzzy matching Levenshtein
 - `backend/src/services/recognition.ts` - Migrado para AudD + captura do Ring Buffer
 - `backend/src/services/audio-manager.ts` - FFmpeg #3 + integração Ring Buffer

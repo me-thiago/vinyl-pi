@@ -256,7 +256,7 @@ export class AudioRingBuffer {
  * Configuração padrão para áudio PCM do Vinyl-OS
  */
 export const DEFAULT_RING_BUFFER_CONFIG: RingBufferConfig = {
-  durationSeconds: 20, // 20 segundos de histórico
+  durationSeconds: 30, // 30 segundos de histórico (preparado para V3 pré-roll)
   sampleRate: 48000,
   channels: 2,
   bytesPerSample: 2, // 16-bit

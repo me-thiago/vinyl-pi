@@ -391,18 +391,74 @@ const { isPlaying, isBuffering, error, play, stop, volume, setVolume } = useAudi
 - WebSocket (Socket.io) para updates em tempo real (status, eventos)
 
 **Backend ↔ Audio:**
-- FFmpeg child process com stdin/stdout pipes para captura
-- HTTP POST para Icecast2 mount point (streaming)
+- FFmpeg child processes (3 processos paralelos) para captura e streaming
+- Named Pipes (FIFOs) para comunicação inter-processo
+- Ring Buffer circular (30s) para captura instantânea
 - Sistema de arquivos para gravações FLAC (V3)
 
 **Backend ↔ External APIs (V2+):**
-- ACRCloud API (HTTPS) para reconhecimento musical
-- AudD API (HTTPS) como fallback
-- Discogs API (HTTPS) para importação de metadados
+- AudD API (HTTPS) para reconhecimento musical (primário)
+- Discogs API (HTTPS) para importação de metadados de coleção
 
 **Frontend ↔ Audio Stream:**
-- HTTP streaming direto do Icecast2 (`http://pi.local:8000/stream`)
-- HTML5 Audio element para reprodução
+- HTTP streaming RAW PCM via Express `/stream.wav` (baixa latência ~150ms)
+- HTTP streaming MP3 via Icecast2 `/stream` (compatibilidade universal)
+
+### Arquitetura de Streaming (Triple-Path)
+
+A partir de V2-06, o sistema utiliza arquitetura Triple-Path com 3 processos FFmpeg paralelos:
+
+```
+                         ┌─────────────────────────────────────────────────────────┐
+                         │                    ALSA Input                           │
+                         │                   (plughw:1,0)                          │
+                         └─────────────────────────┬───────────────────────────────┘
+                                                   │
+                         ┌─────────────────────────▼───────────────────────────────┐
+                         │                   FFmpeg #1 (Main)                      │
+                         │              ALSA → Triple Output                       │
+                         └───────┬─────────────────┬─────────────────┬─────────────┘
+                                 │                 │                 │
+                      stdout (PCM)          FIFO1 (PCM)        FIFO2 (PCM)
+                                 │                 │                 │
+                    ┌────────────▼────────┐ ┌──────▼──────┐ ┌────────▼────────┐
+                    │     Express         │ │  FFmpeg #2  │ │   FFmpeg #3     │
+                    │   /stream.wav       │ │  MP3 Encode │ │   Passthrough   │
+                    │   (Raw PCM)         │ │  (libmp3lame)│ │   → Ring Buffer │
+                    └────────────┬────────┘ └──────┬──────┘ └────────┬────────┘
+                                 │                 │                 │
+                    ┌────────────▼────────┐ ┌──────▼──────┐ ┌────────▼────────┐
+                    │     Frontend        │ │   Icecast2  │ │  Ring Buffer    │
+                    │    Web Audio API    │ │   /stream   │ │    (30s)        │
+                    │     (~150ms)        │ │   (~2-5s)   │ │                 │
+                    └─────────────────────┘ └─────────────┘ └────────┬────────┘
+                                                                     │
+                                                            ┌────────▼────────┐
+                                                            │  Recognition    │
+                                                            │    Service      │
+                                                            │   (AudD API)    │
+                                                            └─────────────────┘
+```
+
+**Componentes:**
+
+| Processo | Input | Output | Função |
+|----------|-------|--------|--------|
+| FFmpeg #1 | ALSA device | stdout + FIFO1 + FIFO2 | Captura e distribuição |
+| FFmpeg #2 | FIFO1 (PCM) | Icecast2 (MP3) | Encoding MP3 128kbps |
+| FFmpeg #3 | FIFO2 (PCM) | Ring Buffer | Alimentação contínua do buffer |
+
+**Ring Buffer (30s):**
+- Localização: `backend/src/utils/ring-buffer.ts`
+- Capacidade: 30 segundos (~5.7MB a 192KB/s)
+- Uso: Captura instantânea para reconhecimento musical
+- Benefícios: Zero latência, pré-roll, retry sem espera
+
+**FIFOs:**
+- `/tmp/vinyl-audio.fifo` - FFmpeg #1 → FFmpeg #2 (MP3)
+- `/tmp/vinyl-recognition.fifo` - FFmpeg #1 → FFmpeg #3 (Recognition)
+
+**Nota:** Esta arquitetura foi implementada em V2-06 e adianta ~80% do V3.2 (Dual-Path Architecture para gravação FLAC).
 
 ## Padrões de Implementação
 

@@ -829,7 +829,7 @@ AUDD_API_KEY=sua-api-key-aqui
 
 ### Ring Buffer para Captura
 
-Implementamos um **terceiro processo FFmpeg** com Ring Buffer circular de 20 segundos:
+Implementamos um **terceiro processo FFmpeg** com Ring Buffer circular de 30 segundos:
 
 ```
 ALSA → FFmpeg #1 → stdout + FIFO1 + FIFO2
@@ -848,7 +848,7 @@ ALSA → FFmpeg #1 → stdout + FIFO1 + FIFO2
 
 - `backend/src/services/recognition.ts` - Migrado para AudD + axios
 - `backend/src/services/audio-manager.ts` - FFmpeg #3 + Ring Buffer
-- `backend/src/utils/ring-buffer.ts` - Buffer circular de 20s
+- `backend/src/utils/ring-buffer.ts` - Buffer circular de 30s
 - `backend/.env` - `AUDD_API_KEY` em vez de `ACRCLOUD_*`
 
 ### Referências
