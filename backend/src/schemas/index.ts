@@ -9,3 +9,4 @@ export * from './settings.schema';
 export * from './sessions.schema';
 export * from './events.schema';
 export * from './pagination.schema';
+export * from './albums.schema';
