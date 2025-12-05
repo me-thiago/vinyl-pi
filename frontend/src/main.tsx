@@ -41,6 +41,8 @@ const Sessions = lazy(() => import('./pages/Sessions'))
 const SessionDetail = lazy(() => import('./pages/SessionDetail'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Diagnostics = lazy(() => import('./pages/Diagnostics'))
+const Collection = lazy(() => import('./pages/Collection'))
+const CollectionDetail = lazy(() => import('./pages/CollectionDetail'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -64,6 +66,12 @@ createRoot(document.getElementById('root')!).render(
               } />
               <Route path="/diagnostics" element={
                 <Suspense fallback={<PageLoader />}><Diagnostics /></Suspense>
+              } />
+              <Route path="/collection" element={
+                <Suspense fallback={<PageLoader />}><Collection /></Suspense>
+              } />
+              <Route path="/collection/:id" element={
+                <Suspense fallback={<PageLoader />}><CollectionDetail /></Suspense>
               } />
             </Route>
           </Routes>

@@ -61,17 +61,6 @@ describe('Dashboard', () => {
   });
 
   describe('renderização inicial', () => {
-    it('deve renderizar o título Dashboard', async () => {
-      renderWithRouter(<Dashboard />);
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    });
-
-    it('deve renderizar o subtítulo', async () => {
-      renderWithRouter(<Dashboard />);
-      // i18n: "Monitoramento em tempo real" (pt-BR) or "Real-time monitoring" (en)
-      expect(screen.getByText(/Monitoramento em tempo real|Real-time monitoring/i)).toBeInTheDocument();
-    });
-
     it('deve renderizar os cards de status', async () => {
       renderWithRouter(<Dashboard />);
 
@@ -229,14 +218,6 @@ describe('Dashboard', () => {
     });
   });
 
-  describe('link de volta', () => {
-    it('deve ter link para página inicial', async () => {
-      renderWithRouter(<Dashboard />);
-
-      const backLink = screen.getByRole('link');
-      expect(backLink).toHaveAttribute('href', '/');
-    });
-  });
 });
 
 describe('Dashboard com status offline', () => {

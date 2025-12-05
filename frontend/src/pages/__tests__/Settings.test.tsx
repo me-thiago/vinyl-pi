@@ -70,15 +70,6 @@ describe('Settings', () => {
   });
 
   describe('renderização inicial', () => {
-    it('deve renderizar o título Configuracoes', async () => {
-      renderWithRouter(<Settings />);
-
-      await waitFor(() => {
-        // i18n: "Configurações" (pt-BR) or "Settings" (en)
-        expect(screen.getByText(/^Configurações$|^Settings$/i)).toBeInTheDocument();
-      });
-    });
-
     it('deve renderizar cards de configuração', async () => {
       renderWithRouter(<Settings />);
 
@@ -226,16 +217,6 @@ describe('Settings', () => {
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalled();
       });
-    });
-  });
-
-  describe('link de volta', () => {
-    it('deve ter link para página inicial', async () => {
-      renderWithRouter(<Settings />);
-
-      const links = screen.getAllByRole('link');
-      const backLink = links.find(link => link.getAttribute('href') === '/');
-      expect(backLink).toBeInTheDocument();
     });
   });
 

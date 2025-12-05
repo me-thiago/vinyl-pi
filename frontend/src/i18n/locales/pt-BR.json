@@ -18,7 +18,9 @@
     "from": "De",
     "to": "Até",
     "details": "Ver detalhes",
-    "backToList": "Voltar para lista"
+    "backToList": "Voltar para lista",
+    "saving": "Salvando...",
+    "dismiss": "Dispensar"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -219,5 +221,70 @@
     "sessionDetail": "Vinyl-OS Session Detail",
     "settings": "Vinyl-OS Configurações",
     "diagnostics": "Vinyl-OS Diagnóstico"
+  },
+  "collection": {
+    "title": "Minha Coleção",
+    "add_album": "Adicionar Álbum",
+    "import_discogs": "Importar do Discogs",
+    "import_discogs_disabled": "Será implementado na story V2-04",
+    "search_placeholder": "Buscar álbuns...",
+    "showing_count": "Mostrando {{count}} de {{total}} álbuns",
+    "load_more": "Carregar mais",
+    "empty_title": "Sua coleção está vazia",
+    "empty_description": "Adicione seu primeiro álbum ou importe do Discogs",
+    "empty": {
+      "no_results_title": "Nenhum álbum encontrado",
+      "no_results_description": "Tente ajustar os filtros de busca"
+    },
+    "form": {
+      "new_album": "Novo Álbum",
+      "edit_album": "Editar Álbum",
+      "new_description": "Adicione um novo álbum à sua coleção",
+      "edit_description": "Atualize as informações do álbum",
+      "title": "Título",
+      "artist": "Artista",
+      "year": "Ano",
+      "label": "Gravadora",
+      "format": "Formato",
+      "condition": "Condição",
+      "cover_url": "URL da Capa",
+      "tags": "Tags",
+      "tags_hint": "Separadas por vírgula",
+      "notes": "Notas",
+      "notes_placeholder": "Informações adicionais sobre este disco...",
+      "save": "Salvar Álbum",
+      "cancel": "Cancelar",
+      "required_field": "Campo obrigatório"
+    },
+    "actions": {
+      "edit": "Editar",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "delete": "Excluir",
+      "menu": "Menu de ações",
+      "confirm_delete_title": "Excluir álbum?",
+      "confirm_delete": "Tem certeza que deseja excluir \"{{title}}\"? Esta ação não pode ser desfeita."
+    },
+    "filters": {
+      "format": "Formato",
+      "year": "Ano",
+      "condition": "Condição",
+      "show_archived": "Mostrar arquivados",
+      "all": "Todos",
+      "clear": "Limpar filtros"
+    },
+    "detail": {
+      "not_found": "Álbum não encontrado",
+      "album_not_found_description": "O álbum solicitado não existe ou foi removido.",
+      "back_to_collection": "Voltar para Coleção",
+      "notes": "Notas",
+      "play_history": "Histórico de Reprodução",
+      "play_history_coming_soon": "O histórico de reprodução será implementado na story V2-09",
+      "view_discogs": "Ver no Discogs",
+      "sync_discogs": "Sincronizar Discogs",
+      "sync_discogs_disabled": "Será implementado na story V2-04",
+      "discogs_unavailable": "Este álbum foi removido do Discogs. Os dados locais foram preservados.",
+      "archived": "Arquivado"
+    }
   }
 }

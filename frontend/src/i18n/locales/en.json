@@ -18,7 +18,9 @@
     "from": "From",
     "to": "To",
     "details": "View details",
-    "backToList": "Back to list"
+    "backToList": "Back to list",
+    "saving": "Saving...",
+    "dismiss": "Dismiss"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -219,5 +221,70 @@
     "sessionDetail": "Vinyl-OS Session Detail",
     "settings": "Vinyl-OS Settings",
     "diagnostics": "Vinyl-OS Diagnostics"
+  },
+  "collection": {
+    "title": "My Collection",
+    "add_album": "Add Album",
+    "import_discogs": "Import from Discogs",
+    "import_discogs_disabled": "Will be implemented in story V2-04",
+    "search_placeholder": "Search albums...",
+    "showing_count": "Showing {{count}} of {{total}} albums",
+    "load_more": "Load more",
+    "empty_title": "Your collection is empty",
+    "empty_description": "Add your first album or import from Discogs",
+    "empty": {
+      "no_results_title": "No albums found",
+      "no_results_description": "Try adjusting your search filters"
+    },
+    "form": {
+      "new_album": "New Album",
+      "edit_album": "Edit Album",
+      "new_description": "Add a new album to your collection",
+      "edit_description": "Update album information",
+      "title": "Title",
+      "artist": "Artist",
+      "year": "Year",
+      "label": "Label",
+      "format": "Format",
+      "condition": "Condition",
+      "cover_url": "Cover URL",
+      "tags": "Tags",
+      "tags_hint": "Comma-separated",
+      "notes": "Notes",
+      "notes_placeholder": "Additional information about this record...",
+      "save": "Save Album",
+      "cancel": "Cancel",
+      "required_field": "Required field"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "delete": "Delete",
+      "menu": "Actions menu",
+      "confirm_delete_title": "Delete album?",
+      "confirm_delete": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone."
+    },
+    "filters": {
+      "format": "Format",
+      "year": "Year",
+      "condition": "Condition",
+      "show_archived": "Show archived",
+      "all": "All",
+      "clear": "Clear filters"
+    },
+    "detail": {
+      "not_found": "Album not found",
+      "album_not_found_description": "The requested album does not exist or has been removed.",
+      "back_to_collection": "Back to Collection",
+      "notes": "Notes",
+      "play_history": "Play History",
+      "play_history_coming_soon": "Play history will be implemented in story V2-09",
+      "view_discogs": "View on Discogs",
+      "sync_discogs": "Sync Discogs",
+      "sync_discogs_disabled": "Will be implemented in story V2-04",
+      "discogs_unavailable": "This album has been removed from Discogs. Local data has been preserved.",
+      "archived": "Archived"
+    }
   }
 }
