@@ -1,8 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft,
   Activity,
   Settings,
   Volume2,
@@ -12,7 +10,6 @@ import {
   RotateCcw,
   Wifi,
   WifiOff,
-  Disc3,
   Zap,
   Clock,
   Gauge
@@ -36,7 +33,6 @@ import {
 } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { VUMeter } from '@/components/vu-meter'
 import { useSocket } from '@/hooks/useSocket'
 import type { EventPayload } from '@/hooks/useSocket'
@@ -253,23 +249,10 @@ export default function Diagnostics() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground">
-              <Disc3 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{t('diagnostics.title')}</h1>
-              <p className="text-xs text-muted-foreground">{t('diagnostics.subtitle')}</p>
-            </div>
-          </div>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        {/* Actions Bar */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -283,13 +266,12 @@ export default function Diagnostics() {
                 <WifiOff className="w-4 h-4 text-destructive" />
               )}
             </Button>
-            <ThemeToggle />
+            <Badge variant={isConnected ? 'outline' : 'secondary'}>
+              {isConnected ? t('diagnostics.connected') : t('diagnostics.disconnected')}
+            </Badge>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Error Alert */}
         {error && (
           <Alert variant="destructive">

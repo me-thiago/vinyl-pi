@@ -1,16 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft,
   Volume2,
   Radio,
   Cpu,
   Copy,
   Check,
   RefreshCw,
-  AlertTriangle,
-  Disc3
+  AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 // Configuracao da API
 const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`
@@ -206,40 +202,21 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground">
-              <Disc3 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{t('settings.title')}</h1>
-              <p className="text-xs text-muted-foreground">{t('settings.subtitle')}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={fetchSettings}
-              disabled={loading}
-              title={t('settings.reload')}
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
+        {/* Actions Bar */}
+        <div className="flex items-center justify-end mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={fetchSettings}
+            disabled={loading}
+            title={t('settings.reload')}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+
         {/* Error Alert */}
         {error && (
           <Alert variant="destructive">

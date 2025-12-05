@@ -3,7 +3,6 @@ import type { ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft,
   Clock,
   Calendar,
   Activity,
@@ -11,7 +10,6 @@ import {
   ChevronRight,
   Filter,
   X,
-  Disc3,
   Radio
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -25,7 +23,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 // Configuração da API
 const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`
@@ -191,35 +188,6 @@ export default function Sessions() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground">
-              <Disc3 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{t('sessions.title')}</h1>
-              <p className="text-xs text-muted-foreground">{t('sessions.subtitle')}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm">{t('nav.dashboard')}</Button>
-            </Link>
-            <Link to="/diagnostics">
-              <Button variant="ghost" size="sm">{t('nav.diagnostics')}</Button>
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Sessão Ativa (se houver) */}

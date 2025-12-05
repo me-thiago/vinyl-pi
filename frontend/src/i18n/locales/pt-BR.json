@@ -22,9 +22,11 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "collection": "Coleção",
     "sessions": "Sessões",
     "diagnostics": "Diagnóstico",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "theme": "Tema"
   },
   "home": {
     "title": "Live Vinyl Visualizer",

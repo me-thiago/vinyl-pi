@@ -1,8 +1,17 @@
 import { Link } from 'react-router-dom';
-import { Play, Pause, Volume2, VolumeX, Settings, Power, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Play, Pause, Volume2, VolumeX, Settings, Power, Loader2, LayoutDashboard, Activity, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { MiniVuMeter } from './MiniVuMeter';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +48,7 @@ export function PlayerBar({
   startStreaming,
   stopStreaming,
 }: PlayerBarProps) {
+  const { t } = useTranslation();
 
   const hasError = error || streamingError;
   const canPlay = isStreaming && !isStreamingLoading;
@@ -166,12 +176,41 @@ export function PlayerBar({
         {playing ? `${latency.toFixed(0)}ms` : '--ms'}
       </Badge>
 
-      {/* Settings Link */}
-      <Link to="/settings">
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-          <Settings className="w-4 h-4" />
-        </Button>
-      </Link>
+      {/* Tools Menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem asChild>
+            <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+              <Settings className="w-4 h-4" />
+              <span>{t('nav.settings')}</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/dashboard" className="flex items-center gap-2 cursor-pointer">
+              <LayoutDashboard className="w-4 h-4" />
+              <span>{t('nav.dashboard')}</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/diagnostics" className="flex items-center gap-2 cursor-pointer">
+              <Activity className="w-4 h-4" />
+              <span>{t('nav.diagnostics')}</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <div className="px-2 py-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">{t('nav.theme')}</span>
+              <ThemeToggle />
+            </div>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
