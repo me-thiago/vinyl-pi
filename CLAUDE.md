@@ -174,6 +174,69 @@ Tools for extending BMAD:
 - User approval required between major sections (unless #yolo mode)
 - Never delegate steps - execute directly
 
+## Development Workflow (Build & Deploy)
+
+Vinyl-OS uses **PM2** to manage processes in production. After modifying TypeScript code, you must rebuild before restarting.
+
+### After Code Changes
+
+```bash
+# Backend only
+npm run build:backend && pm2 restart vinyl-backend
+
+# Frontend only
+npm run build:frontend && pm2 restart vinyl-frontend
+
+# Both
+npm run build && pm2 restart vinyl-backend vinyl-frontend
+```
+
+### Common PM2 Commands
+
+```bash
+pm2 status                    # Ver status de todos os processos
+pm2 logs vinyl-backend        # Ver logs do backend
+pm2 restart vinyl-backend     # Reiniciar backend
+npm run pm2:restart           # Reiniciar todos os serviços
+```
+
+### Development Mode (Hot Reload)
+
+For active development with auto-reload (no manual rebuild needed):
+
+```bash
+npm run dev           # Backend com hot-reload
+npm run dev:frontend  # Frontend com hot-reload (Vite)
+```
+
+### Validação e Commits
+
+**IMPORTANTE:** Sempre executar validação antes de commits:
+
+```bash
+npm run validate      # Roda lint, testes e build (backend + frontend)
+```
+
+O comando `validate` executa:
+1. `prisma generate` (gera client Prisma)
+2. Testes com coverage (backend)
+3. Build TypeScript (backend)
+4. Lint (frontend)
+5. Testes (frontend)
+6. Build Vite (frontend)
+
+**Regra de Commit:** Fazer commit ao final de cada story completada:
+```bash
+npm run validate && git add -A && git commit -m "feat(v1-XX): descrição da story"
+```
+
+Convenção de mensagens:
+- `feat(vX-XX):` - Nova funcionalidade (story)
+- `fix(vX-XX):` - Correção de bug
+- `docs:` - Apenas documentação
+- `refactor:` - Refatoração sem mudança de comportamento
+- `test:` - Adição/correção de testes
+
 ## EventBus Memory Safety
 
 The Vinyl-OS backend uses an EventBus (pub/sub pattern) for internal component communication. **Critical memory leak prevention is required when using EventBus.**

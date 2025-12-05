@@ -154,15 +154,15 @@
 - **Input**: ALSA via plughw (device específico configurável)
 - **Formato interno**: 48kHz/16-bit/stereo (padrão) ou 44.1kHz
 - **Buffer**: 512-2048 samples (configurável para latência vs estabilidade)
-- **Monitoramento**: 
+- **Monitoramento**:
   - Detecção de clipping
   - Monitoramento de nível de áudio (VU meter)
-  - Auto-stop após silêncio configurável (>10s padrão)
+  - Detecção de silêncio (threshold e duração configuráveis)
 
 #### 5.1.2 Streaming Engine
 - **Servidor**: Icecast2 (robusto, testado, compatível)
 - **Encoder**: FFmpeg com libmp3lame
-- **Mount point**: `/stream` (MP3 320kbps CBR)
+- **Mount point**: `/stream` (MP3 128kbps CBR)
 - **Fallback**: Loop de silêncio quando sem input
 - **Clients simultâneos**: Até 20 (configurável)
 - **Buffer do servidor**: 64KB (balanço latência/estabilidade)
@@ -175,17 +175,18 @@
   - Duração configurável (10s padrão)
   - Evento: `silence.detected`
   
-- **Detecção de Toca-discos em Vazio**:
+- **Detecção de Toca-discos em Vazio**: ⏸️ *Adiado para V2/V3*
   - Ruído de fundo baixo mas constante
   - Diferenciar de silêncio total
   - Evento: `turntable.idle`
-  
-- **Detecção de Troca de Faixa**:
+  - **Status**: Não implementado em V1 - nível de áudio oscila muito e não se mantém constante por tempo suficiente para detecção confiável. Requer análise espectral mais sofisticada (possivelmente via Meyda features adicionais).
+
+- **Detecção de Troca de Faixa**: ⏸️ *Adiado indefinidamente*
   - Mudança abrupta de nível de áudio + silêncio curto
   - Thresholds ajustáveis (nível, duração do silêncio)
   - Calibração manual via UI
   - Evento: `track.change.detected`
-  - **Nota**: Precisão inicial pode ser <80%, UI permite ajuste fino
+  - **Status**: Não implementado - ruído de fundo do vinil impede detecção confiável (gaps entre faixas raramente atingem -50dB). Sem padrão consistente de silêncio entre faixas. Possível implementação futura via fingerprinting ou machine learning.
   
 - **Detecção de Sessão**:
   - Início: Primeira detecção de áudio após período idle
@@ -199,20 +200,21 @@
   - Configuração de thresholds:
     - Silence threshold (dB)
     - Silence duration (segundos)
-    - Track change sensitivity
+    - Clipping threshold (dB)
     - Session timeout
-  - Botões de teste manual (trigger de eventos)
 
 #### 5.1.4 EventBus Core
 - Sistema de eventos interno básico
 - Padrão publish/subscribe simples
-- Eventos suportados:
+- Eventos implementados em V1:
   - `audio.start`, `audio.stop`
   - `silence.detected`, `silence.ended`
-  - `turntable.idle`, `turntable.active`
-  - `track.change.detected`
   - `session.started`, `session.ended`
   - `clipping.detected`
+  - `audio.level` (interno, para análise)
+- Eventos planejados (não implementados):
+  - `turntable.idle`, `turntable.active` - adiado para V2/V3
+  - `track.change.detected` - adiado indefinidamente
 - **Nota**: Extensível na V3 para plugins, V1 mantém simples
 
 #### 5.1.5 Interface Web (SPA MVP)

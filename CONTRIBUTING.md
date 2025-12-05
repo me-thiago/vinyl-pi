@@ -86,6 +86,26 @@ Usamos [Conventional Commits](https://www.conventionalcommits.org/):
 
 **Exemplo:** `feat(player): adicionar contador de listeners`
 
+### Fluxo de Commit por Story
+
+**IMPORTANTE:** Cada story deve resultar em um commit ao ser completada.
+
+```bash
+# Após completar uma story:
+npm run validate && git add -A && git commit -m "feat(v1-XX): descrição da story"
+```
+
+**Convenção para stories:**
+- `feat(v1-05):` - Story V1-05 implementada
+- `feat(v1.5-02):` - Story V1.5-02 implementada
+- `fix(v1-05):` - Correção na story V1-05
+
+**Por que commitar por story?**
+- Histórico granular e rastreável
+- Fácil identificar quando uma feature foi introduzida
+- Rollback cirúrgico se necessário
+- Alinhamento com sprint-status.yaml
+
 ### TypeScript
 
 - Usar tipos explícitos quando não óbvios
@@ -132,12 +152,18 @@ Veja `CLAUDE.md` para mais detalhes sobre o padrão EventBus.
    git commit -m "feat: descrição clara da mudança"
    ```
 
-3. **Execute os testes:**
+3. **Execute a validação completa:**
    ```bash
-   npm test          # Testes do backend
-   npm run build     # Verifica build
-   npm run lint      # Verifica linting
+   npm run validate  # Lint + testes + build (backend + frontend)
    ```
+
+   Este comando executa:
+   - `prisma generate` (gera client Prisma)
+   - Testes com coverage (backend)
+   - Build TypeScript (backend)
+   - Lint (frontend)
+   - Testes (frontend)
+   - Build Vite (frontend)
 
 4. **Push e abra o PR:**
    ```bash

@@ -303,6 +303,26 @@ pm2 startup
 # Seguir instruções exibidas pelo comando acima
 ```
 
+### Fluxo de Desenvolvimento (após alterar código)
+
+**IMPORTANTE:** Após modificar código TypeScript, é necessário recompilar antes de reiniciar o PM2.
+
+```bash
+# Apenas Backend
+npm run build:backend && pm2 restart vinyl-backend
+
+# Apenas Frontend
+npm run build:frontend && pm2 restart vinyl-frontend
+
+# Ambos (Backend + Frontend)
+npm run build && pm2 restart vinyl-backend vinyl-frontend
+
+# Rebuild completo (limpa dist/ antes)
+npm run rebuild && pm2 restart vinyl-backend vinyl-frontend
+```
+
+**Dica:** Durante desenvolvimento ativo, considere usar `npm run dev` (backend) ou `npm run dev:frontend` que fazem hot-reload automático, sem necessidade de rebuild manual.
+
 ## 🎵 Como Usar
 
 ### Interface Web

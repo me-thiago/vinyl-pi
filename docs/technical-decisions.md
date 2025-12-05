@@ -16,13 +16,28 @@
 
 ## MP3 Bitrate e Codec
 
-### Decisão: 128kbps com libmp3lame
+### Decisão: 128kbps default, configurável pelo usuário (128/192/256)
 
-**Data:** 2025-11-07  
-**Contexto:** Story V1-05 e V1-06 (Pipeline FFmpeg → Icecast + Frontend Player)  
+**Data:** 2025-11-07 (implementação inicial), 2025-12-04 (configurável via UI)
+**Contexto:** Story V1-05 e V1-06 (Pipeline FFmpeg → Icecast + Frontend Player)
 **Status:** ✅ Implementado e Validado
 
-### Problema
+### Atualização V1.5: Bitrate Configurável
+
+O bitrate do stream MP3 é **configurável pelo usuário** através da página `/settings`:
+- **128 kbps** (default) - Menor uso de banda
+- **192 kbps** - Balanceado
+- **256 kbps** - Maior qualidade
+
+**Fluxo de alteração:**
+1. Usuário seleciona novo bitrate na UI
+2. Frontend envia `PATCH /api/settings` com `stream.bitrate`
+3. Frontend envia `POST /streaming/restart` para reiniciar FFmpeg
+4. FFmpeg reinicia com novo bitrate
+
+**Nota:** Alterar bitrate interrompe momentaneamente o stream (necessário reiniciar FFmpeg).
+
+### Problema Original
 
 Durante implementação do streaming MP3 para Icecast2, testamos diferentes configurações de bitrate e codecs:
 
@@ -94,6 +109,87 @@ ffmpeg -f s16le -ar 48000 -ac 2 -i /tmp/vinyl-audio.fifo \
 - Story: `docs/stories/v1/v1-06-frontend-player-basico.md`
 - Arquitetura detalhada: `docs/archived/dual-streaming-architecture.md`
 - Commits: `40b9475` (redução para 128k), `9cb7862` (otimização 24/7)
+
+---
+
+## Meyda para Análise de Áudio
+
+### Decisão: Meyda como biblioteca de análise de áudio
+
+**Data:** 2025-11-28
+**Contexto:** Story V1-08 (Detecção de Silêncio)
+**Status:** ✅ Implementado
+
+### Problema
+
+Necessidade de analisar nível de áudio em tempo real para:
+1. **V1**: Detecção de silêncio e clipping
+2. **V3 (futuro)**: Análise de qualidade (SNR, wow/flutter, clicks/pops)
+
+### Solução
+
+Escolhemos **Meyda** como biblioteca de análise de áudio.
+
+### Justificativa
+
+**Por que Meyda?**
+- **Leve**: ~50KB, sem dependências pesadas
+- **Sem WebAssembly**: Funciona nativamente em Node.js sem compilação
+- **API simples**: `Meyda.extract(['rms', 'energy'], samples)`
+- **Features extensíveis**: Suporta 26+ features de áudio (RMS, spectralCentroid, MFCC, etc.)
+
+**Visão estratégica para V3:**
+Meyda foi escolhida não apenas para V1, mas pensando em V3 (Quality Analysis):
+- **SNR**: Pode ser calculado via RMS em diferentes segmentos
+- **Spectral analysis**: `spectralCentroid`, `spectralRolloff` para detectar high-freq rolloff
+- **MFCC**: Útil para fingerprinting e detecção de padrões
+- **Energy**: Base para detecção de clicks/pops (picos de energia)
+
+### Uso Atual (V1)
+
+```typescript
+// backend/src/services/audio-analyzer.ts
+import Meyda from 'meyda';
+
+const features = Meyda.extract(['rms', 'energy'], floatSamples);
+const levelDb = 20 * Math.log10(features.rms);
+```
+
+**Features extraídas:**
+- `rms`: Root Mean Square (0-1)
+- `energy`: Energia do sinal
+
+**Publicação:**
+- Evento `audio.level` no EventBus a cada 100ms
+- Payload: `{ rms, levelDb, energy, timestamp }`
+
+### Uso Futuro (V3)
+
+```typescript
+// Exemplo de análise de qualidade (V3)
+const features = Meyda.extract([
+  'rms',
+  'energy',
+  'spectralCentroid',    // Centro de massa espectral
+  'spectralRolloff',     // Frequência de rolloff
+  'zcr'                  // Zero crossing rate (ruído)
+], samples);
+```
+
+### Alternativas Consideradas
+
+| Biblioteca | Prós | Contras | Decisão |
+|------------|------|---------|---------|
+| **Meyda** | Leve, API simples, features extensíveis | Menos features que Web Audio API | ✅ Escolhida |
+| **essentia.js** | Mais features, usado em produção | WebAssembly, complexo, ~2MB | ❌ Rejeitada |
+| **Web Audio API** | Nativo em browsers | Só funciona em browsers, não Node.js | ❌ Rejeitada |
+| **Manual (FFT)** | Controle total | Muito trabalho, reimplementar a roda | ❌ Rejeitada |
+
+### Referências
+
+- Arquivo: `backend/src/services/audio-analyzer.ts`
+- Story: `docs/stories/v1/v1-08-deteccao-silencio.md`
+- Documentação Meyda: https://meyda.js.org/
 
 ---
 
@@ -285,6 +381,66 @@ Frame Size:    4 bytes (2 channels * 2 bytes/sample)
 
 ---
 
+## Eventos de Áudio Adiados
+
+### Decisão: Adiar `turntable.idle` e `track.change.detected`
+
+**Data:** 2025-01-29
+**Contexto:** Story V1-12 (Detecção de Troca de Faixa) e análise de viabilidade
+**Status:** ⏸️ Adiado
+
+### Problema
+
+Durante testes com discos reais, identificamos limitações fundamentais na detecção baseada em threshold de nível de áudio:
+
+**1. Detecção de Troca de Faixa (`track.change.detected`)**
+
+Abordagem planejada: Detectar queda de nível + silêncio curto entre faixas.
+
+**Por que não funciona:**
+- Ruído de fundo do vinil (chiado, pops, crackles) raramente permite que o nível caia abaixo de -50dB nos gaps
+- Variabilidade alta: gaps variam de 0.5s a 3s+, alguns álbuns têm faixas que emendam (crossfade, medley)
+- Alta taxa de falsos positivos poluiria o banco de dados
+- Não há caso de uso imediato definido para esses dados
+
+**Alternativas consideradas:**
+- Threshold dinâmico: Complexo, ainda gera falsos positivos
+- Detecção por queda de energia: Confunde com passagens quietas
+- Threshold configurável: Não resolve discos ruidosos
+
+**Possível solução futura:** Fingerprinting via ACRCloud/AudD (V2) ou machine learning local.
+
+**2. Detecção de Toca-discos em Vazio (`turntable.idle`)**
+
+Abordagem planejada: Identificar ruído de fundo baixo mas constante (disco girando sem música).
+
+**Por que não funciona:**
+- Nível de áudio oscila muito e não se mantém constante
+- Atinge pontos de -50dB, mas não sustenta por 10s (requisito de silêncio)
+- Difícil diferenciar de passagens muito quietas em músicas
+
+**Possível solução futura:** Análise espectral via Meyda (spectralCentroid, spectralFlatness) para identificar padrão característico de ruído de vinil vs silêncio vs música.
+
+### Decisão
+
+| Evento | Status | Motivo | Quando revisitar |
+|--------|--------|--------|------------------|
+| `track.change.detected` | Adiado indefinidamente | Impossível com threshold simples | Quando tiver fingerprinting (V2+) |
+| `turntable.idle` | Adiado para V2/V3 | Requer análise espectral | Quando expandir uso de Meyda |
+
+### Impacto
+
+- EventBus define esses tipos mas nenhum serviço os emite
+- PRD v3.0 atualizado para refletir status de adiamento
+- Funcionalidade core (silêncio, clipping, sessões) não é afetada
+
+### Referências
+
+- Story: `docs/stories/v1/v1-12-deteccao-troca-faixa.md` (decisão de adiamento documentada)
+- PRD: `docs/prd-v3.md` seção 5.1.3
+
+---
+
 ## Constantes e Thresholds
 
 ### Decisão: Valores Hardcoded para Simplificação
@@ -372,16 +528,150 @@ Documentar constantes e thresholds críticos que afetam o comportamento do siste
 
 ---
 
+## V1.5 - Hardening & Quality
+
+### Visão Geral
+
+O Epic V1.5 foi criado após auditoria de código para endereçar gaps de segurança, qualidade e manutenibilidade identificados no V1. Todas as stories foram implementadas entre Nov-Dez 2025.
+
+**Data:** 2025-12-04
+**Status:** ✅ Completo (14/15 stories, 1 adiada para V3)
+
+### Decisões por Categoria
+
+#### Segurança
+
+**CORS Restriction (V1.5-01)**
+- **Problema:** CORS aberto (`*`) permitia requisições de qualquer origem
+- **Solução:** Restringir a origens específicas via `CORS_ORIGINS` no `.env`
+- **Configuração:** `CORS_ORIGINS=http://localhost:5173,http://192.168.x.x:5173`
+- **Arquivo:** `backend/src/index.ts`
+
+**Input Validation com Zod (V1.5-02)**
+- **Problema:** Inputs de API não validados, risco de injection
+- **Solução:** Schemas Zod para todas as rotas com input
+- **Por que Zod?** TypeScript-first, inferência de tipos, mensagens de erro claras, ~50KB
+- **Alternativas rejeitadas:** Joi (sem inferência TS), Yup (menos popular), class-validator (decorators)
+- **Arquivos:** `backend/src/schemas/*.ts`, middleware em `backend/src/middleware/validate.ts`
+
+**Rate Limiting (V1.5-05)**
+- **Problema:** Sem proteção contra abuse/DoS
+- **Solução:** express-rate-limit com limites por endpoint
+- **Configuração:**
+  - API geral: 100 req/min por IP
+  - Settings POST: 10 req/min (mais restritivo)
+  - Stream endpoints: sem limite (streaming contínuo)
+- **Arquivo:** `backend/src/middleware/rate-limit.ts`
+
+#### Observabilidade
+
+**Logger Centralizado - Winston (V1.5-04)**
+- **Problema:** `console.log` espalhado, sem estrutura, sem rotação
+- **Solução:** Winston com transports configuráveis
+- **Features:**
+  - Níveis: error, warn, info, debug
+  - Formato: JSON em prod, colorido em dev
+  - Rotação: diária, max 14 dias
+  - Contexto: cada módulo tem seu logger (`createLogger('ModuleName')`)
+- **Por que Winston?** Maduro, flexível, ecosystem rico
+- **Arquivo:** `backend/src/utils/logger.ts`
+
+**Error Tracking - Sentry (V1.5-12)**
+- **Problema:** Erros em produção não rastreados
+- **Solução:** Sentry SDK para backend e frontend
+- **Configuração:**
+  - DSN via `SENTRY_DSN` no `.env`
+  - Sample rate: 1.0 em dev, 0.1 em prod
+  - Source maps: enviados no build
+- **Arquivos:** `backend/src/utils/sentry.ts`, `frontend/src/lib/sentry.ts`
+
+#### Qualidade de Código
+
+**GitHub Actions CI (V1.5-06)**
+- **Pipeline:** lint → typecheck → test → build
+- **Triggers:** push to main, PRs
+- **Matrix:** Node 20.x
+- **Arquivo:** `.github/workflows/ci.yml`
+
+**Swagger/OpenAPI (V1.5-09)**
+- **Problema:** API não documentada
+- **Solução:** swagger-jsdoc + swagger-ui-express
+- **Acesso:** `http://localhost:3001/api-docs`
+- **Arquivos:** `backend/src/config/swagger.ts`, JSDoc em cada rota
+
+**TypeScript Strict + Enum EventType (V1.5-11)**
+- **Problema:** Strings mágicas para tipos de evento
+- **Solução:** Enum `EventType` para type-safety
+- **Arquivo:** `backend/src/types/events.ts`
+
+#### UX & Performance
+
+**Internacionalização - react-i18next (V1.5-13)**
+- **Problema:** Textos hardcoded em português
+- **Solução:** react-i18next com namespaces
+- **Idiomas:** pt-BR (default), en (futuro)
+- **Por que i18next?** Ecosystem maduro, lazy loading, interpolação
+- **Arquivos:** `frontend/src/i18n/`, `frontend/src/i18n/locales/`
+
+**Code Splitting (V1.5-10)**
+- **Problema:** Bundle único grande (~500KB)
+- **Solução:** React.lazy + Suspense para rotas
+- **Resultado:** Chunk inicial ~150KB, rotas carregam sob demanda
+- **Arquivo:** `frontend/src/App.tsx`
+
+**Testes Frontend - Vitest (V1.5-08)**
+- **Framework:** Vitest (compatível com Vite)
+- **Coverage:** Hooks principais (useAudioStream, useSocket)
+- **Arquivos:** `frontend/src/**/*.test.ts`
+
+#### Manutenção
+
+**Cleanup Archived (V1.5-03)**
+- Movidos 15+ arquivos obsoletos para `docs/archived/`
+- Estrutura de docs simplificada
+
+**CONTRIBUTING.md + CHANGELOG.md (V1.5-15)**
+- Guia de contribuição padronizado
+- Changelog seguindo Keep a Changelog
+
+#### Adiado
+
+**Testes E2E - Playwright (V1.5-14)**
+- **Status:** Adiado para V3
+- **Motivo:** Complexidade de setup com streaming de áudio real
+- **Decisão:** Priorizar testes unitários e integração primeiro
+
+### Referências
+
+- Tech Spec: `docs/tech-spec-epic-v1.5.md`
+- Stories: `docs/stories/v1.5/`
+- Sprint Status: `docs/sprint-status.yaml` (seção epic-v1.5)
+
+---
+
 ## Índice de Decisões por Story
 
 | Story | Decisões Técnicas |
 |-------|-------------------|
 | V1-05 | MP3 Bitrate e Codec |
 | V1-06 | Dual Streaming Architecture, RAW PCM vs MP3 |
+| V1-08 | Meyda para Análise de Áudio |
+| V1-12 | Eventos de Áudio Adiados (track.change, turntable.idle) |
+| V1.5-01 | CORS Restriction |
+| V1.5-02 | Zod Input Validation |
+| V1.5-04 | Winston Logger |
+| V1.5-05 | Rate Limiting |
+| V1.5-06 | GitHub Actions CI |
+| V1.5-08 | Vitest Frontend Tests |
+| V1.5-09 | Swagger/OpenAPI |
+| V1.5-10 | Code Splitting |
+| V1.5-11 | Enum EventType |
+| V1.5-12 | Sentry Error Tracking |
+| V1.5-13 | react-i18next i18n |
 | V3-02 | (Parcialmente adiantado em V1-06) |
 
 ---
 
-**Última revisão:** 2025-11-07  
-**Próxima revisão:** Quando implementar V3-02 (recording path)
+**Última revisão:** 2025-12-04
+**Próxima revisão:** Quando implementar V2 ou V3
 

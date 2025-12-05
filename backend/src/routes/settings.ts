@@ -1,10 +1,24 @@
 import { Router, Request, Response } from 'express';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { SettingsService } from '../services/settings-service';
 import { createLogger } from '../utils/logger';
 import { validate } from '../middleware/validate';
 import { settingsUpdateSchema, settingKeyParamSchema } from '../schemas';
 
 const logger = createLogger('SettingsRouter');
+
+// Ler versão do package.json
+function getPackageVersion(): string {
+  try {
+    const packageJsonPath = join(__dirname, '..', '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    return packageJson.version || '0.0.0';
+  } catch {
+    logger.warn('Não foi possível ler versão do package.json');
+    return '0.0.0';
+  }
+}
 
 export interface SettingsRouterDependencies {
   settingsService: SettingsService;
@@ -121,9 +135,9 @@ export function createSettingsRouter(deps: SettingsRouterDependencies): Router {
   router.get('/system/info', async (_req: Request, res: Response) => {
     try {
       res.json({
-        device: process.env.AUDIO_DEVICE || 'plughw:0,0',
-        sampleRate: parseInt(process.env.AUDIO_SAMPLE_RATE || '44100'),
-        version: 'v1.19',
+        device: process.env.AUDIO_DEVICE || 'plughw:1,0',
+        sampleRate: parseInt(process.env.AUDIO_SAMPLE_RATE || '48000'),
+        version: getPackageVersion(),
         icecastUrl: `http://${process.env.ICECAST_HOST || 'localhost'}:${process.env.ICECAST_PORT || '8000'}${process.env.ICECAST_MOUNT_POINT || '/stream'}`
       });
     } catch (error) {
