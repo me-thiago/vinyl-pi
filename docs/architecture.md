@@ -140,10 +140,12 @@ npx shadcn@latest add https://tweakcn.com/r/themes/modern-minimal.json
 │       ├── main.tsx              # Entry point
 │       ├── App.tsx               # Root component
 │       ├── lib/
-│       │   ├── socket.ts         # Socket.io client
-│       │   ├── api.ts            # API client (fetch)
-│       │   ├── date.ts           # Date formatting helpers
 │       │   └── utils.ts          # shadcn/ui utils (cn function)
+│       ├── i18n/                  # Internacionalização (V1.5)
+│       │   ├── index.ts          # Configuração i18next
+│       │   └── locales/
+│       │       ├── pt-BR.json    # Traduções Português BR
+│       │       └── en.json       # Traduções Inglês
 │       ├── components/
 │       │   ├── ui/               # shadcn/ui components
 │       │   │   ├── button.tsx
@@ -185,10 +187,10 @@ npx shadcn@latest add https://tweakcn.com/r/themes/modern-minimal.json
 │       ├── hooks/
 │       │   ├── useSocket.ts      # Socket.io hook
 │       │   ├── useStatus.ts      # Status hook
-│       │   └── useSessions.ts    # Sessions hook
-│       ├── contexts/
-│       │   └── AppContext.tsx    # Global state (V1)
-│       │   └── AppStore.tsx      # Zustand store (V3+)
+│       │   ├── useSessions.ts    # Sessions hook
+│       │   └── useAudioStream.ts # WAV streaming com Web Audio API (V1.5)
+│       ├── contexts/             # Global state management
+│       │   └── (V3+ Zustand store quando necessário)
 │       └── styles/
 │           └── globals.css       # Tailwind v4 + CSS variables (tweakcn theme)
 │
@@ -249,13 +251,14 @@ npx shadcn@latest add https://tweakcn.com/r/themes/modern-minimal.json
 - **Socket.io ^4.8.2**: WebSocket com fallback, robusto para rede local
 
 **Frontend:**
-- **React ^18.3.1**: Biblioteca UI, hooks modernos
+- **React ^19.1.1**: Biblioteca UI, hooks modernos (atualizado de 18.x)
 - **Vite ^6.0.0**: Build tool rápido, HMR excelente
 - **TypeScript**: Type safety no frontend
 - **React Router ^6.20.0**: Roteamento SPA
 - **TailwindCSS ^4.1.2**: Utility-first CSS v4, melhorias de performance
 - **shadcn/ui**: Componentes UI acessíveis, customizáveis, copy-paste
-- **tweakcn (Modern Minimal)**: Tema pré-configurado moderno e minimalista
+- **react-i18next ^25.7.1**: Internacionalização com suporte a pt-BR e en
+- **@sentry/react ^10.29.0**: Error tracking e performance monitoring
 
 **Áudio & Streaming:**
 - **FFmpeg**: Processamento de áudio via child process
@@ -265,6 +268,121 @@ npx shadcn@latest add https://tweakcn.com/r/themes/modern-minimal.json
 **Infraestrutura:**
 - **PM2 ^5.4.3**: Process manager, auto-restart, clustering opcional
 - **Winston ^3.15.0**: Logging estruturado com rotação
+
+### Internacionalização (i18n)
+
+O sistema suporta múltiplos idiomas usando react-i18next (V1.5):
+
+**Configuração:**
+```typescript
+// src/i18n/index.ts
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+i18n.use(initReactI18next).init({
+  resources: { ptBR, en },
+  lng: 'pt-BR',
+  fallbackLng: 'en',
+  interpolation: { escapeValue: false }
+});
+```
+
+**Idiomas Suportados:**
+- `pt-BR` - Português do Brasil (padrão)
+- `en` - English
+
+**Estrutura de Arquivos:**
+```
+frontend/src/i18n/
+├── index.ts           # Configuração i18next
+└── locales/
+    ├── pt-BR.json     # ~200 chaves de tradução
+    └── en.json        # ~200 chaves de tradução
+```
+
+**Uso nos Componentes:**
+```typescript
+import { useTranslation } from 'react-i18next';
+
+function MyComponent() {
+  const { t } = useTranslation();
+  return <h1>{t('dashboard.title')}</h1>;
+}
+```
+
+### Error Tracking (Sentry)
+
+O sistema utiliza Sentry para monitoramento de erros em produção (V1.5):
+
+**Configuração:**
+```typescript
+// src/main.tsx
+import * as Sentry from '@sentry/react';
+
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration()
+  ],
+  tracesSampleRate: 0.1,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0
+});
+```
+
+**Features Ativas:**
+- Browser Tracing: Performance monitoring de navegação
+- Session Replay: Gravação de sessões com erro para debug
+- Error Boundaries: Captura automática de erros React
+
+**Environment Variables:**
+```bash
+VITE_SENTRY_DSN=https://xxx@sentry.io/yyy  # DSN do projeto Sentry
+```
+
+### Hook useAudioStream
+
+Hook avançado para streaming de áudio WAV via Web Audio API (V1.5):
+
+**Responsabilidades:**
+- Conexão com endpoint `/stream.wav` do backend
+- Decodificação manual de PCM s16le em AudioBuffer
+- Gestão de AudioContext lifecycle
+- Detecção e recuperação de rebuffering
+- Reconnection com exponential backoff
+
+**Arquitetura:**
+```
+Backend (/stream.wav)
+    │ HTTP chunked transfer (PCM s16le, 48kHz, stereo)
+    ▼
+useAudioStream
+    │
+    ├── fetch() com ReadableStream
+    ├── Chunk accumulation (8KB threshold ~42ms)
+    ├── Manual Int16Array → Float32Array conversion
+    ├── AudioBuffer construction (48kHz sample rate)
+    └── AudioBufferSourceNode scheduling
+    │
+    ▼
+Web Audio API → Hardware Audio
+```
+
+**Constantes Chave:**
+| Constante | Valor | Descrição |
+|-----------|-------|-----------|
+| Sample Rate | 48000 Hz | Deve coincidir com backend ALSA |
+| Chunk Threshold | 8KB (~42ms) | Mínimo de dados antes de processar |
+| Rebuffer Enter | 50ms | Threshold para entrar em rebuffering |
+| Rebuffer Exit | 200ms | Threshold para sair de rebuffering |
+| Max Reconnections | 5 | Tentativas antes de desistir |
+| Max Backoff | 30s | Delay máximo entre reconexões |
+
+**Uso:**
+```typescript
+const { isPlaying, isBuffering, error, play, stop, volume, setVolume } = useAudioStream();
+```
 
 ### Pontos de Integração
 

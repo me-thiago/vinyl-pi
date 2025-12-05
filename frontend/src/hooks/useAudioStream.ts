@@ -67,7 +67,8 @@ export function useAudioStream({
         throw new Error('Web Audio API not supported');
       }
 
-      const context = new AudioContextClass({ sampleRate: 44100 });
+      // Sample rate deve ser 48000 para match com o backend (ALSA capture)
+      const context = new AudioContextClass({ sampleRate: 48000 });
       audioContextRef.current = context;
 
       // Criar GainNode para controle de volume

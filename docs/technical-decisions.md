@@ -1,7 +1,7 @@
 # Vinyl-OS - Decisões Técnicas
 
 **Autor:** Amelia (Developer Agent)  
-**Última Atualização:** 2025-11-07
+**Última Atualização:** 2025-12-04
 
 ---
 
@@ -10,6 +10,7 @@
 1. [MP3 Bitrate e Codec](#mp3-bitrate-e-codec)
 2. [Dual Streaming Architecture](#dual-streaming-architecture)
 3. [RAW PCM vs MP3 no Frontend](#raw-pcm-vs-mp3-no-frontend)
+4. [Constantes e Thresholds](#constantes-e-thresholds)
 
 ---
 
@@ -91,7 +92,7 @@ ffmpeg -f s16le -ar 48000 -ac 2 -i /tmp/vinyl-audio.fifo \
 
 - Story: `docs/stories/v1/v1-05-pipeline-ffmpeg-icecast.md`
 - Story: `docs/stories/v1/v1-06-frontend-player-basico.md`
-- Arquitetura: `docs/dual-streaming-architecture.md`
+- Arquitetura detalhada: `docs/archived/dual-streaming-architecture.md`
 - Commits: `40b9475` (redução para 128k), `9cb7862` (otimização 24/7)
 
 ---
@@ -181,9 +182,9 @@ Esta implementação **adianta ~80% do Story V3.2** (Dual-Path Architecture):
 
 ### Referências
 
-- Arquitetura detalhada: `docs/dual-streaming-architecture.md` (1380 linhas)
-- Troubleshooting: `docs/prob-dual-streaming.md`
-- Story atual: `docs/stories/v1/v1-06-frontend-player-basico.md`
+- Arquitetura detalhada (completa): `docs/archived/dual-streaming-architecture.md` (1380 linhas)
+- Troubleshooting (histórico): `docs/archived/prob-dual-streaming.md`
+- Story implementada: `docs/stories/v1/v1-06-frontend-player-basico.md`
 - Story futuro: `docs/stories/v3/v3-02-dual-path-architecture.md`
 
 ---
@@ -279,8 +280,95 @@ Frame Size:    4 bytes (2 channels * 2 bytes/sample)
 ### Referências
 
 - Hook: `frontend/src/hooks/useAudioStream.ts`
-- Arquitetura: `docs/dual-streaming-architecture.md` (seção "Processamento de Áudio no Frontend")
+- Arquitetura detalhada: `docs/archived/dual-streaming-architecture.md` (seção "Processamento de Áudio no Frontend")
 - Story: `docs/stories/v1/v1-06-frontend-player-basico.md`
+
+---
+
+## Constantes e Thresholds
+
+### Decisão: Valores Hardcoded para Simplificação
+
+**Data:** 2025-12-04
+**Contexto:** Documentação de valores técnicos críticos
+**Status:** ✅ Documentado
+
+### Objetivo
+
+Documentar constantes e thresholds críticos que afetam o comportamento do sistema. Estes valores foram ajustados empiricamente durante implementação V1/V1.5 e devem ser considerados para futuros ajustes ou troubleshooting.
+
+### Frontend - useAudioStream.ts
+
+| Constante | Valor | Linha | Descrição |
+|-----------|-------|-------|-----------|
+| `sampleRate` | 48000 Hz | ~70 | Sample rate do AudioContext (deve coincidir com backend) |
+| `CHUNK_THRESHOLD` | 8192 bytes (~42ms) | ~114 | Mínimo de dados acumulados antes de processar chunk |
+| `REBUFFER_ENTER_THRESHOLD` | 50ms | ~170 | Buffer abaixo deste valor dispara rebuffering |
+| `REBUFFER_EXIT_THRESHOLD` | 200ms | ~170 | Buffer acima deste valor sai de rebuffering |
+| `MAX_RECONNECT_ATTEMPTS` | 5 | ~368 | Tentativas de reconexão antes de desistir |
+| `MAX_BACKOFF_DELAY` | 30000ms | ~368 | Delay máximo entre reconexões |
+
+### Backend - audio-manager.ts
+
+| Constante | Valor | Linha | Descrição |
+|-----------|-------|-------|-----------|
+| `RATE_LIMITED_LOG_INTERVAL` | 5000ms | ~118 | Intervalo mínimo entre logs repetitivos |
+| `SIGTERM_TIMEOUT` | 2000ms | ~234 | Tempo para esperar FFmpeg terminar graciosamente |
+| `HEALTH_CHECK_INTERVAL` | 5000ms | ~45 | Intervalo de verificação de saúde do streaming |
+
+### Backend - audio-analyzer.ts
+
+| Constante | Valor | Linha | Descrição |
+|-----------|-------|-------|-----------|
+| `ANALYSIS_WINDOW` | 100ms | ~25 | Janela de análise para cálculo RMS/dB |
+| `NOISE_FLOOR_DB` | -60dB | ~30 | Nível considerado como silêncio |
+
+### Backend - health-monitor.ts
+
+| Constante | Valor | Linha | Descrição |
+|-----------|-------|-------|-----------|
+| `INITIAL_BACKOFF` | 1000ms | ~18 | Delay inicial para restart após falha |
+| `MAX_BACKOFF` | 30000ms | ~19 | Delay máximo entre tentativas de restart |
+| `BACKOFF_MULTIPLIER` | 2 | ~20 | Fator de multiplicação para exponential backoff |
+
+### Backend - settings.schema.ts
+
+| Constante | Valor | Linha | Descrição |
+|-----------|-------|-------|-----------|
+| `MAX_BITRATE` | 256kbps | ~67 | Bitrate máximo permitido (não 320kbps) |
+| `MIN_BITRATE` | 64kbps | ~67 | Bitrate mínimo permitido |
+| `DEFAULT_BITRATE` | 128kbps | ~67 | Bitrate padrão para streaming |
+
+### FFmpeg Pipeline
+
+| Constante | Valor | Descrição |
+|-----------|-------|-----------|
+| `AUDIO_SAMPLE_RATE` | 48000 Hz | Taxa de amostragem ALSA |
+| `AUDIO_CHANNELS` | 2 (stereo) | Canais de áudio |
+| `AUDIO_FORMAT` | s16le | Formato PCM (signed 16-bit little endian) |
+| `MP3_BITRATE` | 128kbps | Bitrate do stream Icecast |
+| `FIFO_PATH` | `/tmp/vinyl-audio.fifo` | Caminho do named pipe |
+
+### Icecast2
+
+| Constante | Valor | Descrição |
+|-----------|-------|-----------|
+| `MAX_LISTENERS` | 20 | Máximo de clientes simultâneos |
+| `SOURCE_TIMEOUT` | 10s | Timeout para fonte desconectada |
+| `CLIENT_TIMEOUT` | 30s | Timeout para cliente inativo |
+| `BURST_SIZE` | 65535 bytes | Buffer inicial para novos clientes |
+
+### Notas de Manutenção
+
+**Quando ajustar estes valores:**
+- `CHUNK_THRESHOLD`: Se áudio estiver choppy, aumentar (tradeoff: mais latência)
+- `REBUFFER_*`: Ajustar se rebuffering ocorrer muito frequentemente ou raramente
+- `MAX_BITRATE`: Se precisar de qualidade superior e Pi suportar
+- `NOISE_FLOOR_DB`: Se detecção de silêncio estiver muito sensível ou insensível
+
+**Valores que NÃO devem ser alterados:**
+- `sampleRate`: Deve coincidir entre ALSA → backend → frontend
+- `AUDIO_FORMAT`: Hardcoded em múltiplos lugares, mudança quebra sistema
 
 ---
 
