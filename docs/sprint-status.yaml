@@ -83,7 +83,7 @@ development_status:
 
   # Epic V2 - Coleção & Reconhecimento Musical
   epic-v2: contexted
-  v2-1-schema-dados-v2: drafted
+  v2-1-schema-dados-v2: ready-for-dev
   v2-2-crud-albums-backend: drafted
   v2-3-ui-gestao-colecao: drafted
   v2-4-integracao-discogs: drafted
