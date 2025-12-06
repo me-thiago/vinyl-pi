@@ -387,6 +387,146 @@ export function createAlbumsRouter(): Router {
 
   /**
    * @openapi
+   * /api/albums/{id}/sessions:
+   *   get:
+   *     summary: Lista sessões onde o álbum foi tocado
+   *     description: Retorna histórico de escuta do álbum com sessões onde foi reconhecido
+   *     tags:
+   *       - Albums
+   *       - Sessions
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *           format: uuid
+   *         description: ID do álbum
+   *     responses:
+   *       200:
+   *         description: Sessões do álbum
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 sessions:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       id:
+   *                         type: string
+   *                       startedAt:
+   *                         type: string
+   *                         format: date-time
+   *                       endedAt:
+   *                         type: string
+   *                         format: date-time
+   *                         nullable: true
+   *                       durationSeconds:
+   *                         type: integer
+   *                       recognizedTrack:
+   *                         type: object
+   *                         properties:
+   *                           title:
+   *                             type: string
+   *                           recognizedAt:
+   *                             type: string
+   *                             format: date-time
+   *                 totalSessions:
+   *                   type: integer
+   *       404:
+   *         description: Álbum não encontrado
+   */
+  router.get(
+    '/albums/:id/sessions',
+    validate(albumIdParamSchema, 'params'),
+    async (req: Request<AlbumIdParam>, res: Response) => {
+      try {
+        const { id } = req.params;
+
+        // Verificar se álbum existe
+        const album = await prisma.album.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+
+        if (!album) {
+          res.status(404).json({
+            error: {
+              message: `Álbum não encontrado: nenhum álbum com id '${id}'`,
+              code: 'ALBUM_NOT_FOUND',
+            },
+          });
+          return;
+        }
+
+        // Buscar tracks deste álbum, ordenados por data de reconhecimento (mais recente primeiro)
+        const tracks = await prisma.track.findMany({
+          where: { albumId: id },
+          orderBy: { recognizedAt: 'desc' },
+          include: {
+            session: {
+              select: {
+                id: true,
+                startedAt: true,
+                endedAt: true,
+                durationSeconds: true,
+              },
+            },
+          },
+        });
+
+        // Agrupar por sessão, pegar primeiro reconhecimento de cada sessão
+        const sessionsMap = new Map<string, {
+          id: string;
+          startedAt: string;
+          endedAt: string | null;
+          durationSeconds: number;
+          recognizedTrack: {
+            title: string;
+            recognizedAt: string;
+          };
+        }>();
+
+        for (const track of tracks) {
+          if (!sessionsMap.has(track.sessionId)) {
+            sessionsMap.set(track.sessionId, {
+              id: track.session.id,
+              startedAt: track.session.startedAt.toISOString(),
+              endedAt: track.session.endedAt?.toISOString() || null,
+              durationSeconds: track.session.durationSeconds,
+              recognizedTrack: {
+                title: track.title,
+                recognizedAt: track.recognizedAt.toISOString(),
+              },
+            });
+          }
+        }
+
+        // Converter para array (já ordenado por recognizedAt desc)
+        const sessions = Array.from(sessionsMap.values());
+
+        res.json({
+          sessions,
+          totalSessions: sessions.length,
+        });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao buscar sessões do álbum', { id: req.params.id, error: errorMsg });
+        res.status(500).json({
+          error: {
+            message: 'Erro ao buscar sessões do álbum',
+            code: 'ALBUM_SESSIONS_FETCH_ERROR',
+          },
+        });
+      }
+    }
+  );
+
+  /**
+   * @openapi
    * /api/albums/{id}:
    *   get:
    *     summary: Busca álbum por ID

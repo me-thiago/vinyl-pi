@@ -21,6 +21,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AlbumsPlayed, type SessionAlbum } from '@/components/Sessions'
 
 // Configuração da API
 const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`
@@ -41,6 +42,7 @@ interface SessionDetail {
   durationSeconds: number
   eventCount: number
   events: EventItem[]
+  albums: SessionAlbum[]  // V2-09: Álbuns tocados na sessão
 }
 
 // Event translations moved to i18n (events.* keys)
@@ -258,6 +260,9 @@ export default function SessionDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* V2-09: Álbuns Tocados */}
+            <AlbumsPlayed albums={session.albums} />
 
             {/* Timeline de Eventos */}
             <Card>

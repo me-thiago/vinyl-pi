@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Filter,
   X,
-  Radio
+  Radio,
+  Disc
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +36,7 @@ interface SessionItem {
   endedAt: string | null
   durationSeconds: number
   eventCount: number
+  albumCount: number // V2-09: Número de álbuns tocados na sessão
 }
 
 interface SessionsResponse {
@@ -366,6 +368,13 @@ export default function Sessions() {
                               <Activity className="w-3 h-3" />
                               {session.eventCount} {t('dashboard.events')}
                             </span>
+                            {/* V2-09: Mostrar contagem de álbuns */}
+                            {session.albumCount > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Disc className="w-3 h-3" />
+                                {t('sessions.albumCount', { count: session.albumCount })}
+                              </span>
+                            )}
                             {session.endedAt && (
                               <span className="hidden sm:inline">
                                 {t('sessions.endedAt')} {formatDateTime(session.endedAt)}

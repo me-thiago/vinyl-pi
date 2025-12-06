@@ -144,7 +144,9 @@
     "page": "Page {{current}} of {{total}}",
     "previous": "Previous",
     "next": "Next",
-    "fetchError": "Failed to fetch sessions"
+    "fetchError": "Failed to fetch sessions",
+    "albumCount_one": "{{count}} album",
+    "albumCount_other": "{{count}} albums"
   },
   "sessionDetail": {
     "title": "Session Details",
@@ -163,7 +165,12 @@
     "eventTimelineDesc": "Events recorded during this session (chronological order)",
     "noEventsInSession": "No events recorded in this session",
     "levelDb": "Level",
-    "eventDuration": "Duration"
+    "eventDuration": "Duration",
+    "albumsPlayed": "Albums Played",
+    "noAlbumsPlayed": "No albums identified in this session",
+    "identifiedAt": "Identified at {{time}}",
+    "identifiedVia": "\"{{track}}\"",
+    "viewAlbum": "View"
   },
   "diagnostics": {
     "title": "Diagnostics",
@@ -279,7 +286,11 @@
       "back_to_collection": "Back to Collection",
       "notes": "Notes",
       "play_history": "Play History",
-      "play_history_coming_soon": "Play history will be implemented in story V2-09",
+      "no_play_history": "No sessions recorded for this album",
+      "total_sessions_one": "{{count}} session",
+      "total_sessions_other": "{{count}} sessions",
+      "view_session": "View",
+      "identified_via": "Identified via \"{{track}}\"",
       "view_discogs": "View on Discogs",
       "sync_discogs": "Sync Discogs",
       "sync_discogs_disabled": "Will be implemented in story V2-04",

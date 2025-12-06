@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Edit,
@@ -10,7 +10,8 @@ import {
   RefreshCw,
   AlertTriangle,
   Disc,
-  Music,
+  Calendar,
+  Clock,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,24 @@ import {
 import { AlbumForm } from '@/components/Collection';
 import { useAlbum, useAlbums, type AlbumUpdateInput, type AlbumCondition } from '@/hooks/useAlbums';
 import { cn } from '@/lib/utils';
+
+// Configuração da API
+const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
+const API_BASE = `${API_HOST}/api`;
+
+/**
+ * Sessão do histórico de escuta do álbum
+ */
+interface AlbumSession {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number;
+  recognizedTrack: {
+    title: string;
+    recognizedAt: string;
+  };
+}
 
 /**
  * Cores para cada condição do disco
@@ -71,6 +90,49 @@ const formatLabels: Record<string, string> = {
 };
 
 /**
+ * Formatar duração em HH:MM:SS
+ */
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+  }
+  return `${minutes}m ${secs.toString().padStart(2, '0')}s`;
+}
+
+/**
+ * Formatar data relativa (Hoje, Ontem, ou data)
+ */
+function formatRelativeDate(isoString: string): string {
+  const date = new Date(isoString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const isToday = date.toDateString() === today.toDateString();
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const time = date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  if (isToday) {
+    return `Hoje, ${time}`;
+  }
+  if (isYesterday) {
+    return `Ontem, ${time}`;
+  }
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+  }) + `, ${time}`;
+}
+
+/**
  * Página de Detalhe do Álbum (/collection/:id)
  *
  * Features:
@@ -92,10 +154,36 @@ export default function CollectionDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  
+  // V2-09: Estado para histórico de escuta
+  const [sessions, setSessions] = useState<AlbumSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
 
   // Hooks
   const { album, loading, error, refresh } = useAlbum(id);
   const { updateAlbum, deleteAlbum, archiveAlbum } = useAlbums();
+
+  // V2-09: Buscar sessões do álbum
+  useEffect(() => {
+    async function fetchSessions() {
+      if (!id) return;
+      
+      setSessionsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/albums/${id}/sessions`);
+        if (response.ok) {
+          const data = await response.json();
+          setSessions(data.sessions);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar sessões do álbum:', err);
+      } finally {
+        setSessionsLoading(false);
+      }
+    }
+    
+    fetchSessions();
+  }, [id]);
 
   // Handlers
   const handleEdit = useCallback(() => {
@@ -366,18 +454,63 @@ export default function CollectionDetail() {
         </div>
       </div>
 
-      {/* Histórico de Reprodução (placeholder para V2-09) */}
+      {/* V2-09: Histórico de Escuta */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Music className="h-5 w-5" />
+            <Calendar className="h-5 w-5" />
             {t('collection.detail.play_history')}
+            {sessions.length > 0 && (
+              <Badge variant="outline" className="ml-2">
+                {t('collection.detail.total_sessions', { count: sessions.length })}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-8">
-            {t('collection.detail.play_history_coming_soon')}
-          </p>
+          {sessionsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>{t('collection.detail.no_play_history')}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {formatRelativeDate(session.startedAt)}
+                        {session.endedAt && ` - ${new Date(session.endedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDuration(session.durationSeconds)}
+                      </span>
+                      <span>
+                        {t('collection.detail.identified_via', { track: session.recognizedTrack.title })}
+                      </span>
+                    </div>
+                  </div>
+                  <Link to={`/sessions/${session.id}`}>
+                    <Button variant="ghost" size="sm">
+                      {t('collection.detail.view_session')}
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

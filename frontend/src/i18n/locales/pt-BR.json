@@ -144,7 +144,9 @@
     "page": "Página {{current}} de {{total}}",
     "previous": "Anterior",
     "next": "Próxima",
-    "fetchError": "Falha ao buscar sessões"
+    "fetchError": "Falha ao buscar sessões",
+    "albumCount_one": "{{count}} álbum",
+    "albumCount_other": "{{count}} álbuns"
   },
   "sessionDetail": {
     "title": "Detalhes da Sessão",
@@ -163,7 +165,12 @@
     "eventTimelineDesc": "Eventos registrados durante esta sessão (ordem cronológica)",
     "noEventsInSession": "Nenhum evento registrado nesta sessão",
     "levelDb": "Nível",
-    "eventDuration": "Duração"
+    "eventDuration": "Duração",
+    "albumsPlayed": "Álbuns Tocados",
+    "noAlbumsPlayed": "Nenhum álbum identificado nesta sessão",
+    "identifiedAt": "Identificado às {{time}}",
+    "identifiedVia": "\"{{track}}\"",
+    "viewAlbum": "Ver"
   },
   "diagnostics": {
     "title": "Diagnóstico",
@@ -278,8 +285,12 @@
       "album_not_found_description": "O álbum solicitado não existe ou foi removido.",
       "back_to_collection": "Voltar para Coleção",
       "notes": "Notas",
-      "play_history": "Histórico de Reprodução",
-      "play_history_coming_soon": "O histórico de reprodução será implementado na story V2-09",
+      "play_history": "Histórico de Escuta",
+      "no_play_history": "Nenhuma sessão registrada para este álbum",
+      "total_sessions_one": "{{count}} sessão",
+      "total_sessions_other": "{{count}} sessões",
+      "view_session": "Ver",
+      "identified_via": "Identificado via \"{{track}}\"",
       "view_discogs": "Ver no Discogs",
       "sync_discogs": "Sincronizar Discogs",
       "sync_discogs_disabled": "Será implementado na story V2-04",
