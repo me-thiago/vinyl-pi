@@ -80,8 +80,9 @@ O botão será adicionado **após o VU Meter, antes do Volume**:
 
 ### AC-6: Estado "Adicionar à Coleção"
 - [x] Botão abre formulário simplificado de criação de álbum
-- [ ] Pré-preenche título, artista, capa do reconhecimento (adiado para V2-08)
-- [ ] Após criar, vincula track ao novo álbum (adiado para V2-08)
+- [x] Pré-preenche título, artista, ano, capa do reconhecimento
+- [x] Toast com ação "Adicionar" quando música não encontrada na coleção
+- [x] Navegação para `/collection?add=true&...` com query params
 
 ---
 
@@ -193,10 +194,16 @@ interface UseRecognitionReturn {
    a. Se !albumMatch → toast "Música não identificada"
    b. Se albumMatch.needsConfirmation === false → toast + ícone ✓
    c. Se albumMatch.needsConfirmation === true → abre Modal
-6. Modal:
-   a. Usuário seleciona álbum (ou "nenhum")
-   b. POST /api/recognize/confirm { trackId, albumId }
-   c. Toast de sucesso, modal fecha
+6. Modal (se há matches na coleção):
+   a. Usuário seleciona álbum → botão "Confirmar seleção"
+   b. Ou clica "Adicionar à coleção" → navega para /collection com prefill
+   c. POST /api/recognize/confirm { trackId, albumId }
+   d. Toast de sucesso, modal fecha
+
+7. Toast com ação (se não há matches na coleção):
+   a. Mostra toast "Tocando: X - Y" com botão "Adicionar à coleção"
+   b. Clique navega para /collection?add=true&title=...&artist=...
+   c. AlbumForm abre pré-preenchido com dados do reconhecimento
 ```
 
 ---

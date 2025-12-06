@@ -65,8 +65,11 @@ export function MatchConfirmation({
   const { t } = useTranslation();
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
 
-  const handleConfirm = async (albumId: string | null) => {
+  const handleSelect = (albumId: string) => {
     setSelectedAlbumId(albumId);
+  };
+
+  const handleConfirm = async (albumId: string | null) => {
     try {
       await onConfirm(albumId);
       onOpenChange(false);
@@ -117,14 +120,14 @@ export function MatchConfirmation({
             {matches.map((match) => (
               <button
                 key={match.albumId}
-                onClick={() => handleConfirm(match.albumId)}
+                onClick={() => handleSelect(match.albumId)}
                 disabled={isConfirming}
                 className={cn(
                   'w-full flex items-center gap-3 p-3 rounded-lg border transition-colors',
                   'hover:bg-accent hover:border-accent-foreground/20',
                   'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
-                  selectedAlbumId === match.albumId && 'border-primary bg-accent'
+                  selectedAlbumId === match.albumId && 'border-2 border-foreground bg-accent'
                 )}
               >
                 {match.coverUrl ? (
@@ -163,23 +166,44 @@ export function MatchConfirmation({
         <Separator />
 
         {/* Ações */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2">
+          {/* Botão principal dinâmico */}
+          {selectedAlbumId ? (
+            // Com seleção → Confirmar álbum selecionado
+            <Button
+              variant="default"
+              className="w-full"
+              onClick={() => handleConfirm(selectedAlbumId)}
+              disabled={isConfirming}
+            >
+              {isConfirming ? (
+                <div className="w-4 h-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2" />
+              ) : (
+                <Check className="w-4 h-4 mr-2" />
+              )}
+              {t('recognition.confirmSelection')}
+            </Button>
+          ) : (
+            // Sem seleção → Adicionar novo álbum
+            <Button
+              variant="default"
+              className="w-full gap-1"
+              onClick={onAddToCollection}
+              disabled={isConfirming}
+            >
+              <Plus className="w-4 h-4" />
+              {t('recognition.addToCollection')}
+            </Button>
+          )}
+          
+          {/* Ação secundária */}
           <Button
             variant="outline"
-            className="flex-1"
+            className="w-full"
             onClick={() => handleConfirm(null)}
             disabled={isConfirming}
           >
             {t('recognition.noneOfThese')}
-          </Button>
-          <Button
-            variant="default"
-            className="flex-1 gap-1"
-            onClick={onAddToCollection}
-            disabled={isConfirming}
-          >
-            <Plus className="w-4 h-4" />
-            {t('recognition.addToCollection')}
           </Button>
         </div>
       </DialogContent>

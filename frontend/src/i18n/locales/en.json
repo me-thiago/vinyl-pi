@@ -298,6 +298,7 @@
     "selectAlbum": "Select the album from your collection:",
     "confidence": "{{percent}}% match",
     "select": "Select",
+    "confirmSelection": "Confirm selection",
     "noneOfThese": "None of these",
     "addToCollection": "Add to collection",
     "linkedTo": "Music linked to {{album}}",

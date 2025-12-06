@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Download, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,7 @@ import {
   CollectionFilters,
   CollectionEmpty,
   DiscogsImport,
+  type AlbumFormDefaults,
 } from '@/components/Collection';
 import { useAlbums, type Album, type AlbumFilters, type AlbumCreateInput, type AlbumUpdateInput } from '@/hooks/useAlbums';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,7 @@ import { cn } from '@/lib/utils';
  */
 export default function Collection() {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Estado de visualização
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -43,6 +46,7 @@ export default function Collection() {
   // Estado do formulário
   const [formOpen, setFormOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
+  const [formDefaultValues, setFormDefaultValues] = useState<AlbumFormDefaults | null>(null);
 
   // Estado do dialog de confirmação de exclusão
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -60,6 +64,29 @@ export default function Collection() {
     errors: number;
     total: number;
   } | null>(null);
+
+  // Lê query params para abrir formulário com prefill (ex: vindo do reconhecimento)
+  useEffect(() => {
+    const add = searchParams.get('add');
+    if (add === 'true') {
+      const title = searchParams.get('title') || '';
+      const artist = searchParams.get('artist') || '';
+      const year = searchParams.get('year');
+      const coverUrl = searchParams.get('coverUrl') || '';
+
+      setFormDefaultValues({
+        title,
+        artist,
+        year: year ? parseInt(year, 10) : null,
+        coverUrl: coverUrl || null,
+      });
+      setEditingAlbum(null);
+      setFormOpen(true);
+
+      // Limpa os query params para não reabrir ao navegar
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Hook de álbuns
   const {
@@ -86,6 +113,7 @@ export default function Collection() {
 
   const handleAddAlbum = useCallback(() => {
     setEditingAlbum(null);
+    setFormDefaultValues(null); // Limpa prefill
     setFormOpen(true);
   }, []);
 
@@ -286,6 +314,7 @@ export default function Collection() {
         open={formOpen}
         onOpenChange={setFormOpen}
         album={editingAlbum}
+        defaultValues={formDefaultValues}
         onSave={handleSaveAlbum}
         loading={loading}
       />

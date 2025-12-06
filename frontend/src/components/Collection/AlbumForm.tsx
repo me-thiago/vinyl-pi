@@ -21,10 +21,23 @@ import {
 } from '@/components/ui/select';
 import type { Album, AlbumCreateInput, AlbumUpdateInput, AlbumFormat, AlbumCondition } from '@/hooks/useAlbums';
 
+/**
+ * Valores default para pré-preencher o formulário (ex: do reconhecimento)
+ */
+export interface AlbumFormDefaults {
+  title?: string;
+  artist?: string;
+  year?: number | null;
+  coverUrl?: string | null;
+  label?: string | null;
+}
+
 interface AlbumFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   album?: Album | null;
+  /** Valores para pré-preencher quando criando novo álbum */
+  defaultValues?: AlbumFormDefaults | null;
   onSave: (data: AlbumCreateInput | AlbumUpdateInput) => Promise<void>;
   loading?: boolean;
 }
@@ -63,7 +76,7 @@ const conditionOptions: { value: AlbumCondition; label: string }[] = [
  * - Validação client-side
  * - Tags como string separada por vírgulas
  */
-export function AlbumForm({ open, onOpenChange, album, onSave, loading }: AlbumFormProps) {
+export function AlbumForm({ open, onOpenChange, album, defaultValues, onSave, loading }: AlbumFormProps) {
   const { t } = useTranslation();
   const isEditing = !!album;
 
@@ -81,9 +94,10 @@ export function AlbumForm({ open, onOpenChange, album, onSave, loading }: AlbumF
   // Erros de validação
   const [errors, setErrors] = useState<{ title?: string; artist?: string }>({});
 
-  // Preenche formulário quando editando
+  // Preenche formulário quando editando ou com defaultValues
   useEffect(() => {
     if (album) {
+      // Editando álbum existente
       setTitle(album.title);
       setArtist(album.artist);
       setYear(album.year?.toString() ?? '');
@@ -93,8 +107,19 @@ export function AlbumForm({ open, onOpenChange, album, onSave, loading }: AlbumF
       setCoverUrl(album.coverUrl ?? '');
       setTags(album.tags?.join(', ') ?? '');
       setNotes(album.notes ?? '');
+    } else if (defaultValues) {
+      // Novo álbum com valores pré-preenchidos (ex: do reconhecimento)
+      setTitle(defaultValues.title ?? '');
+      setArtist(defaultValues.artist ?? '');
+      setYear(defaultValues.year?.toString() ?? '');
+      setLabel(defaultValues.label ?? '');
+      setFormat('');
+      setCondition('');
+      setCoverUrl(defaultValues.coverUrl ?? '');
+      setTags('');
+      setNotes('');
     } else {
-      // Reset para novo álbum
+      // Novo álbum em branco
       setTitle('');
       setArtist('');
       setYear('');
@@ -106,7 +131,7 @@ export function AlbumForm({ open, onOpenChange, album, onSave, loading }: AlbumF
       setNotes('');
     }
     setErrors({});
-  }, [album, open]);
+  }, [album, defaultValues, open]);
 
   /**
    * Valida campos obrigatórios

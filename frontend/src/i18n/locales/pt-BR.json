@@ -298,6 +298,7 @@
     "selectAlbum": "Selecione o álbum da sua coleção:",
     "confidence": "{{percent}}% de correspondência",
     "select": "Selecionar",
+    "confirmSelection": "Confirmar seleção",
     "noneOfThese": "Nenhum destes",
     "addToCollection": "Adicionar à coleção",
     "linkedTo": "Música vinculada a {{album}}",

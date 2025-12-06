@@ -95,9 +95,26 @@ export function PlayerBar({
         setRecognitionButtonState('success');
         toast.success(t('recognition.playing', { title: track.title, artist: track.artist }));
       } else {
-        // Sem match na coleção
+        // Sem match na coleção - oferece adicionar
         setRecognitionButtonState('success');
-        toast.info(t('recognition.playing', { title: track.title, artist: track.artist }));
+        setCurrentTrack(track); // Salva para uso no botão de adicionar
+        toast.info(t('recognition.playing', { title: track.title, artist: track.artist }), {
+          action: {
+            label: t('recognition.addToCollection'),
+            onClick: () => {
+              // Navega para Collection com dados pré-preenchidos
+              const params = new URLSearchParams({
+                add: 'true',
+                title: track.album || track.title,
+                artist: track.artist,
+                ...(track.year && { year: track.year.toString() }),
+                ...(track.albumArt && { coverUrl: track.albumArt }),
+              });
+              navigate(`/collection?${params.toString()}`);
+            },
+          },
+          duration: 10000, // 10 segundos para dar tempo de clicar
+        });
       }
     } else {
       // Erro ou não encontrado
@@ -135,14 +152,25 @@ export function PlayerBar({
   }, [currentTrack, currentMatches, confirm, resetRecognition, t]);
 
   /**
-   * Handler para adicionar à coleção
+   * Handler para adicionar à coleção (do modal de confirmação)
    */
   const handleAddToCollection = useCallback(() => {
     setShowMatchModal(false);
-    // Navegar para página de coleção com dados pré-preenchidos
-    // TODO: Implementar pré-preenchimento no formulário (V2-08 ou futuro)
-    navigate('/collection?action=add');
-  }, [navigate]);
+    
+    if (currentTrack) {
+      // Navega para Collection com dados pré-preenchidos do reconhecimento
+      const params = new URLSearchParams({
+        add: 'true',
+        title: currentTrack.album || currentTrack.title,
+        artist: currentTrack.artist,
+        ...(currentTrack.year && { year: currentTrack.year.toString() }),
+        ...(currentTrack.albumArt && { coverUrl: currentTrack.albumArt }),
+      });
+      navigate(`/collection?${params.toString()}`);
+    } else {
+      navigate('/collection');
+    }
+  }, [navigate, currentTrack]);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-14 bg-card border-t flex items-center px-4 gap-3 z-50">
