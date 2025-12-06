@@ -13,6 +13,7 @@ import {
   Radio,
   Disc
 } from 'lucide-react'
+import { ExportDropdown } from '@/components/ExportDropdown'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -279,15 +280,24 @@ export default function Sessions() {
         {/* Lista de Sessões */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              {t('sessions.history')}
-              {total > 0 && (
-                <Badge variant="outline" className="ml-2">
-                  {t('sessions.session', { count: total })}
-                </Badge>
-              )}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                {t('sessions.history')}
+                {total > 0 && (
+                  <Badge variant="outline" className="ml-2">
+                    {t('sessions.session', { count: total })}
+                  </Badge>
+                )}
+              </CardTitle>
+              <ExportDropdown
+                type="history"
+                params={{
+                  ...(dateFrom ? { from: dateFrom } : {}),
+                  ...(dateTo ? { to: dateTo } : {}),
+                }}
+              />
+            </div>
             <CardDescription>
               {hasFilters
                 ? t('sessions.filteredByPeriod')

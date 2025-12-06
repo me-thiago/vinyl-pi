@@ -336,6 +336,13 @@
     "noData": "No data yet",
     "noListeningData": "No albums identified yet. Use the 🎵 button on the player to record what you're listening to."
   },
+  "export": {
+    "exportCollection": "Export Collection",
+    "exportHistory": "Export History",
+    "formatJson": "JSON",
+    "formatCsv": "CSV",
+    "downloading": "Downloading..."
+  },
   "discogs": {
     "import_title": "Import from Discogs",
     "import_description": "Search albums on Discogs by catalog number or barcode",

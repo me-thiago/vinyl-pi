@@ -1,7 +1,7 @@
 # Story V2-11: Export de Dados
 
 **Epic:** V2 - Coleção & Reconhecimento Musical  
-**Status:** ready-for-dev
+**Status:** done
 
 ---
 
@@ -25,24 +25,24 @@ Esta story adiciona funcionalidade de export para que o usuário possa:
 ## Critérios de Aceitação
 
 ### AC-1: Backend - Export da Coleção
-- [ ] `GET /api/export/collection?format=json` retorna coleção em JSON
-- [ ] `GET /api/export/collection?format=csv` retorna coleção em CSV
-- [ ] Inclui todos os campos: title, artist, year, label, format, condition, tags, notes, discogsId
-- [ ] Opção `?archived=true` para incluir álbuns arquivados (default: false)
-- [ ] Header `Content-Disposition` para download do arquivo
+- [x] `GET /api/export/collection?format=json` retorna coleção em JSON
+- [x] `GET /api/export/collection?format=csv` retorna coleção em CSV
+- [x] Inclui todos os campos: title, artist, year, label, format, condition, tags, notes, discogsId
+- [x] Opção `?archived=true` para incluir álbuns arquivados (default: false)
+- [x] Header `Content-Disposition` para download do arquivo
 
 ### AC-2: Backend - Export do Histórico
-- [ ] `GET /api/export/history?format=json` retorna histórico em JSON
-- [ ] `GET /api/export/history?format=csv` retorna histórico em CSV
-- [ ] Inclui: data da sessão, duração, álbuns tocados
-- [ ] Filtro por período: `?from=YYYY-MM-DD&to=YYYY-MM-DD`
-- [ ] Header `Content-Disposition` para download do arquivo
+- [x] `GET /api/export/history?format=json` retorna histórico em JSON
+- [x] `GET /api/export/history?format=csv` retorna histórico em CSV
+- [x] Inclui: data da sessão, duração, álbuns tocados
+- [x] Filtro por período: `?from=YYYY-MM-DD&to=YYYY-MM-DD`
+- [x] Header `Content-Disposition` para download do arquivo
 
 ### AC-3: UI - Botões de Export
-- [ ] Botão "Exportar" na página Collection (dropdown: JSON/CSV)
-- [ ] Botão "Exportar Histórico" na página Sessions (dropdown: JSON/CSV)
-- [ ] Feedback visual durante download
-- [ ] Arquivo baixa automaticamente com nome descritivo
+- [x] Botão "Exportar" na página Collection (dropdown: JSON/CSV)
+- [x] Botão "Exportar Histórico" na página Sessions (dropdown: JSON/CSV)
+- [x] Feedback visual durante download
+- [x] Arquivo baixa automaticamente com nome descritivo
 
 ---
 
@@ -211,3 +211,4 @@ router.get('/collection', async (req, res) => {
 | Data | Ação | Motivo |
 |------|------|--------|
 | 2025-12-06 | Expansão | Detalhar formatos e UI |
+| 2025-12-06 | Implementação | Story completa - Backend e Frontend |

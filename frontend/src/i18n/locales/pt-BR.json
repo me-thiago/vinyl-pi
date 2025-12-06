@@ -336,6 +336,13 @@
     "noData": "Sem dados ainda",
     "noListeningData": "Nenhum álbum identificado ainda. Use o botão 🎵 no player para registrar o que você está ouvindo."
   },
+  "export": {
+    "exportCollection": "Exportar Coleção",
+    "exportHistory": "Exportar Histórico",
+    "formatJson": "JSON",
+    "formatCsv": "CSV",
+    "downloading": "Baixando..."
+  },
   "discogs": {
     "import_title": "Importar do Discogs",
     "import_description": "Busque álbuns no Discogs por número de catálogo ou código de barras",

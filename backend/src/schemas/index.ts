@@ -11,3 +11,4 @@ export * from './events.schema';
 export * from './pagination.schema';
 export * from './albums.schema';
 export * from './recognition.schema';
+export * from './export.schema';

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Download, Loader2, RefreshCw } from 'lucide-react';
+import { ExportDropdown } from '@/components/ExportDropdown';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -215,6 +216,7 @@ export default function Collection() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <ExportDropdown type="collection" />
         </div>
       </div>
 
