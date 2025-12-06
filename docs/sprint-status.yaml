@@ -95,7 +95,7 @@ development_status:
   v2-10-estatisticas-colecao: done
   v2-11-export-dados: done
   v2-12-configuracoes-reconhecimento: done  # V2-12: Configurações de Reconhecimento implementadas
-  epic-v2-retrospective: optional
+  epic-v2-retrospective: completed          # Retrospectiva realizada em 2025-12-06
 
   # Epic V3 - Gravação & Análise
   epic-v3: backlog
