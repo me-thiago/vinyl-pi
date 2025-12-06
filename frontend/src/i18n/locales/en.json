@@ -287,6 +287,22 @@
       "archived": "Archived"
     }
   },
+  "recognition": {
+    "identify": "Identify music",
+    "identifying": "Identifying...",
+    "success": "Music identified",
+    "error": "Error identifying",
+    "noMatch": "Music not found in collection",
+    "confirmTitle": "Confirm Album",
+    "identifiedAs": "Music identified:",
+    "selectAlbum": "Select the album from your collection:",
+    "confidence": "{{percent}}% match",
+    "select": "Select",
+    "noneOfThese": "None of these",
+    "addToCollection": "Add to collection",
+    "linkedTo": "Music linked to {{album}}",
+    "playing": "Playing: {{title}} - {{artist}}"
+  },
   "discogs": {
     "import_title": "Import from Discogs",
     "import_description": "Search albums on Discogs by catalog number or barcode",

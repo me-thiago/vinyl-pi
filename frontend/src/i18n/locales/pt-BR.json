@@ -287,6 +287,22 @@
       "archived": "Arquivado"
     }
   },
+  "recognition": {
+    "identify": "Identificar música",
+    "identifying": "Identificando...",
+    "success": "Música identificada",
+    "error": "Erro ao identificar",
+    "noMatch": "Música não encontrada na coleção",
+    "confirmTitle": "Confirmar Álbum",
+    "identifiedAs": "Música identificada:",
+    "selectAlbum": "Selecione o álbum da sua coleção:",
+    "confidence": "{{percent}}% de correspondência",
+    "select": "Selecionar",
+    "noneOfThese": "Nenhum destes",
+    "addToCollection": "Adicionar à coleção",
+    "linkedTo": "Música vinculada a {{album}}",
+    "playing": "Tocando: {{title}} - {{artist}}"
+  },
   "discogs": {
     "import_title": "Importar do Discogs",
     "import_description": "Busque álbuns no Discogs por número de catálogo ou código de barras",

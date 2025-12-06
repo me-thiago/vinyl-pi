@@ -1,5 +1,7 @@
-import { Link } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Play, Pause, Volume2, VolumeX, Settings, Power, Loader2, LayoutDashboard, Activity, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { MiniVuMeter } from './MiniVuMeter';
+import { RecognitionButton, MatchConfirmation, type ButtonState } from '@/components/Recognition';
+import { useRecognition, type RecognizedTrack, type AlbumMatchItem } from '@/hooks/useRecognition';
 import { cn } from '@/lib/utils';
 
 interface PlayerBarProps {
@@ -49,9 +53,96 @@ export function PlayerBar({
   stopStreaming,
 }: PlayerBarProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  // Recognition state (V2-07)
+  const {
+    recognize,
+    confirm,
+    isRecognizing,
+    isConfirming,
+    reset: resetRecognition,
+  } = useRecognition();
+
+  const [recognitionButtonState, setRecognitionButtonState] = useState<ButtonState>('idle');
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [currentTrack, setCurrentTrack] = useState<RecognizedTrack | null>(null);
+  const [currentMatches, setCurrentMatches] = useState<AlbumMatchItem[]>([]);
 
   const hasError = error || streamingError;
   const canPlay = isStreaming && !isStreamingLoading;
+
+  /**
+   * Handler para clique no botão de reconhecimento
+   */
+  const handleRecognize = useCallback(async () => {
+    setRecognitionButtonState('loading');
+
+    const result = await recognize();
+
+    if (result.success && result.track) {
+      const track = result.track;
+
+      // Verifica se precisa confirmação
+      if (track.albumMatch?.needsConfirmation && track.albumMatch.matches.length > 0) {
+        // Abre modal de confirmação
+        setCurrentTrack(track);
+        setCurrentMatches(track.albumMatch.matches);
+        setShowMatchModal(true);
+        setRecognitionButtonState('idle');
+      } else if (track.albumMatch && !track.albumMatch.needsConfirmation) {
+        // Match automático - mostra toast de sucesso
+        setRecognitionButtonState('success');
+        toast.success(t('recognition.playing', { title: track.title, artist: track.artist }));
+      } else {
+        // Sem match na coleção
+        setRecognitionButtonState('success');
+        toast.info(t('recognition.playing', { title: track.title, artist: track.artist }));
+      }
+    } else {
+      // Erro ou não encontrado
+      setRecognitionButtonState('error');
+      if (result.errorCode === 'NOT_FOUND') {
+        toast.warning(t('recognition.noMatch'));
+      } else {
+        toast.error(result.error || t('recognition.error'));
+      }
+    }
+  }, [recognize, t]);
+
+  /**
+   * Handler para confirmação de álbum
+   */
+  const handleConfirmMatch = useCallback(async (albumId: string | null) => {
+    if (!currentTrack) return;
+
+    try {
+      await confirm(currentTrack.id, albumId);
+
+      if (albumId) {
+        // Encontrar nome do álbum
+        const album = currentMatches.find((m) => m.albumId === albumId);
+        toast.success(t('recognition.linkedTo', { album: album?.title || 'álbum' }));
+      } else {
+        toast.info(t('recognition.noMatch'));
+      }
+
+      setShowMatchModal(false);
+      resetRecognition();
+    } catch {
+      toast.error(t('recognition.error'));
+    }
+  }, [currentTrack, currentMatches, confirm, resetRecognition, t]);
+
+  /**
+   * Handler para adicionar à coleção
+   */
+  const handleAddToCollection = useCallback(() => {
+    setShowMatchModal(false);
+    // Navegar para página de coleção com dados pré-preenchidos
+    // TODO: Implementar pré-preenchimento no formulário (V2-08 ou futuro)
+    navigate('/collection?action=add');
+  }, [navigate]);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-14 bg-card border-t flex items-center px-4 gap-3 z-50">
@@ -149,6 +240,13 @@ export function PlayerBar({
         )}
       </div>
 
+      {/* Recognition Button (V2-07) */}
+      <RecognitionButton
+        state={isRecognizing ? 'loading' : recognitionButtonState}
+        onClick={handleRecognize}
+        disabled={!isStreaming}
+      />
+
       {/* Volume Control */}
       <div className="flex items-center gap-2 w-56 shrink-0">
         <button
@@ -211,6 +309,24 @@ export function PlayerBar({
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Match Confirmation Modal (V2-07) */}
+      {currentTrack && (
+        <MatchConfirmation
+          open={showMatchModal}
+          onOpenChange={setShowMatchModal}
+          track={{
+            id: currentTrack.id,
+            title: currentTrack.title,
+            artist: currentTrack.artist,
+            albumArt: currentTrack.albumArt,
+          }}
+          matches={currentMatches}
+          onConfirm={handleConfirmMatch}
+          onAddToCollection={handleAddToCollection}
+          isConfirming={isConfirming}
+        />
+      )}
     </div>
   );
 }

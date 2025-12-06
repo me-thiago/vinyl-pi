@@ -2,6 +2,7 @@ import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import * as Sentry from '@sentry/react'
+import { Toaster } from 'sonner'
 import './index.css'
 
 // Initialize i18n before any component renders
@@ -76,6 +77,7 @@ createRoot(document.getElementById('root')!).render(
             </Route>
           </Routes>
         </BrowserRouter>
+        <Toaster richColors position="top-right" />
       </ThemeProvider>
     </ErrorBoundary>
   </StrictMode>,

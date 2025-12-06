@@ -29,7 +29,7 @@ import FormData from 'form-data';
 import prisma from '../prisma/client';
 import { eventBus } from '../utils/event-bus';
 import { createLogger } from '../utils/logger';
-import { findMatches, formatMatchForApi, THRESHOLDS } from './collection-matcher';
+import { findMatches, THRESHOLDS } from './collection-matcher';
 import type { AudioManager } from './audio-manager';
 import type { RecognitionSource } from '@prisma/client';
 
@@ -67,13 +67,26 @@ export interface RecognizeOptions {
 }
 
 /**
- * Resultado do matching de álbum
+ * Resultado de um match individual de álbum
+ */
+export interface AlbumMatchItem {
+  albumId: string;
+  title: string;
+  artist: string;
+  coverUrl: string | null;
+  confidence: number;
+}
+
+/**
+ * Resultado do matching de álbum (com todos os matches)
  */
 export interface AlbumMatchResult {
   albumId: string;
   albumTitle: string;
   matchConfidence: number;
   needsConfirmation: boolean;
+  /** Lista de todos os matches possíveis (até 5) */
+  matches: AlbumMatchItem[];
 }
 
 /**
@@ -457,7 +470,7 @@ export async function recognize(options: RecognizeOptions): Promise<RecognitionR
 
     logger.info(`AudD identificou: "${title}" - ${artist}`);
 
-    // 5. Fuzzy matching contra coleção (V2-06)
+    // 5. Fuzzy matching contra coleção (V2-06, V2-07)
     let albumMatch: AlbumMatchResult | null = null;
     let linkedAlbumId: string | null = null;
 
@@ -466,7 +479,23 @@ export async function recognize(options: RecognizeOptions): Promise<RecognitionR
 
       if (matches.length > 0) {
         const bestMatch = matches[0];
-        albumMatch = formatMatchForApi(bestMatch);
+        
+        // Mapear todos os matches para o formato da API (V2-07)
+        const allMatches: AlbumMatchItem[] = matches.map((m) => ({
+          albumId: m.album.id,
+          title: m.album.title,
+          artist: m.album.artist,
+          coverUrl: m.album.coverUrl,
+          confidence: m.confidence,
+        }));
+
+        albumMatch = {
+          albumId: bestMatch.album.id,
+          albumTitle: bestMatch.album.title,
+          matchConfidence: bestMatch.confidence,
+          needsConfirmation: bestMatch.needsConfirmation,
+          matches: allMatches,
+        };
 
         // Vinculação automática se score >= 0.8
         if (bestMatch.confidence >= THRESHOLDS.AUTO_LINK) {
@@ -476,7 +505,7 @@ export async function recognize(options: RecognizeOptions): Promise<RecognitionR
           );
         } else {
           logger.info(
-            `Match encontrado (confirmação necessária): albumId=${bestMatch.album.id}, confidence=${(bestMatch.confidence * 100).toFixed(1)}%`
+            `Match encontrado (confirmação necessária): albumId=${bestMatch.album.id}, confidence=${(bestMatch.confidence * 100).toFixed(1)}%, total matches=${matches.length}`
           );
         }
       }
