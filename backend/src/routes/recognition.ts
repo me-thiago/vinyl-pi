@@ -138,7 +138,7 @@ export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
           res.status(400).json({
             error: {
               message:
-                'Reconhecimento musical não configurado. Configure ACRCLOUD_HOST, ACRCLOUD_ACCESS_KEY e ACRCLOUD_ACCESS_SECRET.',
+                'Reconhecimento musical não configurado. Configure AUDD_API_KEY no arquivo .env.',
               code: 'RECOGNITION_NOT_CONFIGURED',
             },
           });
@@ -221,8 +221,8 @@ export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
         }
 
         if (error instanceof ACRCloudError) {
-          // Timeout = 504
-          if (error.code === 'ACRCLOUD_TIMEOUT') {
+          // Timeout = 504 (ACRCloudError é alias para AudDError)
+          if (error.code === 'AUDD_TIMEOUT') {
             res.status(504).json({
               error: {
                 message: error.message,
