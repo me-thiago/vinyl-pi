@@ -26,9 +26,30 @@ interface SessionsResponse {
     endedAt: string | null;
     durationSeconds: number;
     eventCount: number;
+    albumCount: number; // V2-09: Número de álbuns únicos tocados
   }[];
   total: number;
   hasMore: boolean;
+}
+
+/**
+ * Info do track reconhecido para exibição
+ */
+interface RecognizedTrackInfo {
+  title: string;
+  recognizedAt: string;
+}
+
+/**
+ * Álbum tocado na sessão (agrupado dos tracks)
+ */
+interface SessionAlbum {
+  id: string;
+  title: string;
+  artist: string;
+  year: number | null;
+  coverUrl: string | null;
+  recognizedTrack: RecognizedTrackInfo;
 }
 
 /**
@@ -46,6 +67,7 @@ interface SessionDetailResponse {
     timestamp: string;
     metadata: object | null;
   }[];
+  albums: SessionAlbum[];
 }
 
 /**
@@ -97,6 +119,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
       }
 
       // Buscar sessões e total em paralelo
+      // V2-09: Incluir tracks para contar álbuns únicos
       const [sessions, total] = await Promise.all([
         prisma.session.findMany({
           where,
@@ -108,21 +131,30 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
             startedAt: true,
             endedAt: true,
             durationSeconds: true,
-            eventCount: true
+            eventCount: true,
+            tracks: {
+              where: { albumId: { not: null } },
+              select: { albumId: true }
+            }
           }
         }),
         prisma.session.count({ where })
       ]);
 
-      // Formatar resposta
+      // Formatar resposta com albumCount
       const response: SessionsResponse = {
-        sessions: sessions.map(session => ({
-          id: session.id,
-          startedAt: session.startedAt.toISOString(),
-          endedAt: session.endedAt?.toISOString() || null,
-          durationSeconds: session.durationSeconds,
-          eventCount: session.eventCount
-        })),
+        sessions: sessions.map(session => {
+          // V2-09: Contar álbuns únicos (Set remove duplicatas)
+          const uniqueAlbumIds = new Set(session.tracks.map(t => t.albumId));
+          return {
+            id: session.id,
+            startedAt: session.startedAt.toISOString(),
+            endedAt: session.endedAt?.toISOString() || null,
+            durationSeconds: session.durationSeconds,
+            eventCount: session.eventCount,
+            albumCount: uniqueAlbumIds.size
+          };
+        }),
         total,
         hasMore: offset + sessions.length < total
       };
@@ -171,7 +203,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
   /**
    * GET /api/sessions/:id
    *
-   * Retorna detalhes de uma sessão específica com seus eventos
+   * Retorna detalhes de uma sessão específica com seus eventos e álbuns tocados
    */
   router.get('/sessions/:id', validate(sessionIdParamSchema, 'params'), async (req: Request<{ id: string }>, res: Response) => {
     try {
@@ -188,6 +220,16 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
               timestamp: true,
               metadata: true
             }
+          },
+          // V2-09: Incluir tracks com albumId para agrupar álbuns tocados
+          tracks: {
+            where: { albumId: { not: null } },
+            orderBy: { recognizedAt: 'asc' },
+            include: {
+              album: {
+                select: { id: true, title: true, artist: true, year: true, coverUrl: true }
+              }
+            }
           }
         }
       });
@@ -198,6 +240,25 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
         });
         return;
       }
+
+      // V2-09: Agrupar tracks por albumId, pegar primeiro reconhecimento de cada álbum
+      const albumsMap = new Map<string, SessionAlbum>();
+      for (const track of session.tracks) {
+        if (track.album && track.albumId && !albumsMap.has(track.albumId)) {
+          albumsMap.set(track.albumId, {
+            id: track.album.id,
+            title: track.album.title,
+            artist: track.album.artist,
+            year: track.album.year,
+            coverUrl: track.album.coverUrl,
+            recognizedTrack: {
+              title: track.title,
+              recognizedAt: track.recognizedAt.toISOString()
+            }
+          });
+        }
+      }
+      const albums = Array.from(albumsMap.values());
 
       const response: SessionDetailResponse = {
         id: session.id,
@@ -210,7 +271,8 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
           eventType: event.eventType,
           timestamp: event.timestamp.toISOString(),
           metadata: event.metadata as object | null
-        }))
+        })),
+        albums
       };
 
       res.json(response);

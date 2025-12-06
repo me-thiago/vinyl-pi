@@ -146,7 +146,7 @@ cd ../frontend && npm install
 Crie um arquivo `.env` na pasta `backend/`:
 
 ```bash
-DATABASE_URL="file:../data/vinyl-os.db"
+DATABASE_URL="file:./data/vinyl-os.db"
 PORT=3001
 ```
 

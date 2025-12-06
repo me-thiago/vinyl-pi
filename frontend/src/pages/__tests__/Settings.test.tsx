@@ -49,6 +49,30 @@ const mockSystemInfo = {
   icecastUrl: 'http://localhost:8000/stream',
 };
 
+// Mock de recognition status (V2-12)
+const mockRecognitionStatus = {
+  services: {
+    acrcloud: {
+      configured: false,
+      lastTestAt: null,
+      lastTestResult: null,
+      lastTestError: null,
+    },
+    audd: {
+      configured: true,
+      lastTestAt: null,
+      lastTestResult: null,
+      lastTestError: null,
+    },
+  },
+  settings: {
+    preferredService: 'auto',
+    sampleDuration: 10,
+    autoOnSessionStart: false,
+    autoDelay: 20,
+  },
+};
+
 describe('Settings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,20 +89,17 @@ describe('Settings', () => {
           json: () => Promise.resolve(mockSystemInfo),
         });
       }
+      if (url.includes('/api/recognition/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockRecognitionStatus),
+        });
+      }
       return Promise.resolve({ ok: false });
     });
   });
 
   describe('renderização inicial', () => {
-    it('deve renderizar o título Configuracoes', async () => {
-      renderWithRouter(<Settings />);
-
-      await waitFor(() => {
-        // i18n: "Configurações" (pt-BR) or "Settings" (en)
-        expect(screen.getByText(/^Configurações$|^Settings$/i)).toBeInTheDocument();
-      });
-    });
-
     it('deve renderizar cards de configuração', async () => {
       renderWithRouter(<Settings />);
 
@@ -229,16 +250,6 @@ describe('Settings', () => {
     });
   });
 
-  describe('link de volta', () => {
-    it('deve ter link para página inicial', async () => {
-      renderWithRouter(<Settings />);
-
-      const links = screen.getAllByRole('link');
-      const backLink = links.find(link => link.getAttribute('href') === '/');
-      expect(backLink).toBeInTheDocument();
-    });
-  });
-
   describe('footer', () => {
     it('deve renderizar o footer', async () => {
       renderWithRouter(<Settings />);
@@ -315,6 +326,12 @@ describe('Settings - alterações pendentes', () => {
           json: () => Promise.resolve(mockSystemInfo),
         });
       }
+      if (url.includes('/api/recognition/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockRecognitionStatus),
+        });
+      }
       return Promise.resolve({ ok: false });
     });
   });
@@ -323,7 +340,8 @@ describe('Settings - alterações pendentes', () => {
     renderWithRouter(<Settings />);
 
     await waitFor(() => {
-      expect(screen.getByRole('slider')).toBeInTheDocument();
+      // Agora temos múltiplos sliders (buffer, autoDelay, sampleDuration)
+      expect(screen.getAllByRole('slider').length).toBeGreaterThan(0);
     });
 
     // Simular alteração no slider (não pode ser testado diretamente, mas verificamos o comportamento)

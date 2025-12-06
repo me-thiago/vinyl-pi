@@ -2,6 +2,7 @@ import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import * as Sentry from '@sentry/react'
+import { Toaster } from 'sonner'
 import './index.css'
 
 // Initialize i18n before any component renders
@@ -41,6 +42,9 @@ const Sessions = lazy(() => import('./pages/Sessions'))
 const SessionDetail = lazy(() => import('./pages/SessionDetail'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Diagnostics = lazy(() => import('./pages/Diagnostics'))
+const Collection = lazy(() => import('./pages/Collection'))
+const CollectionDetail = lazy(() => import('./pages/CollectionDetail'))
+const Stats = lazy(() => import('./pages/Stats'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -65,9 +69,19 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/diagnostics" element={
                 <Suspense fallback={<PageLoader />}><Diagnostics /></Suspense>
               } />
+              <Route path="/collection" element={
+                <Suspense fallback={<PageLoader />}><Collection /></Suspense>
+              } />
+              <Route path="/collection/:id" element={
+                <Suspense fallback={<PageLoader />}><CollectionDetail /></Suspense>
+              } />
+              <Route path="/stats" element={
+                <Suspense fallback={<PageLoader />}><Stats /></Suspense>
+              } />
             </Route>
           </Routes>
         </BrowserRouter>
+        <Toaster richColors position="top-right" />
       </ThemeProvider>
     </ErrorBoundary>
   </StrictMode>,

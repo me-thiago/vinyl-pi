@@ -18,13 +18,18 @@
     "from": "From",
     "to": "To",
     "details": "View details",
-    "backToList": "Back to list"
+    "backToList": "Back to list",
+    "saving": "Saving...",
+    "dismiss": "Dismiss"
   },
   "nav": {
     "dashboard": "Dashboard",
+    "collection": "Collection",
     "sessions": "Sessions",
+    "stats": "Statistics",
     "diagnostics": "Diagnostics",
-    "settings": "Settings"
+    "settings": "Settings",
+    "theme": "Theme"
   },
   "home": {
     "title": "Live Vinyl Visualizer",
@@ -140,7 +145,9 @@
     "page": "Page {{current}} of {{total}}",
     "previous": "Previous",
     "next": "Next",
-    "fetchError": "Failed to fetch sessions"
+    "fetchError": "Failed to fetch sessions",
+    "albumCount_one": "{{count}} album",
+    "albumCount_other": "{{count}} albums"
   },
   "sessionDetail": {
     "title": "Session Details",
@@ -159,7 +166,12 @@
     "eventTimelineDesc": "Events recorded during this session (chronological order)",
     "noEventsInSession": "No events recorded in this session",
     "levelDb": "Level",
-    "eventDuration": "Duration"
+    "eventDuration": "Duration",
+    "albumsPlayed": "Albums Played",
+    "noAlbumsPlayed": "No albums identified in this session",
+    "identifiedAt": "Identified at {{time}}",
+    "identifiedVia": "\"{{track}}\"",
+    "viewAlbum": "View"
   },
   "diagnostics": {
     "title": "Diagnostics",
@@ -217,5 +229,146 @@
     "sessionDetail": "Vinyl-OS Session Detail",
     "settings": "Vinyl-OS Settings",
     "diagnostics": "Vinyl-OS Diagnostics"
+  },
+  "collection": {
+    "title": "My Collection",
+    "add_album": "Add Album",
+    "import_discogs": "Import from Discogs",
+    "import_discogs_disabled": "Will be implemented in story V2-04",
+    "search_placeholder": "Search albums...",
+    "showing_count": "Showing {{count}} of {{total}} albums",
+    "load_more": "Load more",
+    "empty_title": "Your collection is empty",
+    "empty_description": "Add your first album or import from Discogs",
+    "empty": {
+      "no_results_title": "No albums found",
+      "no_results_description": "Try adjusting your search filters"
+    },
+    "form": {
+      "new_album": "New Album",
+      "edit_album": "Edit Album",
+      "new_description": "Add a new album to your collection",
+      "edit_description": "Update album information",
+      "title": "Title",
+      "artist": "Artist",
+      "year": "Year",
+      "label": "Label",
+      "format": "Format",
+      "condition": "Condition",
+      "cover_url": "Cover URL",
+      "tags": "Tags",
+      "tags_hint": "Comma-separated",
+      "notes": "Notes",
+      "notes_placeholder": "Additional information about this record...",
+      "save": "Save Album",
+      "cancel": "Cancel",
+      "required_field": "Required field"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "delete": "Delete",
+      "menu": "Actions menu",
+      "confirm_delete_title": "Delete album?",
+      "confirm_delete": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone."
+    },
+    "filters": {
+      "format": "Format",
+      "year": "Year",
+      "condition": "Condition",
+      "show_archived": "Show archived",
+      "all": "All",
+      "clear": "Clear filters"
+    },
+    "detail": {
+      "not_found": "Album not found",
+      "album_not_found_description": "The requested album does not exist or has been removed.",
+      "back_to_collection": "Back to Collection",
+      "notes": "Notes",
+      "play_history": "Play History",
+      "no_play_history": "No sessions recorded for this album",
+      "total_sessions_one": "{{count}} session",
+      "total_sessions_other": "{{count}} sessions",
+      "view_session": "View",
+      "identified_via": "Identified via \"{{track}}\"",
+      "view_discogs": "View on Discogs",
+      "sync_discogs": "Sync Discogs",
+      "sync_discogs_disabled": "Will be implemented in story V2-04",
+      "discogs_unavailable": "This album has been removed from Discogs. Local data has been preserved.",
+      "archived": "Archived"
+    }
+  },
+  "recognition": {
+    "identify": "Identify music",
+    "identifying": "Identifying...",
+    "success": "Music identified",
+    "error": "Error identifying",
+    "noMatch": "Music not found in collection",
+    "confirmTitle": "Confirm Album",
+    "identifiedAs": "Music identified:",
+    "selectAlbum": "Select the album from your collection:",
+    "confidence": "{{percent}}% match",
+    "select": "Select",
+    "confirmSelection": "Confirm selection",
+    "noneOfThese": "None of these",
+    "addToCollection": "Add to collection",
+    "linkedTo": "Music linked to {{album}}",
+    "playing": "Playing: {{title}} - {{artist}}"
+  },
+  "stats": {
+    "pageTitle": "Statistics",
+    "collectionTitle": "Collection",
+    "listeningTitle": "Listening",
+    "totalAlbums": "Albums",
+    "uniqueArtists": "Artists",
+    "archivedAlbums": "Archived",
+    "manuallyAdded": "Manually added",
+    "byFormat": "By Format",
+    "byDecade": "By Decade",
+    "totalSessions": "Sessions",
+    "sessionsThisMonth": "This month",
+    "uniqueAlbumsPlayed": "Albums played",
+    "topPlayed": "Most Played",
+    "topArtists": "Top Artists",
+    "sessions_one": "{{count}} session",
+    "sessions_other": "{{count}} sessions",
+    "noData": "No data yet",
+    "noListeningData": "No albums identified yet. Use the 🎵 button on the player to record what you're listening to."
+  },
+  "export": {
+    "exportCollection": "Export Collection",
+    "exportHistory": "Export History",
+    "formatJson": "JSON",
+    "formatCsv": "CSV",
+    "downloading": "Downloading..."
+  },
+  "discogs": {
+    "import_title": "Import from Discogs",
+    "import_description": "Search albums on Discogs by catalog number or barcode",
+    "search_by": "Search by",
+    "catalog_number": "Catalog number",
+    "barcode": "Barcode",
+    "catalog_placeholder": "E.g.: MOVLP-1234",
+    "barcode_placeholder": "E.g.: 0889854882617",
+    "results_found": "{{count}} results found",
+    "back_to_search": "New search",
+    "view_on_discogs": "View on Discogs",
+    "import_selected": "Import Selected",
+    "importing": "Importing...",
+    "error_empty_search": "Enter a value to search",
+    "error_not_found": "No results found on Discogs",
+    "error_already_exists": "This album already exists in your collection",
+    "error_rate_limit": "Too many requests. Wait a few seconds and try again.",
+    "error_timeout": "Request timeout. Please try again.",
+    "error_not_configured": "Discogs integration not configured",
+    "error_generic": "Error communicating with Discogs",
+    "sync_collection": "Sync Collection",
+    "sync_collection_title": "Import Discogs Collection?",
+    "sync_collection_description": "This will import all albums from your Discogs collection. Already existing albums will be skipped. This operation may take a few minutes.",
+    "sync_collection_confirm": "Import Collection",
+    "sync_collection_success": "Import complete! {{imported}} imported, {{skipped}} already existed, {{errors}} errors.",
+    "syncing": "Syncing...",
+    "sync_error": "Error syncing with Discogs"
   }
 }

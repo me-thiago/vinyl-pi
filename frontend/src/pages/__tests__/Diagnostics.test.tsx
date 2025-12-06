@@ -110,19 +110,6 @@ describe('Diagnostics', () => {
   });
 
   describe('renderização inicial', () => {
-    it('deve renderizar o título Diagnóstico', async () => {
-      renderWithRouter(<Diagnostics />);
-      // i18n: "Diagnóstico" (pt-BR) or "Diagnostics" (en)
-      // Use role to target the h1 specifically (footer also contains this text)
-      expect(screen.getByRole('heading', { name: /Diagnóstico|Diagnostics/i })).toBeInTheDocument();
-    });
-
-    it('deve renderizar subtítulo', async () => {
-      renderWithRouter(<Diagnostics />);
-      // i18n: "VU Meter e Configurações" (pt-BR) or "VU Meter and Settings" (en)
-      expect(screen.getByText(/VU Meter (e|and) (Configurações|Settings)/i)).toBeInTheDocument();
-    });
-
     it('deve renderizar card de VU Meter', async () => {
       renderWithRouter(<Diagnostics />);
 
@@ -292,15 +279,6 @@ describe('Diagnostics', () => {
     });
   });
 
-  describe('link de volta', () => {
-    it('deve ter link para página inicial', async () => {
-      renderWithRouter(<Diagnostics />);
-
-      const links = screen.getAllByRole('link');
-      const backLink = links.find(link => link.getAttribute('href') === '/');
-      expect(backLink).toBeInTheDocument();
-    });
-  });
 });
 
 describe('Diagnostics - estados especiais', () => {

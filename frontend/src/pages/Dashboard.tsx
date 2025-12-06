@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Radio,
@@ -8,8 +7,6 @@ import {
   AlertTriangle,
   Volume2,
   VolumeX,
-  Disc3,
-  ArrowLeft,
   RefreshCw,
   Wifi,
   WifiOff,
@@ -25,7 +22,6 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { useSocket } from '@/hooks/useSocket'
 import type { StatusPayload, EventPayload } from '@/hooks/useSocket'
 
@@ -166,25 +162,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground">
-              <Disc3 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{t('dashboard.title')}</h1>
-              <p className="text-xs text-muted-foreground">{t('dashboard.subtitle')}</p>
-            </div>
-          </div>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6">
+        {/* Actions Bar */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            {/* Indicador de conexão WebSocket */}
             <Button
               variant="ghost"
               size="icon"
@@ -205,16 +187,11 @@ export default function Dashboard() {
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Badge variant={isConnected ? 'outline' : 'secondary'} className="hidden sm:flex">
+            <Badge variant={isConnected ? 'outline' : 'secondary'}>
               {isConnected ? t('dashboard.live') : formatRelativeTime(lastUpdate.toISOString())}
             </Badge>
-            <ThemeToggle />
           </div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
         {/* Error Alert */}
         {error && (
           <Card className="mb-6 border-destructive">

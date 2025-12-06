@@ -668,10 +668,197 @@ O Epic V1.5 foi criado após auditoria de código para endereçar gaps de segura
 | V1.5-11 | Enum EventType |
 | V1.5-12 | Sentry Error Tracking |
 | V1.5-13 | react-i18next i18n |
+| V2-04 | Discogs Collection Sync - Merge Strategy |
+| V2-06 | Migração ACRCloud → AudD, Ring Buffer, axios vs fetch |
 | V3-02 | (Parcialmente adiantado em V1-06) |
 
 ---
 
-**Última revisão:** 2025-12-04
-**Próxima revisão:** Quando implementar V2 ou V3
+## Discogs Collection Sync - Merge Strategy
+
+### Decisão: Sincronização aditiva (apenas adicionar, nunca deletar)
+
+**Data:** 2025-12-05
+**Contexto:** Story V2-04 (Integração Discogs) - Importação em lote da coleção
+**Status:** ✅ Implementado
+
+### Problema
+
+Ao implementar a sincronização automática da coleção do Discogs, surgiu a questão: o que fazer com álbuns que existem localmente mas não estão na coleção do Discogs?
+
+**Cenários considerados:**
+
+1. **Usuário remove álbum do Discogs mas ainda possui fisicamente:** Não deve ser deletado localmente
+2. **Usuário cadastra álbum manualmente (sem discogsId):** Nunca deve ser afetado pela sync
+3. **Álbum no Discogs foi removido pelo uploader:** Dados locais devem ser preservados
+
+### Solução
+
+**Merge Strategy: ADDITIVE ONLY (apenas adicionar)**
+
+```typescript
+// Endpoint: POST /api/albums/import-collection
+for (const albumData of discogsAlbums) {
+  // Verificar se já existe pelo discogsId
+  const existing = await prisma.album.findUnique({
+    where: { discogsId: albumData.discogsId },
+  });
+
+  if (existing) {
+    results.skipped++;  // ✅ NÃO atualiza, apenas pula
+    continue;
+  }
+
+  // Criar novo álbum
+  await prisma.album.create({ ... });
+  results.imported++;
+}
+// ⚠️ NUNCA deleta álbuns locais
+```
+
+### Regras Implementadas
+
+| Cenário | Ação |
+|---------|------|
+| Álbum existe no Discogs, não existe localmente | ✅ Criar |
+| Álbum existe no Discogs, já existe localmente | ⏭️ Ignorar (skip) |
+| Álbum não existe no Discogs, existe localmente | ⏭️ Preservar (nenhuma ação) |
+| Álbum local sem discogsId | ⏭️ Preservar (nunca tocado) |
+
+### Justificativa
+
+**Por que não sincronizar bidirecional (two-way sync)?**
+- Aumenta complexidade significativamente
+- Risco de perda de dados em caso de erro
+- Usuário pode ter edições locais que quer preservar
+- Discogs é fonte de metadados, não fonte de verdade
+
+**Por que não atualizar álbuns existentes?**
+- Usuário pode ter feito edições manuais (notas, tags, condição)
+- Evita sobrescrever dados locais acidentalmente
+- Se quiser atualizar, use o endpoint `POST /api/albums/:id/sync-discogs`
+
+### Configuração
+
+```bash
+# .env
+DISCOGS_USERNAME=thiagocastroneves  # Username da coleção a importar
+DISCOGS_CONSUMER_KEY=xxx
+DISCOGS_CONSUMER_SECRET=xxx
+```
+
+### UI
+
+- **Botão:** IconButton com ícone `RefreshCw` ao lado de "Import from Discogs"
+- **Confirmação:** AlertDialog explicando que apenas novos álbuns serão importados
+- **Feedback:** Mensagem com contagem de importados/ignorados/erros
+
+### Rate Limiting
+
+A API do Discogs tem limite de 60 req/min. Para coleções grandes:
+- Throttling de 1.1s entre requests já implementado em `discogs.ts`
+- 100 álbuns ≈ 2 minutos (1 request por item na listagem paginada)
+- 500 álbuns ≈ 9 minutos
+
+### Referências
+
+- Endpoint: `backend/src/routes/albums.ts` → `POST /albums/import-collection`
+- Service: `backend/src/services/discogs.ts` → `getCollectionReleases()`
+- UI: `frontend/src/pages/Collection.tsx`
+- Story: `docs/stories/v2/v2-04-integracao-discogs.md`
+
+---
+
+## Migração ACRCloud → AudD para Reconhecimento Musical
+
+### Decisão: Usar AudD em vez de ACRCloud
+
+**Data:** 2025-12-05
+**Contexto:** Story V2-06 (Validação Contra Coleção)
+**Status:** ✅ Implementado
+
+### Problema
+
+Durante implementação do reconhecimento musical, ACRCloud apresentou problemas persistentes de autenticação:
+
+- **Erro:** `3001 - Missing/Invalid Access Key`
+- **Causa:** Autenticação HMAC-SHA1 falhava mesmo com credenciais corretas
+- **Tentativas:** Múltiplas chaves/projetos testados sem sucesso
+
+### Solução
+
+Migramos para **AudD** (https://audd.io/) como serviço de reconhecimento.
+
+### Comparação
+
+| Aspecto | ACRCloud | AudD |
+|---------|----------|------|
+| Autenticação | HMAC-SHA1 (complexa) | API Key simples |
+| Formato de envio | FormData + assinatura | FormData básico |
+| Metadados | Spotify, Deezer, etc | Spotify, Apple Music, Deezer |
+| Preço | Freemium | Freemium (300 req/dia) |
+| Latência | ~1-2s | ~2-3s |
+| Cobertura | Ampla | Ampla |
+
+### Implementação Técnica
+
+**Por que axios em vez de fetch?**
+
+O fetch nativo do Node.js tem problemas com FormData de bibliotecas externas (`form-data`). O axios resolve isso automaticamente:
+
+```typescript
+// ❌ Não funciona - fetch + form-data
+const response = await fetch(url, {
+  body: form as unknown as FormData,  // Erro: "you haven't sent a file"
+  headers: form.getHeaders(),
+});
+
+// ✅ Funciona - axios + form-data
+const response = await axios.post(url, form, {
+  headers: form.getHeaders(),
+  timeout: 15000,
+});
+```
+
+### Configuração
+
+```bash
+# .env
+AUDD_API_KEY=sua-api-key-aqui
+```
+
+### Ring Buffer para Captura
+
+Implementamos um **terceiro processo FFmpeg** com Ring Buffer circular de 30 segundos:
+
+```
+ALSA → FFmpeg #1 → stdout + FIFO1 + FIFO2
+                            ↓           ↓
+                          MP3→Icecast  FFmpeg #3 → Ring Buffer (20s)
+                                                          ↓
+                                                  Recognition Service
+```
+
+**Benefícios:**
+- Captura instantânea (zero latência)
+- Pré-roll: captura áudio de ANTES do trigger
+- Buffer sempre populado quando streaming ativo
+
+### Arquivos Modificados
+
+- `backend/src/services/recognition.ts` - Migrado para AudD + axios
+- `backend/src/services/audio-manager.ts` - FFmpeg #3 + Ring Buffer
+- `backend/src/utils/ring-buffer.ts` - Buffer circular de 30s
+- `backend/.env` - `AUDD_API_KEY` em vez de `ACRCLOUD_*`
+
+### Referências
+
+- Story: `docs/stories/v2/v2-06-validacao-colecao.md`
+- Projeto anterior (referência): `~/vinyl-player/backend/services/advancedRecognition.js`
+- AudD API: https://docs.audd.io/
+
+---
+
+**Última revisão:** 2025-12-05
+**Próxima revisão:** Quando implementar V3
 

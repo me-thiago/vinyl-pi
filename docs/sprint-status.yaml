@@ -82,20 +82,20 @@ development_status:
   epic-v1.5-retrospective: completed
 
   # Epic V2 - Coleção & Reconhecimento Musical
-  epic-v2: backlog
-  v2-1-schema-dados-v2: drafted
-  v2-2-crud-albums-backend: drafted
-  v2-3-ui-gestao-colecao: drafted
-  v2-4-integracao-discogs: drafted
-  v2-5-reconhecimento-musical: drafted
-  v2-6-validacao-colecao: drafted
-  v2-7-ui-matching-confirmacao: drafted
-  v2-8-player-com-colecao: drafted
-  v2-9-historico-escuta-expandido: drafted
-  v2-10-estatisticas-colecao: drafted
-  v2-11-export-dados: drafted
-  v2-12-background-recognition-worker: drafted
-  epic-v2-retrospective: optional
+  epic-v2: contexted
+  v2-1-schema-dados-v2: done
+  v2-2-crud-albums-backend: done
+  v2-3-ui-gestao-colecao: done
+  v2-4-integracao-discogs: done
+  v2-5-reconhecimento-musical: done
+  v2-6-validacao-colecao: done
+  v2-7-ui-matching-confirmacao: done
+  v2-8-player-com-colecao: deferred                          # Adiado: overlap com V2-07, depende de reconhecimento automático (V1-12)
+  v2-9-historico-escuta-expandido: done
+  v2-10-estatisticas-colecao: done
+  v2-11-export-dados: done
+  v2-12-configuracoes-reconhecimento: done  # V2-12: Configurações de Reconhecimento implementadas
+  epic-v2-retrospective: completed          # Retrospectiva realizada em 2025-12-06
 
   # Epic V3 - Gravação & Análise
   epic-v3: backlog

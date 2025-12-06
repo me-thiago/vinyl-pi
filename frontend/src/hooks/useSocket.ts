@@ -50,6 +50,15 @@ export interface AudioLevelPayload {
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 /**
+ * Payload de reconhecimento iniciado (V2-12)
+ */
+export interface RecognitionStartedPayload {
+  sessionId: string;
+  auto: boolean;
+  timestamp: string;
+}
+
+/**
  * Callbacks para eventos do socket
  */
 export interface SocketCallbacks {
@@ -58,6 +67,7 @@ export interface SocketCallbacks {
   onAudioLevel?: (level: AudioLevelPayload) => void;
   onSessionStarted?: (data: { id: string; startedAt: string }) => void;
   onSessionEnded?: (data: { id: string; endedAt: string; durationSeconds: number; eventCount: number }) => void;
+  onRecognitionStarted?: (data: RecognitionStartedPayload) => void;
 }
 
 /**
@@ -173,6 +183,11 @@ export function useSocket(callbacks?: SocketCallbacks): UseSocketReturn {
     // Handler de sessão encerrada
     socket.on('session:ended', (data: { id: string; endedAt: string; durationSeconds: number; eventCount: number }) => {
       callbacksRef.current?.onSessionEnded?.(data);
+    });
+
+    // Handler de reconhecimento iniciado (V2-12)
+    socket.on('recognition_started', (data: RecognitionStartedPayload) => {
+      callbacksRef.current?.onRecognitionStarted?.(data);
     });
   }, []);
 

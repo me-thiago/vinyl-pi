@@ -3,7 +3,6 @@ import type { ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft,
   Clock,
   Calendar,
   Activity,
@@ -11,9 +10,10 @@ import {
   ChevronRight,
   Filter,
   X,
-  Disc3,
-  Radio
+  Radio,
+  Disc
 } from 'lucide-react'
+import { ExportDropdown } from '@/components/ExportDropdown'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -25,7 +25,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 // Configuração da API
 const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`
@@ -38,6 +37,7 @@ interface SessionItem {
   endedAt: string | null
   durationSeconds: number
   eventCount: number
+  albumCount: number // V2-09: Número de álbuns tocados na sessão
 }
 
 interface SessionsResponse {
@@ -191,35 +191,6 @@ export default function Sessions() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary text-primary-foreground">
-              <Disc3 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{t('sessions.title')}</h1>
-              <p className="text-xs text-muted-foreground">{t('sessions.subtitle')}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm">{t('nav.dashboard')}</Button>
-            </Link>
-            <Link to="/diagnostics">
-              <Button variant="ghost" size="sm">{t('nav.diagnostics')}</Button>
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Sessão Ativa (se houver) */}
@@ -309,15 +280,24 @@ export default function Sessions() {
         {/* Lista de Sessões */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              {t('sessions.history')}
-              {total > 0 && (
-                <Badge variant="outline" className="ml-2">
-                  {t('sessions.session', { count: total })}
-                </Badge>
-              )}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                {t('sessions.history')}
+                {total > 0 && (
+                  <Badge variant="outline" className="ml-2">
+                    {t('sessions.session', { count: total })}
+                  </Badge>
+                )}
+              </CardTitle>
+              <ExportDropdown
+                type="history"
+                params={{
+                  ...(dateFrom ? { from: dateFrom } : {}),
+                  ...(dateTo ? { to: dateTo } : {}),
+                }}
+              />
+            </div>
             <CardDescription>
               {hasFilters
                 ? t('sessions.filteredByPeriod')
@@ -398,6 +378,13 @@ export default function Sessions() {
                               <Activity className="w-3 h-3" />
                               {session.eventCount} {t('dashboard.events')}
                             </span>
+                            {/* V2-09: Mostrar contagem de álbuns */}
+                            {session.albumCount > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Disc className="w-3 h-3" />
+                                {t('sessions.albumCount', { count: session.albumCount })}
+                              </span>
+                            )}
                             {session.endedAt && (
                               <span className="hidden sm:inline">
                                 {t('sessions.endedAt')} {formatDateTime(session.endedAt)}

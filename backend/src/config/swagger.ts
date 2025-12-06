@@ -29,6 +29,7 @@ const options: swaggerJsdoc.Options = {
       { name: 'Settings', description: 'Configurações do sistema' },
       { name: 'Sessions', description: 'Sessões de escuta de vinil' },
       { name: 'Events', description: 'Eventos de áudio detectados' },
+      { name: 'Albums', description: 'Gestão da coleção de álbuns (V2)' },
       { name: 'Health', description: 'Verificação de saúde do serviço' }
     ],
     components: {
@@ -325,6 +326,207 @@ const options: swaggerJsdoc.Options = {
             settings: {
               type: 'array',
               items: { $ref: '#/components/schemas/Setting' }
+            }
+          }
+        },
+        Album: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Identificador único do álbum'
+            },
+            title: {
+              type: 'string',
+              description: 'Título do álbum'
+            },
+            artist: {
+              type: 'string',
+              description: 'Nome do artista'
+            },
+            year: {
+              type: 'integer',
+              nullable: true,
+              description: 'Ano de lançamento'
+            },
+            label: {
+              type: 'string',
+              nullable: true,
+              description: 'Gravadora'
+            },
+            format: {
+              type: 'string',
+              enum: ['LP', 'EP', 'SINGLE_7', 'SINGLE_12', 'DOUBLE_LP', 'BOX_SET'],
+              nullable: true,
+              description: 'Formato físico do disco'
+            },
+            coverUrl: {
+              type: 'string',
+              format: 'uri',
+              nullable: true,
+              description: 'URL da capa do álbum'
+            },
+            discogsId: {
+              type: 'integer',
+              nullable: true,
+              description: 'ID do release no Discogs'
+            },
+            discogsAvailable: {
+              type: 'boolean',
+              description: 'Se o álbum ainda existe no Discogs'
+            },
+            condition: {
+              type: 'string',
+              enum: ['mint', 'near_mint', 'vg_plus', 'vg', 'good', 'fair', 'poor'],
+              nullable: true,
+              description: 'Condição física do disco (Goldmine Standard)'
+            },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              nullable: true,
+              description: 'Tags/categorias do álbum'
+            },
+            notes: {
+              type: 'string',
+              nullable: true,
+              description: 'Notas pessoais sobre o álbum'
+            },
+            archived: {
+              type: 'boolean',
+              description: 'Se o álbum foi arquivado (vendido/doado)'
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Data de criação'
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Data da última atualização'
+            }
+          },
+          example: {
+            id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+            title: 'Abbey Road',
+            artist: 'The Beatles',
+            year: 1969,
+            label: 'Apple Records',
+            format: 'LP',
+            coverUrl: 'https://i.discogs.com/abbey-road.jpg',
+            discogsId: 24047,
+            discogsAvailable: true,
+            condition: 'vg_plus',
+            tags: ['rock', '60s', 'classic'],
+            notes: 'Prensagem original UK',
+            archived: false,
+            createdAt: '2025-12-01T10:00:00.000Z',
+            updatedAt: '2025-12-01T10:00:00.000Z'
+          }
+        },
+        AlbumCreate: {
+          type: 'object',
+          required: ['title', 'artist'],
+          properties: {
+            title: {
+              type: 'string',
+              description: 'Título do álbum (obrigatório)'
+            },
+            artist: {
+              type: 'string',
+              description: 'Nome do artista (obrigatório)'
+            },
+            year: {
+              type: 'integer',
+              description: 'Ano de lançamento'
+            },
+            label: {
+              type: 'string',
+              description: 'Gravadora'
+            },
+            format: {
+              type: 'string',
+              enum: ['LP', 'EP', 'SINGLE_7', 'SINGLE_12', 'DOUBLE_LP', 'BOX_SET'],
+              description: 'Formato físico do disco'
+            },
+            coverUrl: {
+              type: 'string',
+              format: 'uri',
+              description: 'URL da capa do álbum'
+            },
+            discogsId: {
+              type: 'integer',
+              description: 'ID do release no Discogs'
+            },
+            condition: {
+              type: 'string',
+              enum: ['mint', 'near_mint', 'vg_plus', 'vg', 'good', 'fair', 'poor'],
+              description: 'Condição física do disco'
+            },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Tags/categorias'
+            },
+            notes: {
+              type: 'string',
+              description: 'Notas pessoais'
+            }
+          },
+          example: {
+            title: 'Abbey Road',
+            artist: 'The Beatles',
+            year: 1969,
+            format: 'LP',
+            condition: 'vg_plus'
+          }
+        },
+        AlbumUpdate: {
+          type: 'object',
+          description: 'Campos para atualização (todos opcionais, exceto discogsId que não pode ser alterado)',
+          properties: {
+            title: { type: 'string' },
+            artist: { type: 'string' },
+            year: { type: 'integer' },
+            label: { type: 'string' },
+            format: {
+              type: 'string',
+              enum: ['LP', 'EP', 'SINGLE_7', 'SINGLE_12', 'DOUBLE_LP', 'BOX_SET']
+            },
+            coverUrl: { type: 'string', format: 'uri' },
+            condition: {
+              type: 'string',
+              enum: ['mint', 'near_mint', 'vg_plus', 'vg', 'good', 'fair', 'poor']
+            },
+            tags: { type: 'array', items: { type: 'string' } },
+            notes: { type: 'string' }
+          }
+        },
+        PaginatedAlbums: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Album' }
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                total: {
+                  type: 'integer',
+                  description: 'Total de álbuns encontrados'
+                },
+                limit: {
+                  type: 'integer',
+                  description: 'Limite usado na busca'
+                },
+                offset: {
+                  type: 'integer',
+                  description: 'Offset usado na busca'
+                }
+              }
             }
           }
         }

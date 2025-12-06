@@ -14,7 +14,12 @@ import { createStatusRouter } from './routes/status';
 import { createEventsRouter } from './routes/events';
 import { createSessionsRouter } from './routes/sessions';
 import { createSettingsRouter } from './routes/settings';
+import { createAlbumsRouter } from './routes/albums';
+import { createRecognitionRouter } from './routes/recognition';
+import { createStatsRouter } from './routes/stats';
+import { createExportRouter } from './routes/export';
 import { SettingsService } from './services/settings-service';
+import { AutoRecognitionService } from './services/auto-recognition';
 import prisma from './prisma/client';
 import { eventBus } from './utils/event-bus';
 import { createLogger } from './utils/logger';
@@ -259,6 +264,15 @@ const socketManager = new SocketManager(httpServer, {
   sessionManager
 });
 
+// Inicializar AutoRecognitionService para reconhecimento automático no início de sessões (V2-12)
+const autoRecognitionService = new AutoRecognitionService({
+  settingsService,
+  audioManager,
+  socketManager,
+});
+autoRecognitionService.start();
+logger.info('AutoRecognitionService iniciado');
+
 // Registrar routes com todas as dependências
 app.use('/api', createStatusRouter({
   audioManager,
@@ -278,6 +292,18 @@ app.use('/api', createSessionsRouter({
 app.use('/api', createSettingsRouter({
   settingsService
 }));
+
+app.use('/api', createAlbumsRouter());
+
+app.use('/api', createRecognitionRouter({
+  sessionManager,
+  audioManager,
+  settingsService
+}));
+
+app.use('/api', createStatsRouter());
+
+app.use('/api', createExportRouter());
 
 // Swagger UI e documentação OpenAPI
 // Acessível em /api/docs e /api/docs.json
@@ -475,7 +501,11 @@ const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} recebido, encerrando graciosamente...`);
 
   try {
-    // Parar socket manager primeiro (fecha conexões WebSocket)
+    // Parar auto-recognition primeiro (cancela timers pendentes)
+    await autoRecognitionService.destroy();
+    logger.info('AutoRecognitionService parado');
+
+    // Parar socket manager (fecha conexões WebSocket)
     await socketManager.destroy();
 
     // Parar event persistence (para de persistir eventos)

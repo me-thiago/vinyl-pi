@@ -136,6 +136,7 @@ export class SocketManager implements Destroyable {
       'session.started',
       'session.ended',
       'track.change.detected',
+      'track.recognized', // V2-05: Música reconhecida
       'audio.start',
       'audio.stop'
     ];
@@ -168,6 +169,14 @@ export class SocketManager implements Destroyable {
             endedAt: payload.timestamp,
             durationSeconds: payload.durationSeconds,
             eventCount: payload.eventCount
+          });
+        } else if (eventType === 'track.recognized') {
+          // V2-05: Emitir evento específico para track reconhecido
+          this.io.emit('track_recognized', {
+            track: payload.track,
+            albumMatch: payload.albumMatch,
+            sessionId: payload.sessionId,
+            timestamp: payload.timestamp
           });
         }
       });

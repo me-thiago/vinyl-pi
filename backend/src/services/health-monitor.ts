@@ -15,7 +15,7 @@ export interface HealthMonitorConfig {
   checkIntervalMs: number;      // Intervalo entre checks (padrão: 30s)
   memoryThresholdMb: number;    // Limite de memória antes de alertar (padrão: 500MB)
   memoryLeakRateMbMin: number;  // Taxa de crescimento para detectar leak (padrão: 50MB/min)
-  maxOrphanProcesses: number;   // Máximo de processos FFmpeg órfãos (padrão: 2)
+  maxOrphanProcesses: number;   // Máximo de processos FFmpeg órfãos (padrão: 3)
 }
 
 /**
@@ -51,7 +51,7 @@ export class HealthMonitor extends EventEmitter {
       checkIntervalMs: config?.checkIntervalMs || 30000,      // 30s
       memoryThresholdMb: config?.memoryThresholdMb || 500,    // 500MB
       memoryLeakRateMbMin: config?.memoryLeakRateMbMin || 50, // 50MB/min
-      maxOrphanProcesses: config?.maxOrphanProcesses || 2     // 2 processos
+      maxOrphanProcesses: config?.maxOrphanProcesses || 3     // 3 processos (main + MP3 + recognition)
     };
     
     logger.info(`HealthMonitor initialized with config: ${JSON.stringify(this.config)}`);

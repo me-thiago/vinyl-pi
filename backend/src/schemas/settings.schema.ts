@@ -66,6 +66,31 @@ export const settingsUpdateSchema = z
       .min(128, { message: 'stream.bitrate deve ser >= 128 kbps' })
       .max(256, { message: 'stream.bitrate deve ser <= 256 kbps' })
       .optional(),
+
+    // Recognition settings (V2-12)
+    'recognition.sampleDuration': z
+      .number({ message: 'recognition.sampleDuration deve ser um número' })
+      .int({ message: 'recognition.sampleDuration deve ser um número inteiro' })
+      .min(5, { message: 'recognition.sampleDuration deve ser >= 5 segundos' })
+      .max(15, { message: 'recognition.sampleDuration deve ser <= 15 segundos' })
+      .optional(),
+
+    'recognition.preferredService': z
+      .enum(['acrcloud', 'audd', 'auto'], {
+        message: "recognition.preferredService deve ser 'acrcloud', 'audd' ou 'auto'",
+      })
+      .optional(),
+
+    'recognition.autoOnSessionStart': z
+      .boolean({ message: 'recognition.autoOnSessionStart deve ser um booleano' })
+      .optional(),
+
+    'recognition.autoDelay': z
+      .number({ message: 'recognition.autoDelay deve ser um número' })
+      .int({ message: 'recognition.autoDelay deve ser um número inteiro' })
+      .min(10, { message: 'recognition.autoDelay deve ser >= 10 segundos' })
+      .max(60, { message: 'recognition.autoDelay deve ser <= 60 segundos' })
+      .optional(),
   })
   .strict();
 

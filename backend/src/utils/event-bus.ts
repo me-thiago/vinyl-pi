@@ -16,7 +16,8 @@ export type EventType =
   | 'track.change.detected'
   | 'session.started'
   | 'session.ended'
-  | 'clipping.detected';
+  | 'clipping.detected'
+  | 'track.recognized'; // V2-05: Música reconhecida via ACRCloud
 
 /**
  * Event handler function signature

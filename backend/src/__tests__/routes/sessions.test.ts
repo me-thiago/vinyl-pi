@@ -68,20 +68,27 @@ describe('Sessions Router', () => {
     });
 
     it('should return sessions from database', async () => {
+      // V2-09: Mock sessions now include tracks for albumCount calculation
       const mockSessions = [
         {
           id: 'session-1',
           startedAt: new Date('2025-01-01T10:00:00.000Z'),
           endedAt: new Date('2025-01-01T11:00:00.000Z'),
           durationSeconds: 3600,
-          eventCount: 10
+          eventCount: 10,
+          tracks: [
+            { albumId: 'album-1' },
+            { albumId: 'album-1' }, // Same album, should count as 1
+            { albumId: 'album-2' }
+          ]
         },
         {
           id: 'session-2',
           startedAt: new Date('2025-01-01T14:00:00.000Z'),
           endedAt: null,
           durationSeconds: 0,
-          eventCount: 5
+          eventCount: 5,
+          tracks: [] // No albums
         }
       ];
 
@@ -94,15 +101,18 @@ describe('Sessions Router', () => {
       expect(response.body.total).toBe(2);
       expect(response.body.hasMore).toBe(false);
 
+      // V2-09: Now includes albumCount
       expect(response.body.sessions[0]).toEqual({
         id: 'session-1',
         startedAt: '2025-01-01T10:00:00.000Z',
         endedAt: '2025-01-01T11:00:00.000Z',
         durationSeconds: 3600,
-        eventCount: 10
+        eventCount: 10,
+        albumCount: 2 // 2 unique albums
       });
 
       expect(response.body.sessions[1].endedAt).toBeNull();
+      expect(response.body.sessions[1].albumCount).toBe(0);
     });
 
     describe('Pagination', () => {
@@ -146,12 +156,14 @@ describe('Sessions Router', () => {
       });
 
       it('should calculate hasMore correctly', async () => {
+        // V2-09: Include tracks array for albumCount calculation
         mockFindMany.mockResolvedValue([{
           id: '1',
           startedAt: new Date(),
           endedAt: null,
           durationSeconds: 0,
-          eventCount: 0
+          eventCount: 0,
+          tracks: []
         }]);
         mockCount.mockResolvedValue(50);
 
@@ -298,7 +310,8 @@ describe('Sessions Router', () => {
   });
 
   describe('GET /api/sessions/:id', () => {
-    it('should return session with events', async () => {
+    it('should return session with events and albums', async () => {
+      // V2-09: Mock session now includes tracks for album grouping
       const mockSession = {
         id: 'session-123',
         startedAt: new Date('2025-01-01T10:00:00.000Z'),
@@ -317,6 +330,20 @@ describe('Sessions Router', () => {
             eventType: 'silence.ended',
             timestamp: new Date('2025-01-01T10:35:00.000Z'),
             metadata: { levelDb: -30 }
+          }
+        ],
+        tracks: [
+          {
+            albumId: 'album-1',
+            title: 'Money',
+            recognizedAt: new Date('2025-01-01T10:15:00.000Z'),
+            album: {
+              id: 'album-1',
+              title: 'The Dark Side of the Moon',
+              artist: 'Pink Floyd',
+              year: 1973,
+              coverUrl: 'https://example.com/cover.jpg'
+            }
           }
         ]
       };
@@ -345,6 +372,20 @@ describe('Sessions Router', () => {
             timestamp: '2025-01-01T10:35:00.000Z',
             metadata: { levelDb: -30 }
           }
+        ],
+        // V2-09: Now includes albums array
+        albums: [
+          {
+            id: 'album-1',
+            title: 'The Dark Side of the Moon',
+            artist: 'Pink Floyd',
+            year: 1973,
+            coverUrl: 'https://example.com/cover.jpg',
+            recognizedTrack: {
+              title: 'Money',
+              recognizedAt: '2025-01-01T10:15:00.000Z'
+            }
+          }
         ]
       });
     });
@@ -358,7 +399,8 @@ describe('Sessions Router', () => {
       expect(response.body.error.message).toContain('Sessão não encontrada');
     });
 
-    it('should order events by timestamp ascending', async () => {
+    it('should order events by timestamp ascending and include tracks', async () => {
+      // V2-09: Update test to reflect new query that includes tracks
       await request(app).get('/api/sessions/session-123');
 
       expect(mockFindUnique).toHaveBeenCalledWith({
@@ -371,6 +413,16 @@ describe('Sessions Router', () => {
               eventType: true,
               timestamp: true,
               metadata: true
+            }
+          },
+          // V2-09: Now includes tracks for album grouping
+          tracks: {
+            where: { albumId: { not: null } },
+            orderBy: { recognizedAt: 'asc' },
+            include: {
+              album: {
+                select: { id: true, title: true, artist: true, year: true, coverUrl: true }
+              }
             }
           }
         }
