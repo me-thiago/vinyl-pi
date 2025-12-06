@@ -92,7 +92,7 @@ development_status:
   v2-7-ui-matching-confirmacao: done
   v2-8-player-com-colecao: deferred                          # Adiado: overlap com V2-07, depende de reconhecimento automático (V1-12)
   v2-9-historico-escuta-expandido: done
-  v2-10-estatisticas-colecao: ready-for-dev
+  v2-10-estatisticas-colecao: done
   v2-11-export-dados: ready-for-dev
   v2-12-configuracoes-reconhecimento: ready-for-dev  # Substituiu background-recognition-worker (adiado V3)
   epic-v2-retrospective: optional

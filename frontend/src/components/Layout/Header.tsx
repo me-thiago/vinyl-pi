@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Disc3, Disc, Calendar } from 'lucide-react';
+import { Disc3, Disc, Calendar, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DynamicBreadcrumb } from './DynamicBreadcrumb';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,7 @@ export function Header() {
   const navItems = [
     { path: '/collection', icon: Disc, label: t('nav.collection') },
     { path: '/sessions', icon: Calendar, label: t('nav.sessions') },
+    { path: '/stats', icon: BarChart3, label: t('nav.stats') },
   ];
 
   return (

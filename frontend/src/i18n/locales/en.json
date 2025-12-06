@@ -26,6 +26,7 @@
     "dashboard": "Dashboard",
     "collection": "Collection",
     "sessions": "Sessions",
+    "stats": "Statistics",
     "diagnostics": "Diagnostics",
     "settings": "Settings",
     "theme": "Theme"
@@ -314,6 +315,26 @@
     "addToCollection": "Add to collection",
     "linkedTo": "Music linked to {{album}}",
     "playing": "Playing: {{title}} - {{artist}}"
+  },
+  "stats": {
+    "pageTitle": "Statistics",
+    "collectionTitle": "Collection",
+    "listeningTitle": "Listening",
+    "totalAlbums": "Albums",
+    "uniqueArtists": "Artists",
+    "archivedAlbums": "Archived",
+    "manuallyAdded": "Manually added",
+    "byFormat": "By Format",
+    "byDecade": "By Decade",
+    "totalSessions": "Sessions",
+    "sessionsThisMonth": "This month",
+    "uniqueAlbumsPlayed": "Albums played",
+    "topPlayed": "Most Played",
+    "topArtists": "Top Artists",
+    "sessions_one": "{{count}} session",
+    "sessions_other": "{{count}} sessions",
+    "noData": "No data yet",
+    "noListeningData": "No albums identified yet. Use the 🎵 button on the player to record what you're listening to."
   },
   "discogs": {
     "import_title": "Import from Discogs",
