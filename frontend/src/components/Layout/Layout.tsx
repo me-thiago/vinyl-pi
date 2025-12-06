@@ -1,9 +1,12 @@
 import { Outlet } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Header } from './Header';
 import { PlayerBar } from './PlayerBar';
 import { useAudioStream } from '@/hooks/useAudioStream';
 import { useStreamingControl } from '@/hooks/useStreamingControl';
+import { useSocket } from '@/hooks/useSocket';
 
 // Contexto exportado para páginas filhas acessarem o analyser
 export interface LayoutContext {
@@ -12,7 +15,23 @@ export interface LayoutContext {
 }
 
 export function Layout() {
+  const { t } = useTranslation();
   const [bufferMs, setBufferMs] = useState(150);
+
+  // Handler para reconhecimento automático iniciado (V2-12)
+  const handleRecognitionStarted = useCallback((data: { auto: boolean }) => {
+    if (data.auto) {
+      toast.info(t('recognition.autoStarted'), {
+        description: t('recognition.autoStartedDesc'),
+        duration: 5000,
+      });
+    }
+  }, [t]);
+
+  // WebSocket para eventos globais (V2-12)
+  useSocket({
+    onRecognitionStarted: handleRecognitionStarted,
+  });
 
   // Buscar configuração de buffer da API
   useEffect(() => {

@@ -49,6 +49,30 @@ const mockSystemInfo = {
   icecastUrl: 'http://localhost:8000/stream',
 };
 
+// Mock de recognition status (V2-12)
+const mockRecognitionStatus = {
+  services: {
+    acrcloud: {
+      configured: false,
+      lastTestAt: null,
+      lastTestResult: null,
+      lastTestError: null,
+    },
+    audd: {
+      configured: true,
+      lastTestAt: null,
+      lastTestResult: null,
+      lastTestError: null,
+    },
+  },
+  settings: {
+    preferredService: 'auto',
+    sampleDuration: 10,
+    autoOnSessionStart: false,
+    autoDelay: 20,
+  },
+};
+
 describe('Settings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,6 +87,12 @@ describe('Settings', () => {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(mockSystemInfo),
+        });
+      }
+      if (url.includes('/api/recognition/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockRecognitionStatus),
         });
       }
       return Promise.resolve({ ok: false });
@@ -296,6 +326,12 @@ describe('Settings - alterações pendentes', () => {
           json: () => Promise.resolve(mockSystemInfo),
         });
       }
+      if (url.includes('/api/recognition/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockRecognitionStatus),
+        });
+      }
       return Promise.resolve({ ok: false });
     });
   });
@@ -304,7 +340,8 @@ describe('Settings - alterações pendentes', () => {
     renderWithRouter(<Settings />);
 
     await waitFor(() => {
-      expect(screen.getByRole('slider')).toBeInTheDocument();
+      // Agora temos múltiplos sliders (buffer, autoDelay, sampleDuration)
+      expect(screen.getAllByRole('slider').length).toBeGreaterThan(0);
     });
 
     // Simular alteração no slider (não pode ser testado diretamente, mas verificamos o comportamento)

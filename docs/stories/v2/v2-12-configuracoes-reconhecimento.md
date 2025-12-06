@@ -1,7 +1,7 @@
 # Story V2-12: Configurações de Reconhecimento
 
 **Epic:** V2 - Coleção & Reconhecimento Musical  
-**Status:** ready-for-dev
+**Status:** done
 
 ---
 
@@ -45,43 +45,43 @@ Quando uma sessão inicia (áudio detectado após silêncio prolongado), o siste
 ## Critérios de Aceitação
 
 ### AC-1: Backend - Settings de Reconhecimento
-- [ ] Novos campos em Settings:
+- [x] Novos campos em Settings:
   - `recognition.sampleDuration` (number, default: 10, min: 5, max: 15)
   - `recognition.preferredService` (enum: 'acrcloud' | 'audd' | 'auto', default: 'auto')
   - `recognition.autoOnSessionStart` (boolean, default: false)
   - `recognition.autoDelay` (number, default: 20, min: 10, max: 60)
-- [ ] Campos salvos via API existente `PUT /api/settings`
+- [x] Campos salvos via API existente `PUT /api/settings`
 
 ### AC-2: Backend - Validação de API Keys
-- [ ] `GET /api/recognition/status` retorna status das APIs configuradas
-- [ ] `POST /api/recognition/test` testa conexão com APIs (sem reconhecer áudio)
-- [ ] Status inclui: apiConfigured, lastTestResult, lastTestAt, autoEnabled
-- [ ] Validação no startup (log warning se keys ausentes)
+- [x] `GET /api/recognition/status` retorna status das APIs configuradas
+- [x] `POST /api/recognition/test` testa conexão com APIs (sem reconhecer áudio)
+- [x] Status inclui: apiConfigured, lastTestResult, lastTestAt, autoEnabled
+- [x] Validação no startup (log warning se keys ausentes)
 
 ### AC-3: Backend - Auto-Reconhecimento no Início da Sessão
-- [ ] Quando `session.started` é emitido E `autoOnSessionStart` está habilitado:
+- [x] Quando `session.started` é emitido E `autoOnSessionStart` está habilitado:
   - Aguarda `autoDelay` segundos
   - Dispara reconhecimento automático
   - Salva track vinculado à sessão
   - Emite WebSocket event `track_recognized`
-- [ ] Se sessão terminar antes do delay, cancela o reconhecimento
-- [ ] Se reconhecimento falhar, loga erro mas não afeta sessão
-- [ ] Apenas 1 auto-reconhecimento por sessão (não repete se manual acontecer antes)
+- [x] Se sessão terminar antes do delay, cancela o reconhecimento
+- [x] Se reconhecimento falhar, loga erro mas não afeta sessão
+- [x] Apenas 1 auto-reconhecimento por sessão (não repete se manual acontecer antes)
 
 ### AC-4: UI - Seção em Settings
-- [ ] Nova seção "Reconhecimento Musical" na página Settings
-- [ ] Toggle "Reconhecimento automático ao iniciar sessão" (default: off)
-- [ ] Slider para delay (10-60 segundos, default: 20)
-- [ ] Campos para API keys (mascarados com ••••••)
-- [ ] Dropdown para serviço preferido
-- [ ] Slider para duração da amostra (5-15 segundos)
-- [ ] Botão "Testar Conexão" com feedback visual
-- [ ] Status: "✅ Configurado" ou "⚠️ Não configurado"
+- [x] Nova seção "Reconhecimento Musical" na página Settings
+- [x] Toggle "Reconhecimento automático ao iniciar sessão" (default: off)
+- [x] Slider para delay (10-60 segundos, default: 20)
+- [x] Campos para API keys (mascarados com ••••••)
+- [x] Dropdown para serviço preferido
+- [x] Slider para duração da amostra (5-15 segundos)
+- [x] Botão "Testar Conexão" com feedback visual
+- [x] Status: "✅ Configurado" ou "⚠️ Não configurado"
 
 ### AC-5: WebSocket - Notificação de Auto-Reconhecimento
-- [ ] Evento `recognition_started` quando auto-reconhecimento inicia
-- [ ] Evento `track_recognized` quando completa (já existe)
-- [ ] Frontend mostra toast/notificação: "Identificando música..."
+- [x] Evento `recognition_started` quando auto-reconhecimento inicia
+- [x] Evento `track_recognized` quando completa (já existe)
+- [x] Frontend mostra toast/notificação: "Identificando música..."
 
 ---
 

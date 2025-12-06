@@ -6,10 +6,15 @@ import {
   recognizeSchema,
   recognizeConfirmSchema,
   tracksQuerySchema,
+  recognitionTestSchema,
+  recognitionConfigSchema,
   RecognizeInput,
   RecognizeConfirmInput,
   TracksQueryInput,
+  RecognitionTestInput,
+  RecognitionConfigInput,
 } from '../schemas';
+import { SettingsService } from '../services/settings-service';
 import {
   recognize,
   confirmTrackAlbum,
@@ -32,6 +37,7 @@ const logger = createLogger('RecognitionRouter');
 export interface RecognitionRouterDeps {
   sessionManager: SessionManager;
   audioManager: AudioManager;
+  settingsService: SettingsService;
 }
 
 /**
@@ -93,9 +99,19 @@ function formatTrackResponse(track: {
  * - POST /api/recognize/confirm - Confirma vínculo track/álbum
  * - GET /api/tracks - Lista histórico de tracks reconhecidos
  */
+/**
+ * Cache para resultados de teste de API (evitar muitas requisições)
+ */
+interface ApiTestCache {
+  acrcloud?: { result: 'success' | 'error'; error?: string; testAt: Date };
+  audd?: { result: 'success' | 'error'; error?: string; testAt: Date };
+}
+
+const apiTestCache: ApiTestCache = {};
+
 export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
   const router = Router();
-  const { sessionManager, audioManager } = deps;
+  const { sessionManager, audioManager, settingsService } = deps;
 
   /**
    * @openapi
@@ -471,6 +487,288 @@ export function createRecognitionRouter(deps: RecognitionRouterDeps): Router {
       });
     }
   });
+
+  /**
+   * @openapi
+   * /api/recognition/status:
+   *   get:
+   *     summary: Status das APIs de reconhecimento (V2-12)
+   *     description: Retorna status de configuração e último teste das APIs
+   *     tags:
+   *       - Recognition
+   *     responses:
+   *       200:
+   *         description: Status das APIs
+   */
+  router.get('/recognition/status', async (_req: Request, res: Response) => {
+    try {
+      // Verificar configuração das APIs
+      const auddConfigured = !!process.env.AUDD_API_KEY;
+      const acrcloudConfigured = !!(
+        process.env.ACRCLOUD_ACCESS_KEY &&
+        process.env.ACRCLOUD_ACCESS_SECRET &&
+        process.env.ACRCLOUD_HOST
+      );
+
+      // Buscar settings de reconhecimento
+      const preferredService = settingsService.get<string>('recognition.preferredService');
+      const sampleDuration = settingsService.get<number>('recognition.sampleDuration');
+      const autoOnSessionStart = settingsService.get<boolean>('recognition.autoOnSessionStart');
+      const autoDelay = settingsService.get<number>('recognition.autoDelay');
+
+      res.json({
+        services: {
+          acrcloud: {
+            configured: acrcloudConfigured,
+            lastTestAt: apiTestCache.acrcloud?.testAt?.toISOString() || null,
+            lastTestResult: apiTestCache.acrcloud?.result || null,
+            lastTestError: apiTestCache.acrcloud?.error || null,
+          },
+          audd: {
+            configured: auddConfigured,
+            lastTestAt: apiTestCache.audd?.testAt?.toISOString() || null,
+            lastTestResult: apiTestCache.audd?.result || null,
+            lastTestError: apiTestCache.audd?.error || null,
+          },
+        },
+        settings: {
+          preferredService,
+          sampleDuration,
+          autoOnSessionStart,
+          autoDelay,
+        },
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error('Erro ao obter status de reconhecimento', { error: errorMsg });
+      res.status(500).json({
+        error: {
+          message: 'Erro ao obter status de reconhecimento',
+          code: 'RECOGNITION_STATUS_ERROR',
+        },
+      });
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/recognition/test:
+   *   post:
+   *     summary: Testa conexão com API de reconhecimento (V2-12)
+   *     description: Testa se a API está acessível e as credenciais são válidas
+   *     tags:
+   *       - Recognition
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - service
+   *             properties:
+   *               service:
+   *                 type: string
+   *                 enum: [acrcloud, audd]
+   *     responses:
+   *       200:
+   *         description: Resultado do teste
+   *       400:
+   *         description: Serviço não configurado
+   */
+  router.post(
+    '/recognition/test',
+    validate(recognitionTestSchema, 'body'),
+    async (req: Request, res: Response) => {
+      const { service } = req.body as RecognitionTestInput;
+      const startTime = Date.now();
+
+      try {
+        if (service === 'audd') {
+          const apiKey = process.env.AUDD_API_KEY;
+          if (!apiKey) {
+            res.status(400).json({
+              success: false,
+              message: 'AudD não configurado. Configure AUDD_API_KEY no .env',
+            });
+            return;
+          }
+
+          // Testar AudD com uma requisição simples (sem áudio, apenas verifica credenciais)
+          // AudD retorna erro específico se a chave for inválida
+          const axios = await import('axios');
+          const FormData = await import('form-data');
+          const form = new FormData.default();
+          form.append('api_token', apiKey);
+          form.append('return', 'spotify');
+
+          // Enviar requisição sem arquivo - AudD vai retornar erro, mas valida a key
+          const response = await axios.default.post('https://api.audd.io/', form, {
+            headers: form.getHeaders(),
+            timeout: 10000,
+          });
+
+          const responseTime = Date.now() - startTime;
+
+          // AudD retorna status: 'success' mesmo sem áudio (result será null)
+          // ou status: 'error' com código de erro
+          if (response.data.status === 'error' && response.data.error?.error_code === 901) {
+            // Error 901 = Invalid api_token
+            apiTestCache.audd = {
+              result: 'error',
+              error: 'API key inválida',
+              testAt: new Date(),
+            };
+            res.json({
+              success: false,
+              message: 'API key inválida',
+              responseTime,
+            });
+            return;
+          }
+
+          // Qualquer outra resposta significa que a key é válida
+          apiTestCache.audd = {
+            result: 'success',
+            testAt: new Date(),
+          };
+
+          res.json({
+            success: true,
+            message: 'Conexão OK',
+            responseTime,
+          });
+        } else if (service === 'acrcloud') {
+          // ACRCloud não está implementado no momento
+          const accessKey = process.env.ACRCLOUD_ACCESS_KEY;
+          if (!accessKey) {
+            res.status(400).json({
+              success: false,
+              message: 'ACRCloud não configurado',
+            });
+            return;
+          }
+
+          // ACRCloud requer autenticação HMAC-SHA1, teste simplificado
+          apiTestCache.acrcloud = {
+            result: 'error',
+            error: 'Teste de ACRCloud não implementado (usando AudD)',
+            testAt: new Date(),
+          };
+
+          res.json({
+            success: false,
+            message: 'ACRCloud não suportado atualmente. Use AudD.',
+            responseTime: Date.now() - startTime,
+          });
+        }
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+
+        logger.error('Erro ao testar API de reconhecimento', { service, error: errorMsg });
+
+        // Atualizar cache com erro
+        if (service === 'audd') {
+          apiTestCache.audd = {
+            result: 'error',
+            error: errorMsg,
+            testAt: new Date(),
+          };
+        } else {
+          apiTestCache.acrcloud = {
+            result: 'error',
+            error: errorMsg,
+            testAt: new Date(),
+          };
+        }
+
+        res.json({
+          success: false,
+          message: errorMsg,
+          responseTime,
+        });
+      }
+    }
+  );
+
+  /**
+   * @openapi
+   * /api/recognition/config:
+   *   put:
+   *     summary: Atualiza configurações de reconhecimento (V2-12)
+   *     description: Atualiza preferências de reconhecimento
+   *     tags:
+   *       - Recognition
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               preferredService:
+   *                 type: string
+   *                 enum: [acrcloud, audd, auto]
+   *               sampleDuration:
+   *                 type: integer
+   *                 minimum: 5
+   *                 maximum: 15
+   *               autoOnSessionStart:
+   *                 type: boolean
+   *               autoDelay:
+   *                 type: integer
+   *                 minimum: 10
+   *                 maximum: 60
+   *     responses:
+   *       200:
+   *         description: Configurações atualizadas
+   */
+  router.put(
+    '/recognition/config',
+    validate(recognitionConfigSchema, 'body'),
+    async (req: Request, res: Response) => {
+      try {
+        const config = req.body as RecognitionConfigInput;
+        const updates: Record<string, string | number | boolean> = {};
+
+        if (config.preferredService !== undefined) {
+          updates['recognition.preferredService'] = config.preferredService;
+        }
+        if (config.sampleDuration !== undefined) {
+          updates['recognition.sampleDuration'] = config.sampleDuration;
+        }
+        if (config.autoOnSessionStart !== undefined) {
+          updates['recognition.autoOnSessionStart'] = config.autoOnSessionStart;
+        }
+        if (config.autoDelay !== undefined) {
+          updates['recognition.autoDelay'] = config.autoDelay;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await settingsService.update(updates);
+        }
+
+        // Retornar configurações atualizadas
+        res.json({
+          settings: {
+            preferredService: settingsService.get<string>('recognition.preferredService'),
+            sampleDuration: settingsService.get<number>('recognition.sampleDuration'),
+            autoOnSessionStart: settingsService.get<boolean>('recognition.autoOnSessionStart'),
+            autoDelay: settingsService.get<number>('recognition.autoDelay'),
+          },
+        });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao atualizar config de reconhecimento', { error: errorMsg });
+        res.status(500).json({
+          error: {
+            message: 'Erro ao atualizar configurações',
+            code: 'CONFIG_UPDATE_ERROR',
+          },
+        });
+      }
+    }
+  );
 
   return router;
 }

@@ -91,6 +91,41 @@ export const SETTINGS_DEFINITIONS: SettingDefinition[] = [
     min: 128,
     max: 256,
     unit: 'kbps'
+  },
+  // Recognition settings (V2-12)
+  {
+    key: 'recognition.sampleDuration',
+    defaultValue: 10,
+    type: 'number',
+    label: 'Sample Duration',
+    description: 'Duração da amostra de áudio para reconhecimento',
+    min: 5,
+    max: 15,
+    unit: 's'
+  },
+  {
+    key: 'recognition.preferredService',
+    defaultValue: 'auto',
+    type: 'string',
+    label: 'Serviço Preferido',
+    description: 'Serviço de reconhecimento musical preferido'
+  },
+  {
+    key: 'recognition.autoOnSessionStart',
+    defaultValue: false,
+    type: 'boolean',
+    label: 'Auto ao Iniciar Sessão',
+    description: 'Identificar automaticamente ao iniciar uma sessão de escuta'
+  },
+  {
+    key: 'recognition.autoDelay',
+    defaultValue: 20,
+    type: 'number',
+    label: 'Delay Auto-Reconhecimento',
+    description: 'Tempo de espera após início da sessão para reconhecer',
+    min: 10,
+    max: 60,
+    unit: 's'
   }
 ];
 

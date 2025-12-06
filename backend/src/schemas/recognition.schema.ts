@@ -78,8 +78,49 @@ export const tracksQuerySchema = z.object({
     .optional(),
 });
 
+/**
+ * Enum de serviços de reconhecimento disponíveis (V2-12)
+ */
+export const RecognitionServiceEnum = z.enum(['acrcloud', 'audd', 'auto'], {
+  message: 'Serviço deve ser: acrcloud, audd ou auto',
+});
+
+/**
+ * Schema para POST /api/recognition/test (V2-12)
+ * Testa conexão com um serviço de reconhecimento
+ */
+export const recognitionTestSchema = z.object({
+  service: z.enum(['acrcloud', 'audd'], {
+    message: 'Serviço deve ser: acrcloud ou audd',
+  }),
+});
+
+/**
+ * Schema para PUT /api/recognition/config (V2-12)
+ * Atualiza configurações de reconhecimento
+ */
+export const recognitionConfigSchema = z.object({
+  preferredService: RecognitionServiceEnum.optional(),
+  sampleDuration: z.coerce
+    .number()
+    .int({ message: 'Duração do sample deve ser um número inteiro' })
+    .min(5, { message: 'Duração mínima é 5 segundos' })
+    .max(15, { message: 'Duração máxima é 15 segundos' })
+    .optional(),
+  autoOnSessionStart: z.boolean().optional(),
+  autoDelay: z.coerce
+    .number()
+    .int({ message: 'Delay deve ser um número inteiro' })
+    .min(10, { message: 'Delay mínimo é 10 segundos' })
+    .max(60, { message: 'Delay máximo é 60 segundos' })
+    .optional(),
+});
+
 // Types exportados
 export type RecognizeTrigger = z.infer<typeof RecognitionTriggerEnum>;
 export type RecognizeInput = z.infer<typeof recognizeSchema>;
 export type RecognizeConfirmInput = z.infer<typeof recognizeConfirmSchema>;
 export type TracksQueryInput = z.infer<typeof tracksQuerySchema>;
+export type RecognitionService = z.infer<typeof RecognitionServiceEnum>;
+export type RecognitionTestInput = z.infer<typeof recognitionTestSchema>;
+export type RecognitionConfigInput = z.infer<typeof recognitionConfigSchema>;

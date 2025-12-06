@@ -7,7 +7,10 @@ import {
   Copy,
   Check,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Music,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 
 // Configuracao da API
 const API_HOST = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`
@@ -63,6 +67,37 @@ const BITRATE_OPTIONS = [
   { value: '256', label: '256 kbps', description: 'Maior qualidade' }
 ]
 
+// Recognition service options
+const SERVICE_OPTIONS = [
+  { value: 'auto', labelKey: 'serviceAuto' },
+  { value: 'audd', labelKey: 'serviceAudd' },
+  { value: 'acrcloud', labelKey: 'serviceAcrcloud' }
+]
+
+// Recognition status type
+interface RecognitionStatus {
+  services: {
+    acrcloud: {
+      configured: boolean
+      lastTestAt: string | null
+      lastTestResult: 'success' | 'error' | null
+      lastTestError: string | null
+    }
+    audd: {
+      configured: boolean
+      lastTestAt: string | null
+      lastTestResult: 'success' | 'error' | null
+      lastTestError: string | null
+    }
+  }
+  settings: {
+    preferredService: 'acrcloud' | 'audd' | 'auto'
+    sampleDuration: number
+    autoOnSessionStart: boolean
+    autoDelay: number
+  }
+}
+
 export default function Settings() {
   const { t } = useTranslation()
   const [settings, setSettings] = useState<SettingDefinition[]>([])
@@ -77,6 +112,20 @@ export default function Settings() {
   // Valores pendentes
   const [pendingBuffer, setPendingBuffer] = useState<number | null>(null)
   const [pendingBitrate, setPendingBitrate] = useState<string | null>(null)
+
+  // Recognition settings (V2-12)
+  const [recognitionStatus, setRecognitionStatus] = useState<RecognitionStatus | null>(null)
+  const [recognitionLoading, setRecognitionLoading] = useState(true)
+  const [testingService, setTestingService] = useState<'acrcloud' | 'audd' | null>(null)
+  const [testResult, setTestResult] = useState<{ service: string; success: boolean; message: string } | null>(null)
+  const [savingRecognition, setSavingRecognition] = useState(false)
+  const [recognitionSaved, setRecognitionSaved] = useState(false)
+
+  // Pending recognition settings
+  const [pendingAutoEnabled, setPendingAutoEnabled] = useState<boolean | null>(null)
+  const [pendingAutoDelay, setPendingAutoDelay] = useState<number | null>(null)
+  const [pendingPreferredService, setPendingPreferredService] = useState<string | null>(null)
+  const [pendingSampleDuration, setPendingSampleDuration] = useState<number | null>(null)
 
   // Buscar settings
   const fetchSettings = useCallback(async () => {
@@ -103,9 +152,91 @@ export default function Settings() {
     }
   }, [t])
 
+  // Buscar status de reconhecimento (V2-12)
+  const fetchRecognitionStatus = useCallback(async () => {
+    try {
+      setRecognitionLoading(true)
+      const res = await fetch(`${API_BASE}/recognition/status`)
+      if (!res.ok) throw new Error('Falha ao carregar status de reconhecimento')
+      const data = await res.json()
+      setRecognitionStatus(data)
+    } catch (err) {
+      console.error('Erro ao buscar status de reconhecimento:', err)
+    } finally {
+      setRecognitionLoading(false)
+    }
+  }, [])
+
+  // Testar conexão com API de reconhecimento
+  const testApiConnection = useCallback(async (service: 'acrcloud' | 'audd') => {
+    setTestingService(service)
+    setTestResult(null)
+    try {
+      const res = await fetch(`${API_BASE}/recognition/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service })
+      })
+      const data = await res.json()
+      setTestResult({
+        service,
+        success: data.success,
+        message: data.success
+          ? t('recognition.settings.testSuccess', { time: data.responseTime })
+          : data.message
+      })
+    } catch (err) {
+      setTestResult({
+        service,
+        success: false,
+        message: err instanceof Error ? err.message : 'Erro desconhecido'
+      })
+    } finally {
+      setTestingService(null)
+    }
+  }, [t])
+
+  // Salvar configurações de reconhecimento
+  const saveRecognitionSettings = useCallback(async () => {
+    setSavingRecognition(true)
+    try {
+      const updates: Record<string, unknown> = {}
+      if (pendingAutoEnabled !== null) updates.autoOnSessionStart = pendingAutoEnabled
+      if (pendingAutoDelay !== null) updates.autoDelay = pendingAutoDelay
+      if (pendingPreferredService !== null) updates.preferredService = pendingPreferredService
+      if (pendingSampleDuration !== null) updates.sampleDuration = pendingSampleDuration
+
+      const res = await fetch(`${API_BASE}/recognition/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+
+      if (!res.ok) throw new Error('Falha ao salvar configurações')
+
+      // Limpar pending states
+      setPendingAutoEnabled(null)
+      setPendingAutoDelay(null)
+      setPendingPreferredService(null)
+      setPendingSampleDuration(null)
+
+      // Recarregar status
+      await fetchRecognitionStatus()
+
+      // Mostrar sucesso
+      setRecognitionSaved(true)
+      setTimeout(() => setRecognitionSaved(false), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar')
+    } finally {
+      setSavingRecognition(false)
+    }
+  }, [pendingAutoEnabled, pendingAutoDelay, pendingPreferredService, pendingSampleDuration, fetchRecognitionStatus])
+
   useEffect(() => {
     fetchSettings()
-  }, [fetchSettings])
+    fetchRecognitionStatus()
+  }, [fetchSettings, fetchRecognitionStatus])
 
   // Obter valor de uma setting
   const getSettingValue = useCallback((key: string): number => {
@@ -120,6 +251,19 @@ export default function Settings() {
   // Verificar se ha mudancas
   const hasBufferChange = pendingBuffer !== null && pendingBuffer !== getSettingValue('player.buffer_ms')
   const hasBitrateChange = pendingBitrate !== null && pendingBitrate !== String(getSettingValue('stream.bitrate'))
+
+  // Current recognition values (pending or saved)
+  const currentAutoEnabled = pendingAutoEnabled ?? recognitionStatus?.settings.autoOnSessionStart ?? false
+  const currentAutoDelay = pendingAutoDelay ?? recognitionStatus?.settings.autoDelay ?? 20
+  const currentPreferredService = pendingPreferredService ?? recognitionStatus?.settings.preferredService ?? 'auto'
+  const currentSampleDuration = pendingSampleDuration ?? recognitionStatus?.settings.sampleDuration ?? 10
+
+  // Has recognition changes
+  const hasRecognitionChanges =
+    (pendingAutoEnabled !== null && pendingAutoEnabled !== recognitionStatus?.settings.autoOnSessionStart) ||
+    (pendingAutoDelay !== null && pendingAutoDelay !== recognitionStatus?.settings.autoDelay) ||
+    (pendingPreferredService !== null && pendingPreferredService !== recognitionStatus?.settings.preferredService) ||
+    (pendingSampleDuration !== null && pendingSampleDuration !== recognitionStatus?.settings.sampleDuration)
 
   // Salvar buffer
   const saveBuffer = useCallback(async () => {
@@ -371,7 +515,201 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {/* Card 3: Sistema (read-only) */}
+            {/* Card 3: Reconhecimento Musical (V2-12) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Music className="w-5 h-5" />
+                  {t('recognition.settings.title')}
+                </CardTitle>
+                <CardDescription>
+                  {t('recognition.settings.description')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {recognitionLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    {t('common.loading')}
+                  </div>
+                ) : (
+                  <>
+                    {/* Seção: Reconhecimento Automático */}
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium">{t('recognition.settings.autoSection')}</h4>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="auto-recognition">
+                            {t('recognition.settings.autoOnSessionStart')}
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {t('recognition.settings.autoOnSessionStartDesc')}
+                          </p>
+                        </div>
+                        <Switch
+                          id="auto-recognition"
+                          checked={currentAutoEnabled}
+                          onCheckedChange={(checked) => setPendingAutoEnabled(checked)}
+                        />
+                      </div>
+
+                      {currentAutoEnabled && (
+                        <div className="space-y-3 pl-4 border-l-2 border-muted">
+                          <div className="flex items-center justify-between">
+                            <Label>{t('recognition.settings.autoDelay')}</Label>
+                            <span className="font-mono text-sm tabular-nums">
+                              {currentAutoDelay} {t('recognition.settings.seconds')}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[currentAutoDelay]}
+                            onValueChange={([value]: number[]) => setPendingAutoDelay(value)}
+                            min={10}
+                            max={60}
+                            step={5}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t pt-4 space-y-4">
+                      <h4 className="text-sm font-medium">{t('recognition.settings.generalSection')}</h4>
+
+                      {/* Serviço Preferido */}
+                      <div className="space-y-2">
+                        <Label>{t('recognition.settings.preferredService')}</Label>
+                        <Select
+                          value={currentPreferredService}
+                          onValueChange={(value) => setPendingPreferredService(value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SERVICE_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {t(`recognition.settings.${option.labelKey}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Duração da Amostra */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>{t('recognition.settings.sampleDuration')}</Label>
+                          <span className="font-mono text-sm tabular-nums">
+                            {currentSampleDuration} {t('recognition.settings.seconds')}
+                          </span>
+                        </div>
+                        <Slider
+                          value={[currentSampleDuration]}
+                          onValueChange={([value]: number[]) => setPendingSampleDuration(value)}
+                          min={5}
+                          max={15}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* API Keys Status */}
+                    <div className="border-t pt-4 space-y-4">
+                      <h4 className="text-sm font-medium">{t('recognition.settings.apiKeysSection')}</h4>
+
+                      {/* AudD */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">AudD</span>
+                          {recognitionStatus?.services.audd.configured ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {t('recognition.settings.configured')}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-yellow-600">
+                              <XCircle className="w-3 h-3" />
+                              {t('recognition.settings.notConfigured')}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => testApiConnection('audd')}
+                          disabled={testingService !== null || !recognitionStatus?.services.audd.configured}
+                        >
+                          {testingService === 'audd' ? t('recognition.settings.testing') : t('recognition.settings.testConnection')}
+                        </Button>
+                      </div>
+
+                      {/* ACRCloud */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">ACRCloud</span>
+                          {recognitionStatus?.services.acrcloud.configured ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {t('recognition.settings.configured')}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <XCircle className="w-3 h-3" />
+                              {t('recognition.settings.notConfigured')}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => testApiConnection('acrcloud')}
+                          disabled={testingService !== null || !recognitionStatus?.services.acrcloud.configured}
+                        >
+                          {testingService === 'acrcloud' ? t('recognition.settings.testing') : t('recognition.settings.testConnection')}
+                        </Button>
+                      </div>
+
+                      {/* Test Result */}
+                      {testResult && (
+                        <Alert variant={testResult.success ? 'default' : 'destructive'}>
+                          {testResult.success ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4" />
+                          )}
+                          <AlertDescription>{testResult.message}</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+
+                    {/* Saved Success */}
+                    {recognitionSaved && (
+                      <Alert className="border-green-500 bg-green-500/10">
+                        <Check className="h-4 w-4 text-green-500" />
+                        <AlertDescription className="text-green-700 dark:text-green-300">
+                          {t('recognition.settings.saved')}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Save Button */}
+                    {hasRecognitionChanges && (
+                      <Button
+                        onClick={saveRecognitionSettings}
+                        disabled={savingRecognition}
+                        className="w-full"
+                      >
+                        {savingRecognition ? t('recognition.settings.saving') : t('recognition.settings.save')}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Card 4: Sistema (read-only) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
