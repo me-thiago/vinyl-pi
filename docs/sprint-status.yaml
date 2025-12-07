@@ -97,21 +97,48 @@ development_status:
   v2-12-configuracoes-reconhecimento: done  # V2-12: Configurações de Reconhecimento implementadas
   epic-v2-retrospective: completed          # Retrospectiva realizada em 2025-12-06
 
-  # Epic V3 - Gravação & Análise
-  epic-v3: backlog
-  v3-1-schema-dados-v3: drafted
-  v3-2-dual-path-architecture: drafted
-  v3-3-gravacao-flac-automatica: drafted
-  v3-4-segmentacao-automatica: drafted
-  v3-5-gravacao-manual-preroll: drafted
-  v3-6-ui-gravacoes: drafted
-  v3-7-geracao-chromaprint: drafted
-  v3-8-reconhecimento-offline: drafted
-  v3-9-analise-snr-wow-flutter: drafted
-  v3-10-deteccao-clicks-pops: drafted
-  v3-11-health-score-relatorios: drafted
-  v3-12-ui-qa-visualizacoes: drafted
-  epic-v3-retrospective: optional
+  # ============================================
+  # Epic V3 - Dividido em 3 fases (V3a/V3b/V3c)
+  # Decisão: 2025-12-06 - Reduzir risco, validação incremental
+  # Ver: docs/epic-v3-vision.md para detalhes
+  # ============================================
+
+  # Epic V3a - Gravação & Fundação (🟢 Baixo-Médio risco)
+  # Tech-spec: docs/tech-spec-epic-v3a.md
+  # Stories: docs/stories/v3a/
+  epic-v3a: contexted
+  v3-01-schema-dados-v3: done              # Tabelas Recording, TrackMarker
+  v3-02-quad-path-architecture: drafted    # FIFO3 + FFmpeg #4
+  v3-03-gravacao-flac-manual: drafted      # API start/stop + RecordingManager
+  v3-04-ui-gravacoes: drafted              # Listagem + botão Record no footer
+  v3-05-ui-detalhe-album: drafted          # Página expandida com gravações
+  v3-06-editor-audio: drafted              # Waveform + trim + marcadores
+  epic-v3a-retrospective: optional
+
+  # Epic V3b - Reconhecimento Offline (🟡 Médio-Alto risco)
+  # Tech-spec: pendente (após V3a)
+  # Depende de V3a completo
+  epic-v3b: backlog
+  v3-07-schema-chromaprints: backlog       # Tabela chromaprints por faixa
+  v3-08-geracao-chromaprint: backlog       # Serviço fpcalc + processamento FLAC
+  v3-09-segmentacao-faixas: backlog        # Usar marcadores do editor
+  v3-10-ui-geracao-fingerprints: backlog   # Botão na página do álbum
+  v3-11-matching-engine: backlog           # Comparar fingerprints (maior risco)
+  v3-12-integracao-local-first: backlog    # Modificar RecognitionService
+  v3-13-ui-now-playing-offline: backlog    # Badge "Local" vs "AudD"
+  epic-v3b-retrospective: optional
+
+  # Epic V3c - Análise & Insights (🔴 Alto risco)
+  # Tech-spec: pendente (após V3b)
+  # Depende de V3a completo (arquivos FLAC para análise)
+  epic-v3c: backlog
+  v3-14-analise-meyda: backlog             # Processar FLAC para SNR, spectral
+  v3-15-deteccao-clicks-pops: backlog      # Identificar transientes súbitos
+  v3-16-deteccao-wow-flutter: backlog      # Medir variação de pitch
+  v3-17-health-score: backlog              # Calcular score 0-100
+  v3-18-relatorio-qualidade: backlog       # Gerar relatório por gravação
+  v3-19-ui-visualizacoes: backlog          # Waveform, timeline de eventos
+  epic-v3c-retrospective: optional
 
   # Epic V4 - Polimento & Controles Avançados
   epic-v4: backlog

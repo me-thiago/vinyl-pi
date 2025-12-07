@@ -64,6 +64,18 @@ enum RecognitionSource {
 }
 
 // ============================================
+// V3a Enums - Gravação & Fundação
+// ============================================
+
+/// Status da gravação FLAC
+enum RecordingStatus {
+  recording    // Gravação em andamento
+  completed    // Gravação finalizada
+  processing   // Processando (trim, etc)
+  error        // Erro durante gravação
+}
+
+// ============================================
 // V1 Models - Foundation Core
 // ============================================
 
@@ -75,6 +87,7 @@ model Session {
   eventCount      Int          @default(0)
   audioEvents     AudioEvent[]
   tracks          Track[]      // V2: Tracks reconhecidos nesta sessão
+  recordings      Recording[]  // V3a: Gravações realizadas nesta sessão
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -120,6 +133,7 @@ model Album {
   notes            String?
   archived         Boolean         @default(false) // true = usuário não possui mais
   tracks           Track[]
+  recordings       Recording[]     // V3a: Gravações vinculadas a este álbum
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -154,4 +168,63 @@ model Track {
   @@index([albumId])
   @@index([recognizedAt(sort: Desc)])
   @@index([artist, title])
+}
+
+// ============================================
+// V3a Models - Gravação & Fundação
+// ============================================
+
+/// Gravação FLAC de um álbum ou sessão de escuta
+model Recording {
+  id               String          @id @default(uuid())
+  albumId          String?
+  album            Album?          @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  sessionId        String?
+  session          Session?        @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Arquivo
+  filePath         String          // Caminho relativo: YYYY-MM/rec-{id}.flac
+  fileName         String          // Nome amigável (ex: "Abbey Road - Lado A")
+  format           String          @default("flac")
+  sampleRate       Int             @default(48000)
+  bitDepth         Int             @default(16)
+  channels         Int             @default(2)
+
+  // Metadados
+  durationSeconds  Int?            // Duração total em segundos
+  fileSizeBytes    Int?            // Tamanho do arquivo
+  status           RecordingStatus @default(recording)
+  notes            String?         // Notas do usuário
+
+  // Timestamps
+  startedAt        DateTime        @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  // Relacionamentos
+  trackMarkers     TrackMarker[]
+
+  @@index([albumId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([startedAt(sort: Desc)])
+}
+
+/// Marcador de faixa dentro de uma gravação FLAC
+model TrackMarker {
+  id               String          @id @default(uuid())
+  recordingId      String
+  recording        Recording       @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  trackNumber      Int             // 1, 2, 3...
+  title            String?         // Nome da faixa (opcional)
+  startOffset      Float           // Início em segundos (ex: 0.0, 180.5)
+  endOffset        Float           // Fim em segundos (ex: 180.5, 360.0)
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([recordingId, trackNumber])
+  @@index([recordingId])
 }
