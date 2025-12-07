@@ -122,6 +122,7 @@ export class AudioManager extends EventEmitter {
   private levelDb?: number;
   private fifoPath: string = '/tmp/vinyl-audio.fifo';
   private recognitionFifoPath: string = '/tmp/vinyl-recognition.fifo';
+  private flacFifoPath: string = '/tmp/vinyl-flac.fifo';  // V3a: FIFO3 para gravação FLAC
   private logRateLimiter = new Map<string, number>();
   private LOG_RATE_LIMIT_MS = 5000; // Log mesmo erro max 1x/5s
   private retryCount = 0;
@@ -591,6 +592,18 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
+   * Retorna o caminho do FIFO3 para gravação FLAC (V3a)
+   *
+   * O RecordingManager usa este path para iniciar FFmpeg #4
+   * que lê PCM do FIFO e grava FLAC.
+   *
+   * @returns Caminho do FIFO FLAC
+   */
+  getFlacFifoPath(): string {
+    return this.flacFifoPath;
+  }
+
+  /**
    * Retorna o stream WAV (stdout do FFmpeg)
    *
    * Usado pelo endpoint /stream.wav para servir áudio PCM de baixa latência.
@@ -615,14 +628,15 @@ export class AudioManager extends EventEmitter {
   /**
    * Cria Named Pipes (FIFOs) para compartilhar áudio entre processos
    *
-   * Dois FIFOs são criados:
+   * Três FIFOs são criados (V3a: Quad-Path Architecture):
    * 1. vinyl-audio.fifo - Para FFmpeg MP3 → Icecast2
    * 2. vinyl-recognition.fifo - Para recognition service (captura de samples)
+   * 3. vinyl-flac.fifo - Para FFmpeg FLAC → Recording (V3a)
    *
    * @private
    */
   private async createFifo(): Promise<void> {
-    const fifoPaths = [this.fifoPath, this.recognitionFifoPath];
+    const fifoPaths = [this.fifoPath, this.recognitionFifoPath, this.flacFifoPath];
 
     for (const fifoPath of fifoPaths) {
       try {
@@ -650,11 +664,11 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Remove Named Pipes (FIFOs)
+   * Remove Named Pipes (FIFOs) - V3a: inclui FIFO3 (FLAC)
    * @private
    */
   private async cleanupFifo(): Promise<void> {
-    const fifoPaths = [this.fifoPath, this.recognitionFifoPath];
+    const fifoPaths = [this.fifoPath, this.recognitionFifoPath, this.flacFifoPath];
 
     for (const fifoPath of fifoPaths) {
       try {
@@ -771,6 +785,13 @@ export class AudioManager extends EventEmitter {
     args.push('-c:a', 'pcm_s16le');
     args.push('-f', 's16le');
     args.push(this.recognitionFifoPath);
+
+    // Output 4: Raw PCM para FIFO de FLAC Recording (V3a)
+    // RecordingManager lê daqui e grava FLAC via FFmpeg #4
+    args.push('-map', '0:a');
+    args.push('-c:a', 'pcm_s16le');
+    args.push('-f', 's16le');
+    args.push(this.flacFifoPath);
 
     return args;
   }

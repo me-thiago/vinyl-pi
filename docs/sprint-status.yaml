@@ -108,7 +108,7 @@ development_status:
   # Stories: docs/stories/v3a/
   epic-v3a: contexted
   v3-01-schema-dados-v3: done              # Tabelas Recording, TrackMarker
-  v3-02-quad-path-architecture: drafted    # FIFO3 + FFmpeg #4
+  v3-02-quad-path-architecture: done        # FIFO3 + FFmpeg #4 implementado
   v3-03-gravacao-flac-manual: drafted      # API start/stop + RecordingManager
   v3-04-ui-gravacoes: drafted              # Listagem + botão Record no footer
   v3-05-ui-detalhe-album: drafted          # Página expandida com gravações

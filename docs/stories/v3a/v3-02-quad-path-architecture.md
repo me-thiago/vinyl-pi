@@ -1,7 +1,7 @@
 # Story V3-02: Quad-Path Architecture
 
 **Epic:** V3a - Gravação & Fundação
-**Status:** drafted
+**Status:** done
 
 **User Story:**
 Como desenvolvedor,
@@ -100,11 +100,24 @@ ffmpeg -f s16le -ar 48000 -ac 2 -i /tmp/vinyl-flac.fifo \
 
 ## Testes
 
-- [ ] Criar FIFO3 no startup
-- [ ] FFmpeg #1 escreve no FIFO3 quando streaming ativo
-- [ ] FFmpeg #4 spawn funciona
-- [ ] FFmpeg #4 kill funciona (graceful)
-- [ ] Streaming não é afetado durante gravação
+- [x] Criar FIFO3 no startup
+- [x] FFmpeg #1 escreve no FIFO3 quando streaming ativo
+- [x] FFmpeg #4 spawn funciona
+- [x] FFmpeg #4 kill funciona (graceful)
+- [x] Streaming não é afetado durante gravação (drain process mantém FIFO3 drenado)
+
+### Testes Unitários Implementados (22 tests)
+
+- `recording-manager.test.ts`:
+  - constructor: inicialização, compression level default
+  - startDrain: iniciar processo, não duplicar
+  - stopDrain: parar processo, idempotente
+  - startRecording: sucesso, albumId, fileName, erro se já gravando, para drain
+  - stopRecording: sucesso, erro se não gravando, reinicia drain
+  - getStatus: sem gravação, com gravação
+  - getIsRecording: false/true
+  - destroy: para gravação, para drain
+  - events: recording_started, recording_stopped
 
 ## Referências
 

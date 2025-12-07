@@ -10,6 +10,7 @@ import { EventDetector } from './services/event-detector';
 import { EventPersistence } from './services/event-persistence';
 import { SessionManager } from './services/session-manager';
 import { SocketManager } from './services/socket-manager';
+import { RecordingManager, DEFAULT_RECORDING_CONFIG } from './services/recording-manager';
 import { createStatusRouter } from './routes/status';
 import { createEventsRouter } from './routes/events';
 import { createSessionsRouter } from './routes/sessions';
@@ -18,6 +19,7 @@ import { createAlbumsRouter } from './routes/albums';
 import { createRecognitionRouter } from './routes/recognition';
 import { createStatsRouter } from './routes/stats';
 import { createExportRouter } from './routes/export';
+import { createRecordingsRouter } from './routes/recordings';
 import { SettingsService } from './services/settings-service';
 import { AutoRecognitionService } from './services/auto-recognition';
 import prisma from './prisma/client';
@@ -142,6 +144,48 @@ audioManager.on('streaming_started', (info) => {
 
 audioManager.on('streaming_stopped', () => {
   logger.info('Streaming parado');
+});
+
+// Inicializar RecordingManager (V3a) - Gerencia gravação FLAC
+const recordingManager = new RecordingManager({
+  flacFifoPath: audioManager.getFlacFifoPath(),
+  recordingsPath: process.env.RECORDINGS_PATH || './data/recordings',
+  sampleRate: parseInt(process.env.AUDIO_SAMPLE_RATE || '48000'),
+  channels: parseInt(process.env.AUDIO_CHANNELS || '2'),
+  compressionLevel: parseInt(process.env.FLAC_COMPRESSION_LEVEL || '5'),
+});
+
+// Integrar RecordingManager com eventos de streaming
+// Quando streaming inicia, ativar drain do FIFO3 (para não bloquear FFmpeg #1)
+audioManager.on('streaming_started', async () => {
+  try {
+    await recordingManager.startDrain();
+    logger.info('RecordingManager drain iniciado');
+  } catch (err) {
+    logger.error('Erro ao iniciar drain do RecordingManager', { error: err });
+  }
+});
+
+audioManager.on('streaming_stopped', async () => {
+  try {
+    await recordingManager.stopDrain();
+    logger.info('RecordingManager drain parado');
+  } catch (err) {
+    logger.error('Erro ao parar drain do RecordingManager', { error: err });
+  }
+});
+
+// Event handlers para RecordingManager
+recordingManager.on('recording_started', (data) => {
+  logger.info('Gravação FLAC iniciada', { data });
+});
+
+recordingManager.on('recording_stopped', (data) => {
+  logger.info('Gravação FLAC parada', { data });
+});
+
+recordingManager.on('recording_error', (data) => {
+  logger.error('Erro na gravação FLAC', { data });
 });
 
 // Inicializar HealthMonitor
@@ -311,6 +355,11 @@ app.use('/api', createRecognitionRouter({
 app.use('/api', createStatsRouter());
 
 app.use('/api', createExportRouter());
+
+app.use('/api', createRecordingsRouter({
+  recordingManager,
+  sessionManager
+}));
 
 // Swagger UI e documentação OpenAPI
 // Acessível em /api/docs e /api/docs.json
@@ -508,7 +557,11 @@ const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} recebido, encerrando graciosamente...`);
 
   try {
-    // Parar auto-recognition primeiro (cancela timers pendentes)
+    // Parar recording manager primeiro (para gravação ativa se houver)
+    await recordingManager.destroy();
+    logger.info('RecordingManager parado');
+
+    // Parar auto-recognition (cancela timers pendentes)
     await autoRecognitionService.destroy();
     logger.info('AutoRecognitionService parado');
 
