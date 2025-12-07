@@ -220,15 +220,58 @@ else
     echo -e "  ${RED}✗${RESET} Backend:               ${RED}NOT RUNNING${RESET}"
 fi
 
-# FFmpeg processes
-FFMPEG_COUNT=$(pgrep ffmpeg | wc -l || echo "0")
+# FFmpeg processes (Quad-Path Architecture)
+FFMPEG_PIDS=$(pgrep ffmpeg 2>/dev/null || true)
+FFMPEG_COUNT=$(echo "$FFMPEG_PIDS" | grep -c . 2>/dev/null || echo "0")
+
 if [ "$FFMPEG_COUNT" -gt 0 ]; then
-    FFMPEG_MEM=$(pgrep ffmpeg | xargs ps -o rss= -p 2>/dev/null | awk '{sum+=$1} END {print int(sum/1024)}' || echo "0")
-    FFMPEG_UPTIME=$(pgrep ffmpeg | head -1 | xargs ps -o etime= -p 2>/dev/null | xargs || echo "?")
-    echo -e "  ${GREEN}✓${RESET} FFmpeg (${FFMPEG_COUNT} procs):     ${FFMPEG_MEM} MB | Uptime: ${FFMPEG_UPTIME}"
+    FFMPEG_MEM=$(echo "$FFMPEG_PIDS" | xargs ps -o rss= -p 2>/dev/null | awk '{sum+=$1} END {print int(sum/1024)}' || echo "0")
+    echo -e "  ${GREEN}✓${RESET} FFmpeg (${FFMPEG_COUNT}/4 procs):   ${FFMPEG_MEM} MB total"
     VINYL_TOTAL=$((VINYL_TOTAL + FFMPEG_MEM))
+    
+    # Detalhar cada FFmpeg
+    echo ""
+    echo "  FFmpeg Pipeline Details:"
+    
+    # Esperamos 4 FFmpegs quando streaming ativo:
+    # #1: ALSA → stdout + FIFOs (main)
+    # #2: FIFO1 → MP3 → Icecast
+    # #3: FIFO2 → Ring Buffer (recognition)
+    # #4: FIFO3 → FLAC (recording)
+    
+    PROC_NUM=1
+    for PID in $FFMPEG_PIDS; do
+        if [ -n "$PID" ]; then
+            FF_MEM=$(ps -o rss= -p "$PID" 2>/dev/null | awk '{print int($1/1024)}' || echo "0")
+            FF_CPU=$(ps -o %cpu= -p "$PID" 2>/dev/null | xargs || echo "0")
+            FF_CMD=$(ps -o args= -p "$PID" 2>/dev/null | head -c 60 || echo "?")
+            
+            # Identificar tipo de FFmpeg
+            if echo "$FF_CMD" | grep -q "alsa"; then
+                FF_TYPE="#1 Main (ALSA→FIFOs)"
+            elif echo "$FF_CMD" | grep -q "icecast"; then
+                FF_TYPE="#2 MP3→Icecast"
+            elif echo "$FF_CMD" | grep -q "vinyl-recognition"; then
+                FF_TYPE="#3 Recognition"
+            elif echo "$FF_CMD" | grep -q "vinyl-flac\|flac"; then
+                FF_TYPE="#4 FLAC Recording"
+            else
+                FF_TYPE="#${PROC_NUM} Unknown"
+            fi
+            
+            echo -e "    ${CYAN}${FF_TYPE}${RESET}: ${FF_MEM}MB | CPU: ${FF_CPU}%"
+            PROC_NUM=$((PROC_NUM + 1))
+        fi
+    done
+    
+    # Alertas
+    if [ "$FFMPEG_COUNT" -lt 4 ]; then
+        echo ""
+        echo -e "    ${YELLOW}⚠️  Expected 4 FFmpegs when streaming, found ${FFMPEG_COUNT}${RESET}"
+    fi
 else
     echo -e "  ${RED}✗${RESET} FFmpeg:                ${RED}NOT RUNNING${RESET}"
+    echo -e "    ${YELLOW}(Start streaming to spawn FFmpeg processes)${RESET}"
 fi
 
 # Icecast
@@ -255,14 +298,40 @@ fi
 echo ""
 echo -e "${BOLD}Total Vinyl-OS Memory:   ${CYAN}${VINYL_TOTAL} MB${RESET}"
 
-# FIFO status
+# FIFO status (Quad-Path Architecture)
 echo ""
-echo "Audio Pipeline:"
+echo "Audio Pipeline FIFOs:"
+
+FIFO_COUNT=0
+
+# FIFO1: MP3 → Icecast
 if [ -p /tmp/vinyl-audio.fifo ]; then
-    FIFO_SIZE=$(ls -la /tmp/vinyl-audio.fifo 2>/dev/null | awk '{print $5}' || echo "0")
-    echo -e "  ${GREEN}✓${RESET} FIFO exists:           /tmp/vinyl-audio.fifo"
+    echo -e "  ${GREEN}✓${RESET} FIFO1 (MP3→Icecast):   /tmp/vinyl-audio.fifo"
+    FIFO_COUNT=$((FIFO_COUNT + 1))
 else
-    echo -e "  ${YELLOW}◐${RESET} FIFO:                  Not created (streaming not started?)"
+    echo -e "  ${YELLOW}◐${RESET} FIFO1:                 Not created"
+fi
+
+# FIFO2: Recognition → Ring Buffer
+if [ -p /tmp/vinyl-recognition.fifo ]; then
+    echo -e "  ${GREEN}✓${RESET} FIFO2 (Recognition):   /tmp/vinyl-recognition.fifo"
+    FIFO_COUNT=$((FIFO_COUNT + 1))
+else
+    echo -e "  ${YELLOW}◐${RESET} FIFO2:                 Not created"
+fi
+
+# FIFO3: FLAC Recording
+if [ -p /tmp/vinyl-flac.fifo ]; then
+    echo -e "  ${GREEN}✓${RESET} FIFO3 (FLAC Record):   /tmp/vinyl-flac.fifo"
+    FIFO_COUNT=$((FIFO_COUNT + 1))
+else
+    echo -e "  ${YELLOW}◐${RESET} FIFO3:                 Not created"
+fi
+
+if [ "$FIFO_COUNT" -eq 0 ]; then
+    echo -e "  ${YELLOW}(Start streaming to create FIFOs)${RESET}"
+elif [ "$FIFO_COUNT" -lt 3 ]; then
+    echo -e "  ${YELLOW}⚠️  Expected 3 FIFOs, found ${FIFO_COUNT}${RESET}"
 fi
 
 # API Health check
