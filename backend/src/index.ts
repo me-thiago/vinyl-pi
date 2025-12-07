@@ -239,18 +239,6 @@ eventPersistence.start();
 // Conectar EventPersistence ao SessionManager
 eventPersistence.setSessionManager(sessionManager);
 
-// Inicializar SettingsService e aplicar configurações
-settingsService.initialize().then(async () => {
-  const allSettings = await settingsService.getAll();
-  const settings: Record<string, number | string | boolean> = {};
-  allSettings.forEach(s => { settings[s.key] = s.value; });
-  applySettings(settings);
-
-  logger.info('Configurações carregadas e aplicadas');
-}).catch(err => {
-  logger.error('Falha ao inicializar configurações', { error: err });
-});
-
 logger.info('AudioAnalyzer iniciado');
 logger.info('EventDetector iniciado');
 logger.info('SessionManager iniciado');
@@ -264,14 +252,33 @@ const socketManager = new SocketManager(httpServer, {
   sessionManager
 });
 
-// Inicializar AutoRecognitionService para reconhecimento automático no início de sessões (V2-12)
+// Inicializar AutoRecognitionService (será iniciado após SettingsService)
+// Declarado aqui para acesso no graceful shutdown
 const autoRecognitionService = new AutoRecognitionService({
   settingsService,
   audioManager,
   socketManager,
 });
-autoRecognitionService.start();
-logger.info('AutoRecognitionService iniciado');
+
+// Inicializar SettingsService e aplicar configurações
+// IMPORTANTE: AutoRecognitionService.start() é chamado APÓS initialize() para evitar race condition
+// onde session.started poderia disparar antes do settingsService estar pronto
+settingsService.initialize().then(async () => {
+  const allSettings = await settingsService.getAll();
+  const settings: Record<string, number | string | boolean> = {};
+  allSettings.forEach(s => { settings[s.key] = s.value; });
+  applySettings(settings);
+
+  logger.info('Configurações carregadas e aplicadas');
+
+  // Iniciar AutoRecognitionService SOMENTE após SettingsService estar pronto
+  // Isso evita race condition onde handleSessionStarted chamaria settingsService.get()
+  // antes de initialize() completar (causaria: "SettingsService not initialized")
+  autoRecognitionService.start();
+  logger.info('AutoRecognitionService iniciado');
+}).catch(err => {
+  logger.error('Falha ao inicializar configurações', { error: err });
+});
 
 // Registrar routes com todas as dependências
 app.use('/api', createStatusRouter({

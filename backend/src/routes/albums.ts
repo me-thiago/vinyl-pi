@@ -113,11 +113,24 @@ function formatAlbumResponse(album: {
  * Endpoints:
  * - GET /api/albums - Lista álbuns com filtros e paginação
  * - POST /api/albums - Cria novo álbum
+ * - POST /api/albums/import-discogs - Importa álbum do Discogs
+ * - POST /api/albums/import-discogs/select - Seleciona release para importar
+ * - POST /api/albums/import-collection - Importa coleção completa do Discogs
  * - GET /api/albums/:id - Busca álbum por ID
+ * - GET /api/albums/:id/sessions - Lista sessões do álbum
  * - PUT /api/albums/:id - Atualiza álbum
  * - DELETE /api/albums/:id - Deleta álbum
  * - PATCH /api/albums/:id/archive - Arquiva/desarquiva álbum
- * - POST /api/albums/:id/sync-discogs - Stub para V2-04 (501)
+ * - POST /api/albums/:id/sync-discogs - Re-sincroniza álbum com Discogs
+ *
+ * NOTA sobre ordem das rotas:
+ * As rotas estáticas (import-discogs, import-collection) estão definidas após as
+ * rotas parametrizadas (:id) no código. Isso NÃO causa conflito porque:
+ * - Rotas estáticas são POST
+ * - Rotas parametrizadas que vêm antes são GET/PUT/DELETE
+ * - Express diferencia por método HTTP antes de comparar paths
+ *
+ * Se no futuro adicionar rotas GET estáticas, elas DEVEM vir antes de GET /:id.
  */
 export function createAlbumsRouter(): Router {
   const router = Router();
