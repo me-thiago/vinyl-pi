@@ -11,6 +11,7 @@
 2. [Dual Streaming Architecture](#dual-streaming-architecture)
 3. [RAW PCM vs MP3 no Frontend](#raw-pcm-vs-mp3-no-frontend)
 4. [Constantes e Thresholds](#constantes-e-thresholds)
+5. [Quad-Path Architecture - FFmpeg #4 Always-On](#quad-path-architecture---ffmpeg-4-always-on)
 
 ---
 
@@ -670,7 +671,7 @@ O Epic V1.5 foi criado após auditoria de código para endereçar gaps de segura
 | V1.5-13 | react-i18next i18n |
 | V2-04 | Discogs Collection Sync - Merge Strategy |
 | V2-06 | Migração ACRCloud → AudD, Ring Buffer, axios vs fetch |
-| V3-02 | (Parcialmente adiantado em V1-06) |
+| V3-02 | Quad-Path Architecture - FFmpeg #4 Always-On vs Drain Swap |
 
 ---
 
@@ -859,6 +860,170 @@ ALSA → FFmpeg #1 → stdout + FIFO1 + FIFO2
 
 ---
 
-**Última revisão:** 2025-12-05
+## Quad-Path Architecture - FFmpeg #4 Always-On
+
+### Decisão: FFmpeg #4 sempre ativo (não drain swap)
+
+**Data:** 2025-12-07
+**Contexto:** Story V3-02 (Quad-Path Architecture para gravação FLAC)
+**Status:** ✅ Implementado
+
+### Problema
+
+Ao adicionar o quarto caminho FFmpeg para gravação FLAC, surgiu a questão: como garantir que o FIFO3 sempre tenha um leitor sem bloquear o FFmpeg #1?
+
+**Contexto técnico:**
+- FFmpeg #1 escreve em 4 outputs: stdout + FIFO1 + FIFO2 + FIFO3
+- Se um FIFO não tiver leitor, FFmpeg #1 bloqueia (blocking I/O)
+- Gravação FLAC é on-demand (usuário inicia/para quando quiser)
+
+### Opções Consideradas
+
+#### Opção A: Drain Swap (implementação inicial)
+
+```
+Quando NÃO gravando:
+  dd if=/tmp/vinyl-flac.fifo of=/dev/null (drena dados)
+  
+Quando gravando:
+  1. kill(dd)
+  2. spawn(ffmpeg → arquivo.flac)
+  
+Quando para:
+  1. kill(ffmpeg)
+  2. spawn(dd)
+```
+
+**Prós:**
+- CPU mínimo quando não gravando (~0.1% para `dd`)
+- Sem processamento desnecessário
+
+**Contras:**
+- ⚠️ **Race condition:** Janela de ~5-50ms entre kill(dd) e spawn(ffmpeg) sem leitor
+- Complexidade: lógica de swap entre processos
+- Inconsistente: FFmpeg #2 e #3 são sempre ativos
+
+#### Opção B: FFmpeg #4 Always-On (escolhida)
+
+```
+FFmpeg #4 sempre ligado quando streaming ativo:
+  FIFO3 → FFmpeg #4 (FLAC encoder) → stdout → Node.js
+  
+Node.js decide destino:
+  - Se gravando: outputStream.write(data) → arquivo
+  - Se NÃO gravando: descarta dados (não faz nada)
+```
+
+**Prós:**
+- ✅ **Sem race condition:** FFmpeg #4 sempre lê do FIFO
+- ✅ **Consistente:** Mesmo padrão de #2 e #3
+- ✅ **Simples:** Sem lógica de swap
+- ✅ **Arquitetura uniforme:** Todos FFmpegs iniciam/param junto
+
+**Contras:**
+- CPU constante ~3-5% (encode FLAC mesmo descartando)
+
+### Decisão
+
+**Escolhemos Opção B (Always-On)** porque:
+
+1. **Consistência arquitetural** é mais valiosa que economia de CPU
+2. **Race condition eliminada** - robustez > performance marginal
+3. **Raspberry Pi 5 suporta** o overhead adicional sem problemas
+4. **Manutenibilidade** - código mais simples de entender
+
+### Comparação de Trade-offs
+
+| Aspecto | Drain Swap | Always-On |
+|---------|------------|-----------|
+| CPU quando não grava | ~0.1% (dd) | ~3-5% (FFmpeg) |
+| Race condition | Sim (~5-50ms) | Não |
+| Complexidade código | Alta | Baixa |
+| Consistência com #2/#3 | ❌ Diferente | ✅ Igual |
+| Pontos de falha | 2 (dd + ffmpeg) | 1 (ffmpeg) |
+
+### Arquitetura Final (Quad-Path)
+
+```
+                    ┌──────────────┐
+                    │  ALSA Input  │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  FFmpeg #1   │
+                    │  (4 outputs) │
+                    └──┬───┬───┬───┬──┘
+                       │   │   │   │
+         stdout ───────┘   │   │   └───────► FIFO3
+         (PCM)             │   │              (PCM)
+            │              │   │                │
+     ┌──────▼─────┐   FIFO1│  FIFO2│      ┌─────▼─────┐
+     │  Express   │        │       │      │ FFmpeg #4 │
+     │ /stream.wav│        │       │      │   (FLAC)  │
+     └────────────┘        │       │      └─────┬─────┘
+                           │       │            │
+                    ┌──────▼──┐ ┌──▼──────┐     │ stdout
+                    │FFmpeg #2│ │FFmpeg #3│     │
+                    │  (MP3)  │ │  (PCM)  │     │
+                    └────┬────┘ └────┬────┘     │
+                         │          │          │
+                    ┌────▼────┐ ┌───▼────┐ ┌───▼────┐
+                    │Icecast2 │ │  Ring  │ │Node.js │
+                    │ Stream  │ │ Buffer │ │ Write/ │
+                    └─────────┘ └────────┘ │Discard │
+                                           └────────┘
+```
+
+### Implementação
+
+```typescript
+// RecordingManager - FFmpeg #4 sempre ativo
+class RecordingManager {
+  // Inicia com streaming (não on-demand)
+  async startFlacProcess(): Promise<void> {
+    this.ffmpegProcess = spawn('ffmpeg', [
+      '-f', 's16le', '-ar', '48000', '-ac', '2',
+      '-i', '/tmp/vinyl-flac.fifo',
+      '-c:a', 'flac',
+      '-f', 'flac',
+      'pipe:1',  // stdout → Node.js
+    ]);
+    
+    // Node.js decide destino
+    this.ffmpegProcess.stdout.on('data', (chunk) => {
+      if (this.isRecording && this.outputStream) {
+        this.outputStream.write(chunk);  // → arquivo
+      }
+      // else: descarta implicitamente
+    });
+  }
+}
+
+// Integração no index.ts
+audioManager.on('streaming_started', () => {
+  recordingManager.startFlacProcess();  // Inicia junto
+});
+
+audioManager.on('streaming_stopped', () => {
+  recordingManager.stopFlacProcess();   // Para junto
+});
+```
+
+### Lições Aprendidas
+
+1. **Consistência > Otimização prematura:** Manter padrões uniformes facilita manutenção
+2. **Race conditions são bugs sutis:** Melhor eliminar do que mitigar
+3. **Raspberry Pi 5 é poderoso:** 3-5% de CPU adicional é negligível
+4. **Questionar decisões iniciais:** A primeira implementação (drain) funcionava mas era inferior
+
+### Referências
+
+- Story: `docs/stories/v3a/v3-02-quad-path-architecture.md`
+- Código: `backend/src/services/recording-manager.ts`
+- Commit: `44bf7d7 refactor(v3-02): FFmpeg #4 always-on architecture`
+
+---
+
+**Última revisão:** 2025-12-07
 **Próxima revisão:** Quando implementar V3
 
