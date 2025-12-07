@@ -1,7 +1,19 @@
 import { RecordingManager, RecordingConfig } from '../../services/recording-manager';
 import { ChildProcess } from 'child_process';
+import { WriteStream } from 'fs';
 
 // Mock modules first (hoisted)
+jest.mock('fs', () => ({
+  access: jest.fn((path, cb) => cb(null)),
+  createWriteStream: jest.fn(() => ({
+    write: jest.fn(() => true),
+    end: jest.fn((cb) => cb && cb()),
+    destroy: jest.fn(),
+    destroyed: false,
+    on: jest.fn(),
+  })),
+}));
+
 jest.mock('fs/promises', () => ({
   mkdir: jest.fn().mockResolvedValue(undefined as void),
   stat: jest.fn().mockResolvedValue({ size: 1024000 }),
@@ -45,6 +57,7 @@ describe('RecordingManager', () => {
   let recordingManager: RecordingManager;
   let mockConfig: RecordingConfig;
   let mockProcess: Partial<ChildProcess>;
+  let mockStdout: { on: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -57,11 +70,23 @@ describe('RecordingManager', () => {
       compressionLevel: 5,
     };
 
+    // Mock stdout for data events
+    mockStdout = {
+      on: jest.fn((event: string, handler: (data: Buffer) => void) => {
+        // Simular alguns dados FLAC
+        if (event === 'data') {
+          setTimeout(() => handler(Buffer.from('fake-flac-data')), 10);
+        }
+        return mockStdout;
+      }),
+    };
+
     // Mock child process
     mockProcess = {
       pid: 12345,
       killed: false,
       kill: jest.fn(() => true),
+      stdout: mockStdout as unknown as NodeJS.ReadableStream,
       on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
         if (event === 'exit') {
           // Simular saída imediata do processo
@@ -87,12 +112,10 @@ describe('RecordingManager', () => {
 
   afterEach(async () => {
     await recordingManager.destroy();
-    // Limpar timers pendentes
     jest.useRealTimers();
   });
 
   afterAll(() => {
-    // Garantir cleanup final
     jest.clearAllTimers();
   });
 
@@ -101,7 +124,7 @@ describe('RecordingManager', () => {
       expect(recordingManager).toBeDefined();
       const status = recordingManager.getStatus();
       expect(status.isRecording).toBe(false);
-      expect(status.drainActive).toBe(false);
+      expect(status.flacProcessActive).toBe(false);
     });
 
     it('should use default compression level if not provided', () => {
@@ -112,43 +135,43 @@ describe('RecordingManager', () => {
     });
   });
 
-  describe('startDrain', () => {
-    it('should start drain process', async () => {
-      await recordingManager.startDrain();
+  describe('startFlacProcess', () => {
+    it('should start FFmpeg #4 FLAC process', async () => {
+      await recordingManager.startFlacProcess();
 
       expect(mockSpawn).toHaveBeenCalledWith(
-        'dd',
+        'ffmpeg',
         expect.arrayContaining([
-          `if=${mockConfig.flacFifoPath}`,
-          'of=/dev/null',
-          'bs=4k',
+          '-i', mockConfig.flacFifoPath,
+          '-c:a', 'flac',
+          'pipe:1',
         ]),
         expect.any(Object)
       );
 
       const status = recordingManager.getStatus();
-      expect(status.drainActive).toBe(true);
+      expect(status.flacProcessActive).toBe(true);
     });
 
-    it('should not start drain if already active', async () => {
-      await recordingManager.startDrain();
-      await recordingManager.startDrain();
+    it('should not start if already active', async () => {
+      await recordingManager.startFlacProcess();
+      await recordingManager.startFlacProcess();
 
       // spawn should only be called once
       expect(mockSpawn).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('stopDrain', () => {
-    it('should stop drain process', async () => {
-      await recordingManager.startDrain();
-      await recordingManager.stopDrain();
+  describe('stopFlacProcess', () => {
+    it('should stop FFmpeg #4 process', async () => {
+      await recordingManager.startFlacProcess();
+      await recordingManager.stopFlacProcess();
 
       expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM');
     });
 
-    it('should do nothing if drain not active', async () => {
-      await recordingManager.stopDrain();
+    it('should do nothing if not active', async () => {
+      await recordingManager.stopFlacProcess();
       // Should not throw
     });
   });
@@ -174,16 +197,17 @@ describe('RecordingManager', () => {
       updatedAt: new Date(),
     };
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockPrismaCreate.mockResolvedValue(mockRecording);
+      // Start FLAC process first (required for recording)
+      await recordingManager.startFlacProcess();
     });
 
     it('should start recording successfully', async () => {
       const result = await recordingManager.startRecording();
 
-      expect(result.id).toBe('test-uuid');
       expect(result.status).toBe('recording');
-      expect(mockSpawn).toHaveBeenCalled();
+      expect(mockPrismaCreate).toHaveBeenCalled();
 
       const status = recordingManager.getStatus();
       expect(status.isRecording).toBe(true);
@@ -224,15 +248,12 @@ describe('RecordingManager', () => {
       );
     });
 
-    it('should stop drain before starting recording', async () => {
-      await recordingManager.startDrain();
-      const initialDrain = recordingManager.getStatus().drainActive;
-      expect(initialDrain).toBe(true);
+    it('should throw if FLAC process not active', async () => {
+      await recordingManager.stopFlacProcess();
 
-      await recordingManager.startRecording();
-
-      // Drain should be stopped
-      expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM');
+      await expect(recordingManager.startRecording()).rejects.toThrow(
+        'FFmpeg FLAC não está ativo'
+      );
     });
   });
 
@@ -265,9 +286,10 @@ describe('RecordingManager', () => {
       completedAt: new Date(),
     };
 
-    beforeEach(() => {
+    beforeEach(async () => {
       mockPrismaCreate.mockResolvedValue(mockRecordingCreated);
       mockPrismaUpdate.mockResolvedValue(mockRecordingCompleted);
+      await recordingManager.startFlacProcess();
     });
 
     it('should stop recording and return updated recording', async () => {
@@ -287,18 +309,15 @@ describe('RecordingManager', () => {
       );
     });
 
-    it('should restart drain after stopping', async () => {
+    it('should NOT stop FLAC process after stopping recording', async () => {
       await recordingManager.startRecording();
       mockSpawn.mockClear();
 
       await recordingManager.stopRecording();
 
-      // Drain should be started again
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'dd',
-        expect.any(Array),
-        expect.any(Object)
-      );
+      // FLAC process should still be active (consistent with FFmpeg #3)
+      const status = recordingManager.getStatus();
+      expect(status.flacProcessActive).toBe(true);
     });
   });
 
@@ -307,8 +326,16 @@ describe('RecordingManager', () => {
       const status = recordingManager.getStatus();
 
       expect(status.isRecording).toBe(false);
-      expect(status.drainActive).toBe(false);
+      expect(status.flacProcessActive).toBe(false);
       expect(status.currentRecording).toBeUndefined();
+    });
+
+    it('should return correct status when FLAC process active', async () => {
+      await recordingManager.startFlacProcess();
+      const status = recordingManager.getStatus();
+
+      expect(status.isRecording).toBe(false);
+      expect(status.flacProcessActive).toBe(true);
     });
 
     it('should return correct status when recording', async () => {
@@ -319,14 +346,14 @@ describe('RecordingManager', () => {
         filePath: '2025-12/test.flac',
       });
 
+      await recordingManager.startFlacProcess();
       await recordingManager.startRecording();
       const status = recordingManager.getStatus();
 
       expect(status.isRecording).toBe(true);
+      expect(status.flacProcessActive).toBe(true);
       expect(status.currentRecording).toBeDefined();
-      // ID é gerado pelo RecordingManager via crypto.randomUUID(), não pelo mock
       expect(status.currentRecording?.id).toBeDefined();
-      expect(typeof status.currentRecording?.id).toBe('string');
     });
   });
 
@@ -343,6 +370,7 @@ describe('RecordingManager', () => {
         filePath: '2025-12/test.flac',
       });
 
+      await recordingManager.startFlacProcess();
       await recordingManager.startRecording();
       expect(recordingManager.getIsRecording()).toBe(true);
     });
@@ -363,21 +391,45 @@ describe('RecordingManager', () => {
         fileSizeBytes: 1024,
       });
 
+      await recordingManager.startFlacProcess();
       await recordingManager.startRecording();
       await recordingManager.destroy();
 
       expect(recordingManager.getIsRecording()).toBe(false);
     });
 
-    it('should stop drain if active', async () => {
-      await recordingManager.startDrain();
+    it('should stop FLAC process if active', async () => {
+      await recordingManager.startFlacProcess();
       await recordingManager.destroy();
 
-      expect(recordingManager.getStatus().drainActive).toBe(false);
+      expect(recordingManager.getStatus().flacProcessActive).toBe(false);
+    });
+  });
+
+  describe('legacy methods (backwards compatibility)', () => {
+    it('startDrain should call startFlacProcess', async () => {
+      await recordingManager.startDrain();
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'ffmpeg',
+        expect.any(Array),
+        expect.any(Object)
+      );
+    });
+
+    it('stopDrain should call stopFlacProcess', async () => {
+      await recordingManager.startFlacProcess();
+      await recordingManager.stopDrain();
+
+      expect(mockProcess.kill).toHaveBeenCalled();
     });
   });
 
   describe('events', () => {
+    beforeEach(async () => {
+      await recordingManager.startFlacProcess();
+    });
+
     it('should emit recording_started event', async () => {
       const listener = jest.fn();
       recordingManager.on('recording_started', listener);

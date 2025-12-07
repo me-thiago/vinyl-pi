@@ -156,22 +156,23 @@ const recordingManager = new RecordingManager({
 });
 
 // Integrar RecordingManager com eventos de streaming
-// Quando streaming inicia, ativar drain do FIFO3 (para não bloquear FFmpeg #1)
+// Quando streaming inicia, ativar FFmpeg #4 (FLAC encoder sempre ativo)
+// Arquitetura consistente com FFmpeg #3 (recognition → ringBuffer)
 audioManager.on('streaming_started', async () => {
   try {
-    await recordingManager.startDrain();
-    logger.info('RecordingManager drain iniciado');
+    await recordingManager.startFlacProcess();
+    logger.info('RecordingManager FFmpeg #4 FLAC iniciado');
   } catch (err) {
-    logger.error('Erro ao iniciar drain do RecordingManager', { error: err });
+    logger.error('Erro ao iniciar FFmpeg FLAC do RecordingManager', { error: err });
   }
 });
 
 audioManager.on('streaming_stopped', async () => {
   try {
-    await recordingManager.stopDrain();
-    logger.info('RecordingManager drain parado');
+    await recordingManager.stopFlacProcess();
+    logger.info('RecordingManager FFmpeg #4 FLAC parado');
   } catch (err) {
-    logger.error('Erro ao parar drain do RecordingManager', { error: err });
+    logger.error('Erro ao parar FFmpeg FLAC do RecordingManager', { error: err });
   }
 });
 

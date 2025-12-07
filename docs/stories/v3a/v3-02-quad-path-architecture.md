@@ -22,13 +22,15 @@ para que o sistema possa gravar áudio lossless sem impactar o streaming existen
 5. Output para FIFO3: mesmo formato PCM (s16le, 48kHz, stereo)
 6. Streaming existente (PCM + MP3 + Ring Buffer) não é afetado
 
-### FFmpeg #4 (Novo)
+### FFmpeg #4 (Novo - Sempre Ativo)
 
-7. FFmpeg #4 é sob demanda (inicia quando gravação começa)
+7. FFmpeg #4 inicia junto com streaming (consistente com #2 e #3)
 8. FFmpeg #4 lê do FIFO3
 9. FFmpeg #4 codifica para FLAC (compression_level 5)
-10. FFmpeg #4 escreve diretamente no arquivo de output
-11. FFmpeg #4 termina quando gravação para (SIGTERM graceful)
+10. FFmpeg #4 escreve FLAC para stdout → Node.js decide destino
+11. Quando gravando: Node.js escreve em arquivo
+12. Quando não gravando: Node.js descarta dados
+13. FFmpeg #4 termina quando streaming para (SIGTERM graceful)
 
 ### Arquitetura Final
 
@@ -76,14 +78,14 @@ const ffmpegArgs = [
 ];
 ```
 
-## Comando FFmpeg #4
+## Comando FFmpeg #4 (stdout para Node.js)
 
 ```bash
 ffmpeg -f s16le -ar 48000 -ac 2 -i /tmp/vinyl-flac.fifo \
   -c:a flac \
   -compression_level 5 \
-  -y \
-  /path/to/output.flac
+  -f flac \
+  pipe:1   # stdout → Node.js decide: arquivo ou descarte
 ```
 
 ## Pré-requisitos
@@ -102,22 +104,33 @@ ffmpeg -f s16le -ar 48000 -ac 2 -i /tmp/vinyl-flac.fifo \
 
 - [x] Criar FIFO3 no startup
 - [x] FFmpeg #1 escreve no FIFO3 quando streaming ativo
-- [x] FFmpeg #4 spawn funciona
+- [x] FFmpeg #4 spawn funciona (inicia junto com streaming)
 - [x] FFmpeg #4 kill funciona (graceful)
-- [x] Streaming não é afetado durante gravação (drain process mantém FIFO3 drenado)
+- [x] Streaming não é afetado durante gravação (FFmpeg #4 sempre ativo)
 
-### Testes Unitários Implementados (22 tests)
+### Testes Unitários Implementados (25 tests)
 
 - `recording-manager.test.ts`:
   - constructor: inicialização, compression level default
-  - startDrain: iniciar processo, não duplicar
-  - stopDrain: parar processo, idempotente
-  - startRecording: sucesso, albumId, fileName, erro se já gravando, para drain
-  - stopRecording: sucesso, erro se não gravando, reinicia drain
-  - getStatus: sem gravação, com gravação
+  - startFlacProcess: iniciar FFmpeg #4, não duplicar
+  - stopFlacProcess: parar processo, idempotente
+  - startRecording: sucesso, albumId, fileName, erro se já gravando, erro se FLAC não ativo
+  - stopRecording: sucesso, erro se não gravando, NÃO para FLAC process
+  - getStatus: sem gravação, FLAC ativo, com gravação
   - getIsRecording: false/true
-  - destroy: para gravação, para drain
+  - destroy: para gravação, para FLAC process
+  - legacy methods: startDrain → startFlacProcess, stopDrain → stopFlacProcess
   - events: recording_started, recording_stopped
+
+### Arquitetura Refatorada (Consistente com FFmpeg #3)
+
+```
+FFmpeg #4 (sempre ativo quando streaming) → stdout FLAC → Node.js → arquivo ou descarte
+```
+
+- **Sem drain process** - FFmpeg #4 fica sempre ligado como FFmpeg #3
+- **stdout → Node.js** - Node decide se escreve em arquivo ou descarta
+- **Consistência** - Mesmo padrão de FFmpeg #2 e #3
 
 ## Referências
 

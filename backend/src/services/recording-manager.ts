@@ -1,7 +1,9 @@
 import { spawn, ChildProcess } from 'child_process';
-import { mkdir, stat, access, unlink } from 'fs/promises';
+import { mkdir, stat, access, unlink, createWriteStream } from 'fs';
+import { mkdir as mkdirAsync, stat as statAsync } from 'fs/promises';
 import { join, dirname } from 'path';
 import { EventEmitter } from 'events';
+import { WriteStream } from 'fs';
 import { createLogger } from '../utils/logger';
 import prisma from '../prisma/client';
 import { RecordingStatus } from '@prisma/client';
@@ -40,36 +42,37 @@ export interface RecordingManagerStatus {
     fileSizeBytes: number;
     filePath: string;
   };
-  drainActive: boolean;        // Se o drain process está ativo
+  flacProcessActive: boolean;  // Se FFmpeg #4 está rodando
 }
 
 /**
  * RecordingManager - Gerencia gravação FLAC via FFmpeg #4 (V3a)
  *
- * Arquitetura:
- * - FIFO3 sempre precisa de um leitor para não bloquear FFmpeg #1
- * - Quando NÃO está gravando: "drain process" lê e descarta dados
- * - Quando ESTÁ gravando: FFmpeg #4 lê e grava FLAC
+ * Arquitetura Consistente (igual FFmpeg #3):
+ * - FFmpeg #4 sempre ligado quando streaming ativo
+ * - Lê de FIFO3, escreve FLAC para stdout
+ * - Node.js lê stdout e decide: arquivo (quando gravando) ou descarte
  *
  * Lifecycle:
- * 1. startDrain() - Inicia drain process (chamado quando streaming inicia)
- * 2. startRecording() - Para drain, inicia FFmpeg #4
- * 3. stopRecording() - Para FFmpeg #4, reinicia drain
- * 4. stopDrain() - Para drain (chamado quando streaming para)
+ * 1. startFlacProcess() - Inicia FFmpeg #4 (quando streaming inicia)
+ * 2. startRecording() - Começa a escrever stdout para arquivo
+ * 3. stopRecording() - Para de escrever, fecha arquivo
+ * 4. stopFlacProcess() - Para FFmpeg #4 (quando streaming para)
  *
  * ⚠️ LIFECYCLE NOTE: This service is managed by the application and
  * should be properly destroyed when no longer needed to avoid leaks.
  */
 export class RecordingManager extends EventEmitter {
   private config: RecordingConfig;
-  private drainProcess: ChildProcess | null = null;
   private ffmpegProcess: ChildProcess | null = null;
+  private outputStream: WriteStream | null = null;
   private currentRecordingId: string | null = null;
   private recordingStartTime: Date | null = null;
   private isRecording: boolean = false;
-  private isDraining: boolean = false;
+  private isFlacProcessActive: boolean = false;
   private fileSizeCheckInterval: NodeJS.Timeout | null = null;
   private currentFilePath: string | null = null;
+  private bytesWritten: number = 0;
 
   constructor(config: RecordingConfig) {
     super();
@@ -81,90 +84,99 @@ export class RecordingManager extends EventEmitter {
   }
 
   /**
-   * Inicia o drain process (lê FIFO3 e descarta)
+   * Inicia o FFmpeg #4 (FLAC encoder sempre ativo)
    *
-   * Deve ser chamado quando streaming inicia, para evitar que
-   * o FIFO3 bloqueie o FFmpeg #1.
+   * Deve ser chamado quando streaming inicia.
+   * FFmpeg lê do FIFO3 e escreve FLAC para stdout.
+   * Node.js processa stdout - descarta ou grava em arquivo.
+   *
+   * Consistente com FFmpeg #3 (recognition → ringBuffer).
    */
-  async startDrain(): Promise<void> {
-    if (this.isDraining || this.isRecording) {
-      logger.warn('Drain already active or recording in progress');
+  async startFlacProcess(): Promise<void> {
+    if (this.isFlacProcessActive) {
+      logger.warn('FLAC process already active');
       return;
     }
 
     try {
       // Verificar se FIFO existe
-      await access(this.config.flacFifoPath);
+      await new Promise<void>((resolve, reject) => {
+        access(this.config.flacFifoPath, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     } catch {
-      logger.warn(`FIFO3 not found at ${this.config.flacFifoPath}, drain not started`);
+      logger.warn(`FIFO3 not found at ${this.config.flacFifoPath}, FLAC process not started`);
       return;
     }
 
-    // Usar 'cat FIFO > /dev/null' para drenar dados
-    // Alternativa mais eficiente: dd if=FIFO of=/dev/null bs=4k
-    this.drainProcess = spawn('dd', [
-      `if=${this.config.flacFifoPath}`,
-      'of=/dev/null',
-      'bs=4k',
-    ], {
-      stdio: ['ignore', 'ignore', 'pipe'],
+    // Construir argumentos FFmpeg
+    const args = this.buildFlacFFmpegArgs();
+    logger.info(`Starting FFmpeg FLAC (always-on): ffmpeg ${args.join(' ')}`);
+
+    // Spawn FFmpeg #4 - stdout é pipe para Node.js
+    this.ffmpegProcess = spawn('ffmpeg', args, {
+      stdio: ['ignore', 'pipe', 'pipe'],  // stdout=pipe (FLAC), stderr=pipe (logs)
     });
 
-    this.drainProcess.on('error', (err) => {
-      logger.error(`Drain process error: ${err.message}`);
-      this.isDraining = false;
-    });
+    this.setupFFmpegHandlers();
+    this.isFlacProcessActive = true;
 
-    this.drainProcess.on('exit', (code, signal) => {
-      // Só logar se não foi parada intencional
-      if (this.isDraining) {
-        logger.info(`Drain process exited (code: ${code}, signal: ${signal})`);
-      }
-      this.isDraining = false;
-      this.drainProcess = null;
-    });
-
-    this.isDraining = true;
-    logger.info('Drain process started (FIFO3 → /dev/null)');
+    logger.info('FFmpeg #4 FLAC process started (stdout → Node.js)');
   }
 
   /**
-   * Para o drain process
+   * Para o FFmpeg #4
+   *
+   * Deve ser chamado quando streaming para.
    */
-  async stopDrain(): Promise<void> {
-    if (!this.isDraining || !this.drainProcess) {
+  async stopFlacProcess(): Promise<void> {
+    if (!this.isFlacProcessActive || !this.ffmpegProcess) {
       return;
     }
 
+    // Se estiver gravando, parar primeiro
+    if (this.isRecording) {
+      try {
+        await this.stopRecording();
+      } catch (err) {
+        logger.warn(`Error stopping recording during FLAC process stop: ${err}`);
+      }
+    }
+
     return new Promise((resolve) => {
-      const processRef = this.drainProcess;
+      const processRef = this.ffmpegProcess;
       if (!processRef) {
-        this.isDraining = false;
+        this.isFlacProcessActive = false;
         resolve();
         return;
       }
 
       processRef.once('exit', () => {
-        this.isDraining = false;
-        this.drainProcess = null;
-        logger.info('Drain process stopped');
+        this.isFlacProcessActive = false;
+        this.ffmpegProcess = null;
+        logger.info('FFmpeg #4 FLAC process stopped');
         resolve();
       });
 
       processRef.kill('SIGTERM');
 
-      // Timeout: force kill se não parar em 1s
+      // Timeout: force kill se não parar em 2s
       setTimeout(() => {
         if (processRef && !processRef.killed) {
+          logger.warn('FFmpeg FLAC did not stop gracefully, sending SIGKILL');
           processRef.kill('SIGKILL');
         }
         resolve();
-      }, 1000);
+      }, 2000);
     });
   }
 
   /**
    * Inicia uma gravação FLAC
+   *
+   * Abre arquivo e começa a escrever stdout do FFmpeg #4 nele.
    *
    * @param options Opções de gravação
    * @returns Recording criado no banco
@@ -179,10 +191,11 @@ export class RecordingManager extends EventEmitter {
       throw new Error('Gravação já em andamento. Pare a gravação atual primeiro.');
     }
 
-    // 1. Parar drain process
-    await this.stopDrain();
+    if (!this.isFlacProcessActive || !this.ffmpegProcess) {
+      throw new Error('FFmpeg FLAC não está ativo. Streaming precisa estar ligado.');
+    }
 
-    // 2. Gerar caminho do arquivo
+    // 1. Gerar caminho do arquivo
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const recordingId = crypto.randomUUID();
@@ -190,10 +203,10 @@ export class RecordingManager extends EventEmitter {
     const relativePath = join(yearMonth, `${fileName}.flac`);
     const absolutePath = join(this.config.recordingsPath, relativePath);
 
-    // 3. Criar diretório se não existir
-    await mkdir(dirname(absolutePath), { recursive: true });
+    // 2. Criar diretório se não existir
+    await mkdirAsync(dirname(absolutePath), { recursive: true });
 
-    // 4. Criar registro no banco
+    // 3. Criar registro no banco
     const recording = await prisma.recording.create({
       data: {
         id: recordingId,
@@ -210,22 +223,22 @@ export class RecordingManager extends EventEmitter {
       },
     });
 
-    // 5. Iniciar FFmpeg #4
-    const ffmpegArgs = this.buildFlacFFmpegArgs(absolutePath);
-    logger.info(`Starting FFmpeg FLAC: ffmpeg ${ffmpegArgs.join(' ')}`);
+    // 4. Abrir arquivo para escrita
+    this.outputStream = createWriteStream(absolutePath);
+    this.bytesWritten = 0;
 
-    this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
-      stdio: ['ignore', 'ignore', 'pipe'],
+    this.outputStream.on('error', (err) => {
+      logger.error(`Output stream error: ${err.message}`);
+      this.emit('recording_error', { error: err.message });
     });
 
-    this.setupFFmpegHandlers();
-
+    // 5. Atualizar estado
     this.isRecording = true;
     this.currentRecordingId = recordingId;
     this.recordingStartTime = now;
     this.currentFilePath = absolutePath;
 
-    // 6. Iniciar verificação periódica de tamanho do arquivo
+    // 6. Iniciar verificação periódica de tamanho
     this.startFileSizeMonitor();
 
     logger.info(`Recording started: ${relativePath} (ID: ${recordingId})`);
@@ -242,7 +255,9 @@ export class RecordingManager extends EventEmitter {
   /**
    * Para a gravação atual
    *
-   * @returns Recording atualizado com duração e tamanho
+   * Fecha arquivo e atualiza banco com duração e tamanho.
+   *
+   * @returns Recording atualizado
    */
   async stopRecording(): Promise<{
     id: string;
@@ -262,18 +277,18 @@ export class RecordingManager extends EventEmitter {
     // 1. Parar verificação de tamanho
     this.stopFileSizeMonitor();
 
-    // 2. Parar FFmpeg #4
-    await this.stopFFmpegProcess();
+    // 2. Fechar stream de escrita
+    await this.closeOutputStream();
 
     // 3. Calcular duração e tamanho
     const durationSeconds = startTime
       ? Math.floor((Date.now() - startTime.getTime()) / 1000)
       : 0;
 
-    let fileSizeBytes = 0;
+    let fileSizeBytes = this.bytesWritten;
     try {
       if (filePath) {
-        const stats = await stat(filePath);
+        const stats = await statAsync(filePath);
         fileSizeBytes = stats.size;
       }
     } catch (err) {
@@ -296,9 +311,7 @@ export class RecordingManager extends EventEmitter {
     this.currentRecordingId = null;
     this.recordingStartTime = null;
     this.currentFilePath = null;
-
-    // 6. Reiniciar drain process
-    await this.startDrain();
+    this.bytesWritten = 0;
 
     logger.info(`Recording stopped: ${recording.filePath} (${durationSeconds}s, ${fileSizeBytes} bytes)`);
     this.emit('recording_stopped', { recording });
@@ -313,12 +326,12 @@ export class RecordingManager extends EventEmitter {
   }
 
   /**
-   * Retorna o status atual da gravação
+   * Retorna o status atual
    */
   getStatus(): RecordingManagerStatus {
     const status: RecordingManagerStatus = {
       isRecording: this.isRecording,
-      drainActive: this.isDraining,
+      flacProcessActive: this.isFlacProcessActive,
     };
 
     if (this.isRecording && this.currentRecordingId && this.recordingStartTime) {
@@ -330,7 +343,7 @@ export class RecordingManager extends EventEmitter {
         id: this.currentRecordingId,
         startedAt: this.recordingStartTime,
         durationSeconds,
-        fileSizeBytes: 0, // Será atualizado pelo monitor
+        fileSizeBytes: this.bytesWritten,
         filePath: this.currentFilePath || '',
       };
     }
@@ -361,18 +374,40 @@ export class RecordingManager extends EventEmitter {
       }
     }
 
-    await this.stopDrain();
+    await this.stopFlacProcess();
 
     logger.info('RecordingManager destroyed');
   }
 
+  // ==================== MÉTODOS LEGADO (para compatibilidade) ====================
+
   /**
-   * Constrói argumentos do FFmpeg #4 para gravação FLAC
+   * @deprecated Use startFlacProcess() instead
+   */
+  async startDrain(): Promise<void> {
+    return this.startFlacProcess();
+  }
+
+  /**
+   * @deprecated Use stopFlacProcess() instead
+   */
+  async stopDrain(): Promise<void> {
+    return this.stopFlacProcess();
+  }
+
+  // ==================== MÉTODOS PRIVADOS ====================
+
+  /**
+   * Constrói argumentos do FFmpeg #4 para FLAC
+   *
+   * Diferente da versão anterior, agora escreve para stdout (pipe:1)
+   * em vez de arquivo direto. Node.js decide o destino.
+   *
    * @private
    */
-  private buildFlacFFmpegArgs(outputPath: string): string[] {
+  private buildFlacFFmpegArgs(): string[] {
     return [
-      '-y', // Sobrescrever se existir
+      '-y',
       '-loglevel', 'error',
 
       // Input: PCM do FIFO3
@@ -381,20 +416,35 @@ export class RecordingManager extends EventEmitter {
       '-ac', this.config.channels.toString(),
       '-i', this.config.flacFifoPath,
 
-      // Output: FLAC
+      // Output: FLAC para stdout
       '-c:a', 'flac',
       '-compression_level', this.config.compressionLevel.toString(),
-      outputPath,
+      '-f', 'flac',
+      'pipe:1',  // stdout - Node.js lê e decide destino
     ];
   }
 
   /**
    * Configura handlers para FFmpeg #4
+   *
+   * O stdout é lido continuamente. Quando gravando, escreve em arquivo.
+   * Quando não gravando, descarta (Node.js não faz nada com os dados).
+   *
    * @private
    */
   private setupFFmpegHandlers(): void {
     if (!this.ffmpegProcess) return;
 
+    // Handler principal: stdout com dados FLAC
+    this.ffmpegProcess.stdout?.on('data', (data: Buffer) => {
+      if (this.isRecording && this.outputStream && !this.outputStream.destroyed) {
+        this.outputStream.write(data);
+        this.bytesWritten += data.length;
+      }
+      // Quando não gravando: dados são descartados implicitamente
+    });
+
+    // Monitorar stderr para erros
     this.ffmpegProcess.stderr?.on('data', (data) => {
       const output = data.toString();
       if (output.includes('error') || output.includes('Error')) {
@@ -404,6 +454,7 @@ export class RecordingManager extends EventEmitter {
       }
     });
 
+    // Handler de saída
     this.ffmpegProcess.on('exit', async (code, signal) => {
       logger.info(`FFmpeg FLAC exited (code: ${code}, signal: ${signal})`);
 
@@ -411,91 +462,93 @@ export class RecordingManager extends EventEmitter {
       if (this.isRecording && code !== 0 && code !== null) {
         logger.error(`FFmpeg FLAC crashed during recording!`);
 
-        if (this.currentRecordingId) {
-          try {
-            await prisma.recording.update({
-              where: { id: this.currentRecordingId },
-              data: { status: 'error' },
-            });
-          } catch (err) {
-            logger.error(`Failed to update recording status: ${err}`);
-          }
-        }
-
-        this.isRecording = false;
-        this.currentRecordingId = null;
-        this.recordingStartTime = null;
-        this.currentFilePath = null;
-
-        // Reiniciar drain para não bloquear FIFO
-        await this.startDrain();
-
-        this.emit('recording_error', { error: 'FFmpeg crashed' });
+        await this.handleRecordingError('FFmpeg crashed');
       }
 
+      this.isFlacProcessActive = false;
       this.ffmpegProcess = null;
     });
 
+    // Handler de erro
     this.ffmpegProcess.on('error', (err) => {
       logger.error(`FFmpeg FLAC process error: ${err.message}`);
     });
   }
 
   /**
-   * Para o processo FFmpeg #4
+   * Trata erro durante gravação
    * @private
    */
-  private async stopFFmpegProcess(): Promise<void> {
-    if (!this.ffmpegProcess) return;
+  private async handleRecordingError(errorMessage: string): Promise<void> {
+    if (this.currentRecordingId) {
+      try {
+        await prisma.recording.update({
+          where: { id: this.currentRecordingId },
+          data: { status: 'error' },
+        });
+      } catch (err) {
+        logger.error(`Failed to update recording status: ${err}`);
+      }
+    }
+
+    await this.closeOutputStream();
+
+    this.isRecording = false;
+    this.currentRecordingId = null;
+    this.recordingStartTime = null;
+    this.currentFilePath = null;
+    this.bytesWritten = 0;
+
+    this.emit('recording_error', { error: errorMessage });
+  }
+
+  /**
+   * Fecha o stream de saída
+   * @private
+   */
+  private async closeOutputStream(): Promise<void> {
+    if (!this.outputStream) return;
 
     return new Promise((resolve) => {
-      const processRef = this.ffmpegProcess;
-      if (!processRef) {
+      if (!this.outputStream) {
         resolve();
         return;
       }
 
-      processRef.once('exit', () => {
-        this.ffmpegProcess = null;
+      this.outputStream.end(() => {
+        this.outputStream = null;
         resolve();
       });
 
-      processRef.kill('SIGTERM');
-
-      // Timeout: force kill se não parar em 2s
+      // Timeout: force close
       setTimeout(() => {
-        if (processRef && !processRef.killed) {
-          logger.warn('FFmpeg FLAC did not stop gracefully, sending SIGKILL');
-          processRef.kill('SIGKILL');
+        if (this.outputStream) {
+          this.outputStream.destroy();
+          this.outputStream = null;
         }
         resolve();
-      }, 2000);
+      }, 1000);
     });
   }
 
   /**
-   * Inicia monitoramento periódico de tamanho do arquivo
+   * Inicia monitoramento periódico de tamanho
    * @private
    */
   private startFileSizeMonitor(): void {
-    this.fileSizeCheckInterval = setInterval(async () => {
-      if (!this.currentFilePath || !this.isRecording) return;
+    this.fileSizeCheckInterval = setInterval(() => {
+      if (!this.isRecording) return;
 
-      try {
-        const stats = await stat(this.currentFilePath);
-        const durationSeconds = this.recordingStartTime
-          ? Math.floor((Date.now() - this.recordingStartTime.getTime()) / 1000)
-          : 0;
+      const durationSeconds = this.recordingStartTime
+        ? Math.floor((Date.now() - this.recordingStartTime.getTime()) / 1000)
+        : 0;
 
-        this.emit('recording_progress', {
-          recordingId: this.currentRecordingId,
-          durationSeconds,
-          fileSizeBytes: stats.size,
-        });
-      } catch {
-        // Arquivo pode não existir ainda nos primeiros segundos
-      }
-    }, 2000); // A cada 2 segundos
+      this.emit('recording_progress', {
+        recordingId: this.currentRecordingId,
+        durationSeconds,
+        fileSizeBytes: this.bytesWritten,
+      });
+    }, 2000);
   }
 
   /**
