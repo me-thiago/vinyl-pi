@@ -1,7 +1,7 @@
 # Story V3-05: UI Detalhe Álbum
 
 **Epic:** V3a - Gravação & Fundação
-**Status:** drafted
+**Status:** done
 
 **User Story:**
 Como usuário,
@@ -119,3 +119,136 @@ frontend/src/
 ## Referências
 
 - [Tech Spec V3a](../../tech-spec-epic-v3a.md) - Seção UI Album Detail, AC-18/19
+
+---
+
+## Dev Agent Record
+
+**Implementado em:** 2025-12-07
+**Status:** ✅ Done
+
+### Resumo da Implementação
+
+Story V3-05 implementa a visualização de gravações na página de detalhe do álbum, permitindo aos usuários:
+- Ver todas as gravações vinculadas a um álbum
+- Iniciar novas gravações já linkadas ao álbum
+- Vincular gravações existentes a álbuns (modal de seleção)
+- Desvincular gravações sem deletá-las
+- Gerenciar gravações de forma contextualizada
+
+### Decisões de Implementação
+
+1. **Backend: Expansão da API `/albums/:id`**
+   - Modificado para incluir `recordings` com Prisma `include`
+   - Retorna gravações ordenadas por `startedAt desc`
+   - Inclui `_count` para trackMarkers
+
+2. **Frontend: Componente `AlbumRecordings`**
+   - Criado como seção reutilizável para qualquer página de álbum
+   - Usa `RecordingCard` existente (sem mostrar álbum, já que estamos no contexto dele)
+   - Botão "Gravar este álbum" chama `useRecording().startRecording(albumId)`
+   - Ação "Desvincular" faz `PATCH /api/recordings/:id` com `albumId: null`
+
+3. **Frontend: Modal `LinkRecordingDialog`**
+   - Busca todos os álbuns da coleção (limite 100, não arquivados)
+   - Permite busca local por título/artista
+   - Seleção visual com highlight e capa
+   - Vincula fazendo `PATCH /api/recordings/:id` com `albumId`
+
+4. **Frontend: Integração em `Recordings.tsx`**
+   - Botão "Link to Album" agora funcional (antes era placeholder)
+   - Abre modal de seleção de álbum
+   - Atualiza lista após vincular com sucesso
+
+5. **Frontend: Integração em `CollectionDetail.tsx`**
+   - Página já existia, apenas adicionamos seção `<AlbumRecordings />`
+   - Posicionada entre os metadados do álbum e o histórico de escuta
+   - Usa `refresh()` do hook para atualizar após mudanças
+
+6. **i18n: Novas traduções**
+   - `album.recordings`, `album.recordThisAlbum`, `album.noRecordings`
+   - `recording.linkAction`, `recording.linkDialogDescription`
+   - `recording.linked`, `recording.unlinked`, `recording.startedForAlbum`
+   - Todos os textos em PT-BR e EN
+
+### Mapeamento de Critérios de Aceitação
+
+| # | Critério | Status | Implementação |
+|---|----------|--------|---------------|
+| 1 | Rota `/albums/:id` existente | ✅ | Página `CollectionDetail.tsx` já existia desde V2 |
+| 2 | Exibe informações do álbum | ✅ | Página já mostrava todos os dados do álbum |
+| 3 | Seção "Gravações" listando recordings | ✅ | Componente `AlbumRecordings.tsx` |
+| 4 | Mostra lista de gravações do álbum | ✅ | Usa `RecordingCard` para cada gravação |
+| 5 | Exibe metadados de gravação | ✅ | Nome, duração, tamanho, data, status, trackMarkers |
+| 6 | Link para editar gravação | ⏳ | Placeholder para V3-06 (Editor) |
+| 7 | Ação desvincular | ✅ | Botão overlay + PATCH API |
+| 8 | Botão "Gravar este álbum" | ✅ | No header da seção `AlbumRecordings` |
+| 9 | Inicia gravação vinculada | ✅ | `startRecording(albumId)` |
+| 10 | Gravação aparece automaticamente | ✅ | `onRecordingsChange` chama `refresh()` após 1s |
+| API | Backend inclui recordings | ✅ | Modificado `/albums/:id` com Prisma include |
+
+### Arquivos Criados/Modificados
+
+**Backend:**
+- `backend/src/routes/albums.ts` - Adicionado `include: { recordings }` no GET /:id
+
+**Frontend - Componentes:**
+- `frontend/src/components/Album/AlbumRecordings.tsx` *(novo)*
+- `frontend/src/components/Recording/LinkRecordingDialog.tsx` *(novo)*
+- `frontend/src/pages/CollectionDetail.tsx` - Integração do `AlbumRecordings`
+- `frontend/src/pages/Recordings.tsx` - Implementação do modal de linking
+
+**Frontend - Hooks/Types:**
+- `frontend/src/hooks/useAlbums.ts` - Tipo `Album` expandido com `recordings?`
+
+**Frontend - Testes:**
+- `frontend/src/components/Album/__tests__/AlbumRecordings.test.tsx` *(novo)*
+- `frontend/src/components/Recording/__tests__/LinkRecordingDialog.test.tsx` *(novo)*
+
+**Frontend - i18n:**
+- `frontend/src/i18n/locales/pt-BR.json` - Novas keys: `album.*`, `recording.*`
+- `frontend/src/i18n/locales/en.json` - Mesmas keys em inglês
+
+### Testes Implementados
+
+**`AlbumRecordings.test.tsx` (4 testes):**
+- ✅ Renderiza com nenhuma gravação (estado vazio)
+- ✅ Renderiza lista de gravações
+- ✅ Mostra badge de contagem
+- ✅ Chama `onRecordingsChange` ao iniciar gravação
+
+**`LinkRecordingDialog.test.tsx` (5 testes):**
+- ✅ Renderiza quando aberto
+- ✅ Não renderiza quando fechado
+- ✅ Busca álbuns ao abrir
+- ✅ Mostra estado vazio quando não há álbuns
+- ✅ Filtra álbuns por busca
+- ✅ Habilita botão ao selecionar álbum
+
+**Resultado:**
+```
+Test Files  15 passed (15)
+Tests       205 passed (205)
+```
+
+### Validação e Deploy
+
+✅ **Backend tests:** 661 passed
+✅ **Frontend lint:** Sem erros
+✅ **Frontend tests:** 205 passed
+✅ **Frontend build:** Sucesso (646 kB)
+✅ **Backend build:** Sucesso
+✅ **PM2 restart:** Todos os processos online
+
+### Próximos Passos (Futuras Stories)
+
+- **V3-06:** Implementar editor de gravação (waveform, trim, marcadores)
+- **Melhoria (opcional):** Migrar progress polling para WebSocket
+- **Melhoria (opcional):** Filtro por álbum na página `/recordings`
+
+### Notas Adicionais
+
+- O "Link to Album" que era placeholder na V3-04 agora está **funcional** ✅
+- A ação "Editar" ainda é placeholder (V3-06)
+- Histórico de escuta já existia desde V2-09
+- Página `CollectionDetail` usou estrutura existente, apenas expandimos

@@ -17,6 +17,9 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { MiniVuMeter } from './MiniVuMeter';
 import { RecognitionButton, MatchConfirmation, type ButtonState } from '@/components/Recognition';
 import { useRecognition, type RecognizedTrack, type AlbumMatchItem } from '@/hooks/useRecognition';
+import { RecordButton } from '@/components/Recording/RecordButton';
+import { RecordingStatus } from '@/components/Recording/RecordingStatus';
+import { useRecording } from '@/hooks/useRecording';
 import { cn } from '@/lib/utils';
 
 interface PlayerBarProps {
@@ -55,6 +58,15 @@ export function PlayerBar({
   const { t } = useTranslation();
   const navigate = useNavigate();
 
+  // Recording state (V3-04)
+  const {
+    isRecording,
+    currentRecording,
+    startRecording: startRec,
+    stopRecording: stopRec,
+    isLoading: isRecordingLoading,
+  } = useRecording();
+
   // Recognition state (V2-07)
   const {
     recognize,
@@ -71,6 +83,24 @@ export function PlayerBar({
 
   const hasError = error || streamingError;
   const canPlay = isStreaming && !isStreamingLoading;
+
+  /**
+   * Handler para toggle de gravação
+   */
+  const handleRecordToggle = useCallback(async () => {
+    try {
+      if (isRecording) {
+        await stopRec();
+        toast.success(t('recording.stopped'));
+      } else {
+        await startRec();
+        toast.success(t('recording.started'));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Recording error';
+      toast.error(t('recording.error'), { description: message });
+    }
+  }, [isRecording, startRec, stopRec, t]);
 
   /**
    * Handler para clique no botão de reconhecimento
@@ -274,6 +304,23 @@ export function PlayerBar({
         onClick={handleRecognize}
         disabled={!isStreaming}
       />
+
+      {/* Record Button (V3-04) */}
+      <RecordButton
+        isRecording={isRecording}
+        isLoading={isRecordingLoading}
+        onClick={handleRecordToggle}
+        disabled={!isStreaming}
+      />
+
+      {/* Recording Status (V3-04) */}
+      {isRecording && currentRecording && (
+        <RecordingStatus
+          durationSeconds={currentRecording.durationSeconds}
+          fileSizeBytes={currentRecording.fileSizeBytes}
+          className="hidden sm:flex"
+        />
+      )}
 
       {/* Volume Control */}
       <div className="flex items-center gap-2 w-56 shrink-0">

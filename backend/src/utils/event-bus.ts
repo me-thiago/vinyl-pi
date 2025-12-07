@@ -3,9 +3,10 @@ import { createLogger } from './logger';
 const logger = createLogger('EventBus');
 
 /**
- * Event types supported in V1
+ * Event types supported in V1, V2, and V3a
  */
 export type EventType =
+  // V1 - Audio events
   | 'audio.start'
   | 'audio.stop'
   | 'audio.level'
@@ -17,7 +18,15 @@ export type EventType =
   | 'session.started'
   | 'session.ended'
   | 'clipping.detected'
-  | 'track.recognized'; // V2-05: Música reconhecida via ACRCloud
+  // V2 - Recognition events
+  | 'track.recognized'
+  // V3a - Recording events
+  | 'recording.started'
+  | 'recording.stopped'
+  | 'recording.deleted'
+  | 'recording.trimmed'
+  | 'storage.alert'
+  | 'storage.ok';
 
 /**
  * Event handler function signature

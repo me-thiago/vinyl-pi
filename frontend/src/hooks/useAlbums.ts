@@ -29,6 +29,18 @@ export interface Album {
   archived: boolean;
   createdAt: string;
   updatedAt: string;
+  // V3-05: Recordings vinculadas ao álbum
+  recordings?: Array<{
+    id: string;
+    fileName: string;
+    durationSeconds: number | null;
+    fileSizeBytes: number | null;
+    status: string;
+    startedAt: string;
+    _count?: {
+      trackMarkers: number;
+    };
+  }>;
 }
 
 /**

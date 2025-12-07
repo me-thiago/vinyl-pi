@@ -44,6 +44,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Diagnostics = lazy(() => import('./pages/Diagnostics'))
 const Collection = lazy(() => import('./pages/Collection'))
 const CollectionDetail = lazy(() => import('./pages/CollectionDetail'))
+const Recordings = lazy(() => import('./pages/Recordings'))
 const Stats = lazy(() => import('./pages/Stats'))
 
 createRoot(document.getElementById('root')!).render(
@@ -74,6 +75,9 @@ createRoot(document.getElementById('root')!).render(
               } />
               <Route path="/collection/:id" element={
                 <Suspense fallback={<PageLoader />}><CollectionDetail /></Suspense>
+              } />
+              <Route path="/recordings" element={
+                <Suspense fallback={<PageLoader />}><Recordings /></Suspense>
               } />
               <Route path="/stats" element={
                 <Suspense fallback={<PageLoader />}><Stats /></Suspense>

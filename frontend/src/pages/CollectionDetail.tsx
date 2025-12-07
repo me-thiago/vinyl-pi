@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AlbumForm } from '@/components/Collection';
+import { AlbumRecordings } from '@/components/Album/AlbumRecordings';
 import { useAlbum, useAlbums, type AlbumUpdateInput, type AlbumCondition } from '@/hooks/useAlbums';
 import { cn } from '@/lib/utils';
 
@@ -453,6 +454,18 @@ export default function CollectionDetail() {
           )}
         </div>
       </div>
+
+      {/* V3-05: Gravações do Álbum */}
+      {album.recordings && (
+        <AlbumRecordings
+          albumId={album.id}
+          albumTitle={album.title}
+          albumArtist={album.artist}
+          albumCoverUrl={album.coverUrl}
+          recordings={album.recordings}
+          onRecordingsChange={refresh}
+        />
+      )}
 
       {/* V2-09: Histórico de Escuta */}
       <Card>

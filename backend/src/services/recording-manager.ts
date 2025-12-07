@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { EventEmitter } from 'events';
 import { WriteStream } from 'fs';
 import { createLogger } from '../utils/logger';
+import { eventBus } from '../utils/event-bus';
 import prisma from '../prisma/client';
 import { RecordingStatus } from '@prisma/client';
 
@@ -243,6 +244,16 @@ export class RecordingManager extends EventEmitter {
 
     logger.info(`Recording started: ${relativePath} (ID: ${recordingId})`);
     this.emit('recording_started', { recording });
+    
+    // Emit EventBus event for cross-component communication
+    await eventBus.publish('recording.started', {
+      recording: {
+        id: recording.id,
+        albumId: recording.albumId,
+        filePath: recording.filePath,
+        startedAt: recording.startedAt.toISOString(),
+      },
+    });
 
     return {
       id: recording.id,
@@ -315,6 +326,18 @@ export class RecordingManager extends EventEmitter {
 
     logger.info(`Recording stopped: ${recording.filePath} (${durationSeconds}s, ${fileSizeBytes} bytes)`);
     this.emit('recording_stopped', { recording });
+    
+    // Emit EventBus event for cross-component communication
+    await eventBus.publish('recording.stopped', {
+      recording: {
+        id: recording.id,
+        albumId: recording.albumId,
+        filePath: recording.filePath,
+        durationSeconds: recording.durationSeconds || 0,
+        fileSizeBytes: recording.fileSizeBytes || 0,
+        completedAt: recording.completedAt?.toISOString(),
+      },
+    });
 
     return {
       id: recording.id,

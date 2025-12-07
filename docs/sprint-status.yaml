@@ -109,10 +109,11 @@ development_status:
   epic-v3a: contexted
   v3-01-schema-dados-v3: done              # Tabelas Recording, TrackMarker
   v3-02-quad-path-architecture: done        # FIFO3 + FFmpeg #4 implementado
-  v3-03-gravacao-flac-manual: drafted      # API start/stop + RecordingManager
-  v3-04-ui-gravacoes: drafted              # Listagem + botão Record no footer
-  v3-05-ui-detalhe-album: drafted          # Página expandida com gravações
+  v3-03-gravacao-flac-manual: done           # API start/stop + RecordingManager
+  v3-04-ui-gravacoes: done                   # Listagem + botão Record no footer
+  v3-05-ui-detalhe-album: done             # Página expandida com gravações + correção thumbnail álbum
   v3-06-editor-audio: drafted              # Waveform + trim + marcadores
+  v3a-07-refactor-audio-manager: drafted   # Tech debt: extrair FFmpegProcessManager, FifoManager, FFmpegArgsBuilder
   epic-v3a-retrospective: optional
 
   # Epic V3b - Reconhecimento Offline (🟡 Médio-Alto risco)

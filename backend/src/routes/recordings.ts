@@ -4,7 +4,12 @@ import { SessionManager } from '../services/session-manager';
 import prisma from '../prisma/client';
 import { createLogger } from '../utils/logger';
 import { validate } from '../middleware/validate';
-import { z } from 'zod';
+import {
+  startRecordingSchema,
+  stopRecordingSchema,
+  updateRecordingSchema,
+  listRecordingsSchema,
+} from '../schemas/recordings.schema';
 
 const logger = createLogger('RecordingsRouter');
 
@@ -15,42 +20,6 @@ interface RecordingsRouterDeps {
   recordingManager: RecordingManager;
   sessionManager: SessionManager;
 }
-
-/**
- * Schema para iniciar gravação
- */
-const startRecordingSchema = z.object({
-  albumId: z.string().uuid().optional(),
-  fileName: z.string().min(1).max(200).optional(),
-});
-
-/**
- * Schema para parar gravação
- */
-const stopRecordingSchema = z.object({
-  recordingId: z.string().uuid().optional(), // Opcional pois pode inferir da gravação ativa
-});
-
-/**
- * Schema para atualizar gravação
- */
-const updateRecordingSchema = z.object({
-  fileName: z.string().min(1).max(200).optional(),
-  albumId: z.string().uuid().nullable().optional(),
-  notes: z.string().max(1000).optional(),
-});
-
-/**
- * Schema para query de listagem
- */
-const listRecordingsSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
-  albumId: z.string().uuid().optional(),
-  status: z.enum(['recording', 'completed', 'processing', 'error']).optional(),
-  sort: z.enum(['startedAt', 'durationSeconds', 'fileSizeBytes']).default('startedAt'),
-  order: z.enum(['asc', 'desc']).default('desc'),
-});
 
 /**
  * Cria router para endpoints de recordings (V3a)

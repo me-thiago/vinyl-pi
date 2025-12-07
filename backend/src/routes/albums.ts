@@ -87,6 +87,7 @@ function formatAlbumResponse(album: {
   archived: boolean;
   createdAt: Date;
   updatedAt: Date;
+  recordings?: any[]; // V3-05: Gravações vinculadas ao álbum
 }): AlbumResponse {
   return {
     id: album.id,
@@ -104,6 +105,7 @@ function formatAlbumResponse(album: {
     archived: album.archived,
     createdAt: album.createdAt.toISOString(),
     updatedAt: album.updatedAt.toISOString(),
+    ...(album.recordings !== undefined && { recordings: album.recordings }), // V3-05: Incluir se presente
   };
 }
 
@@ -576,6 +578,16 @@ export function createAlbumsRouter(): Router {
 
         const album = await prisma.album.findUnique({
           where: { id },
+          include: {
+            recordings: {
+              orderBy: { startedAt: 'desc' },
+              include: {
+                _count: {
+                  select: { trackMarkers: true },
+                },
+              },
+            },
+          },
         });
 
         if (!album) {

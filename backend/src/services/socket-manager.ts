@@ -138,7 +138,9 @@ export class SocketManager implements Destroyable {
       'track.change.detected',
       'track.recognized', // V2-05: Música reconhecida
       'audio.start',
-      'audio.stop'
+      'audio.stop',
+      'recording.started', // V3a: Gravação iniciada
+      'recording.stopped', // V3a: Gravação parada
     ];
 
     // Subscrever a cada evento
@@ -177,6 +179,18 @@ export class SocketManager implements Destroyable {
             albumMatch: payload.albumMatch,
             sessionId: payload.sessionId,
             timestamp: payload.timestamp
+          });
+        } else if (eventType === 'recording.started') {
+          // V3a: Emitir evento específico para gravação iniciada
+          this.io.emit('recording_started', {
+            recording: payload.recording,
+            timestamp: new Date().toISOString()
+          });
+        } else if (eventType === 'recording.stopped') {
+          // V3a: Emitir evento específico para gravação parada
+          this.io.emit('recording_stopped', {
+            recording: payload.recording,
+            timestamp: new Date().toISOString()
           });
         }
       });
