@@ -72,7 +72,7 @@ format_bytes() {
     fi
 }
 
-# Barra de progresso mini
+# Barra de progresso mini (ASCII para compatibilidade)
 mini_bar() {
     local percent_raw=$1
     # Remove decimal part for arithmetic
@@ -83,6 +83,7 @@ mini_bar() {
     local filled=$((percent * width / 100))
     local empty=$((width - filled))
     
+    echo -n "["
     if [ "$percent" -ge 80 ]; then
         echo -n -e "${GREEN}"
     elif [ "$percent" -ge 50 ]; then
@@ -91,10 +92,10 @@ mini_bar() {
         echo -n -e "${RED}"
     fi
     
-    printf '%*s' "$filled" '' | tr ' ' '█'
+    printf '%*s' "$filled" '' | tr ' ' '#'
     echo -n -e "${DIM}"
-    printf '%*s' "$empty" '' | tr ' ' '░'
-    echo -n -e "${RESET}"
+    printf '%*s' "$empty" '' | tr ' ' '-'
+    echo -n -e "${RESET}]"
 }
 
 ###############################################################################
@@ -338,6 +339,150 @@ if [ "$SESSION_ID" != "none" ] && [ "$SESSION_ID" != "null" ]; then
     echo -e "    ID: ${SESSION_ID:0:8}..."
     echo -e "    Duration: ${SESSION_DURATION}s (${SESSION_MINS}min)"
 fi
+
+echo ""
+
+###############################################################################
+# 5. RESOURCE BREAKDOWN
+###############################################################################
+
+echo -e "${BOLD}${WHITE}═══ RESOURCE BREAKDOWN ═══${RESET}"
+echo ""
+
+# Backend
+if [ -n "$BACKEND_MEM" ] && [ "$BACKEND_MEM" != "0" ]; then
+    echo -e "  ${BOLD}Backend (Node.js):${RESET}"
+    echo -e "    Memory: ${BACKEND_MEM}MB │ CPU: ${BACKEND_CPU}%"
+fi
+
+# FFmpeg breakdown
+echo ""
+echo -e "  ${BOLD}FFmpeg Processes:${RESET}"
+
+FFMPEG_TOTAL_MEM=0
+FFMPEG_TOTAL_CPU=0
+
+for PID in $FFMPEG_PIDS; do
+    if [ -n "$PID" ]; then
+        FF_MEM=$(ps -o rss= -p "$PID" 2>/dev/null | awk '{print int($1/1024)}' || echo "0")
+        FF_CPU=$(ps -o %cpu= -p "$PID" 2>/dev/null | xargs || echo "0")
+        FF_CMD=$(ps -o args= -p "$PID" 2>/dev/null || echo "")
+        
+        FFMPEG_TOTAL_MEM=$((FFMPEG_TOTAL_MEM + FF_MEM))
+        # CPU is float, just display it
+        
+        # Identify FFmpeg type by args
+        if echo "$FF_CMD" | grep -q "alsa"; then
+            FF_NAME="${YELLOW}#1 Main (ALSA)${RESET}"
+        elif echo "$FF_CMD" | grep -q "vinyl-audio.fifo"; then
+            FF_NAME="${YELLOW}#2 MP3→Icecast${RESET}"
+        elif echo "$FF_CMD" | grep -q "vinyl-recognition"; then
+            FF_NAME="${YELLOW}#3 Ring Buffer${RESET}"
+        elif echo "$FF_CMD" | grep -q "vinyl-flac"; then
+            FF_NAME="${YELLOW}#4 FLAC Record${RESET}"
+        else
+            FF_NAME="${DIM}Unknown${RESET}"
+        fi
+        
+        printf "    %-25b %4sMB │ CPU: %5s%%\n" "$FF_NAME" "$FF_MEM" "$FF_CPU"
+    fi
+done
+
+echo -e "    ${DIM}─────────────────────────────────────${RESET}"
+echo -e "    ${BOLD}Total FFmpeg:${RESET}           ${FFMPEG_TOTAL_MEM}MB"
+
+# Icecast
+ICECAST_PID=$(pgrep -f icecast2 | head -1 2>/dev/null || true)
+if [ -n "$ICECAST_PID" ]; then
+    ICECAST_MEM=$(ps -o rss= -p "$ICECAST_PID" 2>/dev/null | awk '{print int($1/1024)}' || echo "0")
+    ICECAST_CPU=$(ps -o %cpu= -p "$ICECAST_PID" 2>/dev/null | xargs || echo "0")
+    echo ""
+    echo -e "  ${BOLD}Icecast2:${RESET}"
+    echo -e "    Memory: ${ICECAST_MEM}MB │ CPU: ${ICECAST_CPU}%"
+fi
+
+# Total Vinyl-OS
+VINYL_TOTAL=$((BACKEND_MEM + FFMPEG_TOTAL_MEM + ICECAST_MEM))
+echo ""
+echo -e "  ${BOLD}${CYAN}Total Vinyl-OS Memory: ${VINYL_TOTAL}MB${RESET}"
+
+echo ""
+
+###############################################################################
+# 6. SYSTEM OVERVIEW
+###############################################################################
+
+echo -e "${BOLD}${WHITE}═══ SYSTEM OVERVIEW ═══${RESET}"
+echo ""
+
+# CPU Temperature
+if command -v vcgencmd &> /dev/null; then
+    TEMP=$(vcgencmd measure_temp 2>/dev/null | grep -oP '\d+\.\d+' || echo "?")
+    TEMP_INT=${TEMP%.*}
+    
+    if [ "$TEMP_INT" -gt 75 ] 2>/dev/null; then
+        TEMP_COLOR="${RED}"
+        TEMP_ICON="🔥"
+    elif [ "$TEMP_INT" -gt 60 ] 2>/dev/null; then
+        TEMP_COLOR="${YELLOW}"
+        TEMP_ICON="🌡️"
+    else
+        TEMP_COLOR="${GREEN}"
+        TEMP_ICON="❄️"
+    fi
+    echo -e "  CPU Temp:      ${TEMP_COLOR}${TEMP}°C${RESET} ${TEMP_ICON}"
+else
+    echo -e "  CPU Temp:      ${DIM}N/A (vcgencmd not available)${RESET}"
+fi
+
+# Load Average
+LOAD=$(uptime | awk -F'load average:' '{print $2}' | xargs)
+echo -e "  Load Avg:      ${LOAD}"
+
+# Memory
+MEM_TOTAL=$(free -m | awk '/^Mem:/ {print $2}')
+MEM_USED=$(free -m | awk '/^Mem:/ {print $3}')
+MEM_AVAIL=$(free -m | awk '/^Mem:/ {print $7}')
+MEM_PERCENT=$((MEM_USED * 100 / MEM_TOTAL))
+
+if [ "$MEM_PERCENT" -gt 80 ]; then
+    MEM_COLOR="${RED}"
+elif [ "$MEM_PERCENT" -gt 60 ]; then
+    MEM_COLOR="${YELLOW}"
+else
+    MEM_COLOR="${GREEN}"
+fi
+
+echo -e "  Memory:        ${MEM_COLOR}${MEM_USED}MB / ${MEM_TOTAL}MB${RESET} (${MEM_AVAIL}MB free)"
+
+# Disk Space
+DISK_INFO=$(df -h / | tail -1)
+DISK_USED=$(echo "$DISK_INFO" | awk '{print $3}')
+DISK_TOTAL=$(echo "$DISK_INFO" | awk '{print $2}')
+DISK_AVAIL=$(echo "$DISK_INFO" | awk '{print $4}')
+DISK_PERCENT=$(echo "$DISK_INFO" | awk '{print $5}' | tr -d '%')
+
+if [ "$DISK_PERCENT" -gt 80 ]; then
+    DISK_COLOR="${RED}"
+elif [ "$DISK_PERCENT" -gt 60 ]; then
+    DISK_COLOR="${YELLOW}"
+else
+    DISK_COLOR="${GREEN}"
+fi
+
+echo -e "  SD Card:       ${DISK_COLOR}${DISK_USED} / ${DISK_TOTAL}${RESET} (${DISK_AVAIL} free)"
+
+# Recordings folder size (if exists)
+RECORDINGS_PATH="./data/recordings"
+if [ -d "$RECORDINGS_PATH" ]; then
+    REC_SIZE=$(du -sh "$RECORDINGS_PATH" 2>/dev/null | awk '{print $1}' || echo "0")
+    REC_COUNT=$(find "$RECORDINGS_PATH" -name "*.flac" 2>/dev/null | wc -l || echo "0")
+    echo -e "  Recordings:    ${REC_SIZE} (${REC_COUNT} files)"
+fi
+
+# Uptime
+UPTIME_STR=$(uptime -p | sed 's/up //')
+echo -e "  Uptime:        ${UPTIME_STR}"
 
 echo ""
 echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${RESET}"
