@@ -106,29 +106,98 @@ function runFFprobe(args: string[]): Promise<string> {
 
 /**
  * Obtém a duração de um arquivo de áudio em segundos
+ *
+ * Tenta primeiro via ffprobe (rápido), mas se o arquivo não tiver
+ * metadados de duração (comum em FLAC gerados via streaming),
+ * faz fallback para decodificação completa com ffmpeg.
  */
 export async function getDuration(filePath: string): Promise<number> {
   logger.debug('Obtendo duração', { filePath });
 
-  const args = [
-    '-v',
-    'error',
-    '-show_entries',
-    'format=duration',
-    '-of',
-    'default=noprint_wrappers=1:nokey=1',
-    filePath,
-  ];
+  // Método 1: Tentar via ffprobe (rápido)
+  try {
+    const args = [
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      filePath,
+    ];
 
-  const output = await runFFprobe(args);
-  const duration = parseFloat(output);
+    const output = await runFFprobe(args);
+    const duration = parseFloat(output);
 
-  if (isNaN(duration)) {
+    if (!isNaN(duration) && duration > 0) {
+      logger.debug('Duração obtida via ffprobe', { filePath, duration });
+      return duration;
+    }
+  } catch (err) {
+    logger.debug('ffprobe falhou, tentando fallback', { filePath, err });
+  }
+
+  // Método 2: Fallback - decodificar o arquivo com ffmpeg
+  // Necessário para FLAC gerados via streaming (sem metadados de duração)
+  logger.debug('Usando fallback de decodificação para obter duração', { filePath });
+
+  const duration = await getDurationByDecoding(filePath);
+
+  if (duration <= 0) {
     throw new Error(`Não foi possível obter duração de: ${filePath}`);
   }
 
-  logger.debug('Duração obtida', { filePath, duration });
+  logger.debug('Duração obtida via decodificação', { filePath, duration });
   return duration;
+}
+
+/**
+ * Obtém duração decodificando o arquivo (mais lento, mas funciona sempre)
+ * Usado como fallback para arquivos sem metadados de duração
+ */
+async function getDurationByDecoding(filePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const process = spawn('ffmpeg', [
+      '-i', filePath,
+      '-f', 'null',
+      '-',
+    ]);
+
+    let stderr = '';
+
+    process.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    process.on('close', (code) => {
+      // FFmpeg escreve "time=HH:MM:SS.ss" no stderr durante processamento
+      // Pegamos o último time= que é a duração total
+      const timeMatches = stderr.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/g);
+
+      if (timeMatches && timeMatches.length > 0) {
+        const lastTime = timeMatches[timeMatches.length - 1];
+        const match = lastTime.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+
+        if (match) {
+          const hours = parseInt(match[1], 10);
+          const minutes = parseInt(match[2], 10);
+          const seconds = parseInt(match[3], 10);
+          const centiseconds = parseInt(match[4], 10);
+
+          const totalSeconds = hours * 3600 + minutes * 60 + seconds + centiseconds / 100;
+          resolve(totalSeconds);
+          return;
+        }
+      }
+
+      // Se não encontrou, retorna 0
+      resolve(0);
+    });
+
+    process.on('error', (err) => {
+      reject(new Error(`Falha ao decodificar arquivo: ${err.message}`));
+    });
+  });
 }
 
 /**
