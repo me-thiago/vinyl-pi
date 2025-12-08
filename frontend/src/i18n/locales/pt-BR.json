@@ -455,5 +455,46 @@
     "recordThisAlbum": "Gravar este álbum",
     "noRecordings": "Nenhuma gravação deste álbum",
     "startRecordingHint": "Use o botão acima para iniciar uma gravação"
+  },
+  "editor": {
+    "notFound": "Gravação não encontrada",
+    "loadError": "Erro ao carregar gravação",
+    "backToList": "Voltar para lista",
+    "info": {
+      "title": "Informações",
+      "duration": "Duração",
+      "size": "Tamanho",
+      "markers": "Marcadores"
+    },
+    "trim": {
+      "title": "Cortar Áudio",
+      "enable": "Ativar Corte",
+      "cancel": "Cancelar",
+      "start": "Início",
+      "end": "Fim",
+      "newDuration": "Nova duração",
+      "preview": "Preview",
+      "apply": "Aplicar Corte",
+      "warning": "Esta operação é irreversível. O áudio fora da seleção será permanentemente removido.",
+      "confirmTitle": "Confirmar Corte",
+      "confirmDescription": "Você está prestes a cortar o áudio. Esta operação é irreversível e removerá permanentemente o conteúdo fora da seleção.",
+      "confirmButton": "Sim, Cortar",
+      "success": "Corte aplicado com sucesso",
+      "successDescription": "A gravação foi atualizada.",
+      "error": "Erro ao aplicar corte"
+    },
+    "markers": {
+      "title": "Marcadores de Faixa",
+      "add": "Adicionar",
+      "empty": "Nenhum marcador definido",
+      "emptyHint": "Clique em \"Adicionar\" ou clique na waveform para criar um marcador",
+      "currentPosition": "Posição atual",
+      "created": "Marcador criado",
+      "createError": "Erro ao criar marcador",
+      "updated": "Marcador atualizado",
+      "updateError": "Erro ao atualizar marcador",
+      "deleted": "Marcador removido",
+      "deleteError": "Erro ao remover marcador"
+    }
   }
 }

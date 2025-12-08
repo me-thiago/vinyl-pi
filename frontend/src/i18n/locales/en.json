@@ -428,5 +428,46 @@
     "recordThisAlbum": "Record this album",
     "noRecordings": "No recordings for this album",
     "startRecordingHint": "Use the button above to start a recording"
+  },
+  "editor": {
+    "notFound": "Recording not found",
+    "loadError": "Error loading recording",
+    "backToList": "Back to list",
+    "info": {
+      "title": "Information",
+      "duration": "Duration",
+      "size": "Size",
+      "markers": "Markers"
+    },
+    "trim": {
+      "title": "Trim Audio",
+      "enable": "Enable Trim",
+      "cancel": "Cancel",
+      "start": "Start",
+      "end": "End",
+      "newDuration": "New duration",
+      "preview": "Preview",
+      "apply": "Apply Trim",
+      "warning": "This operation is irreversible. Audio outside the selection will be permanently removed.",
+      "confirmTitle": "Confirm Trim",
+      "confirmDescription": "You are about to trim the audio. This operation is irreversible and will permanently remove content outside the selection.",
+      "confirmButton": "Yes, Trim",
+      "success": "Trim applied successfully",
+      "successDescription": "The recording has been updated.",
+      "error": "Error applying trim"
+    },
+    "markers": {
+      "title": "Track Markers",
+      "add": "Add",
+      "empty": "No markers defined",
+      "emptyHint": "Click \"Add\" or click on the waveform to create a marker",
+      "currentPosition": "Current position",
+      "created": "Marker created",
+      "createError": "Error creating marker",
+      "updated": "Marker updated",
+      "updateError": "Error updating marker",
+      "deleted": "Marker removed",
+      "deleteError": "Error removing marker"
+    }
   }
 }

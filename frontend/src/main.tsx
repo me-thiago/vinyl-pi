@@ -45,6 +45,7 @@ const Diagnostics = lazy(() => import('./pages/Diagnostics'))
 const Collection = lazy(() => import('./pages/Collection'))
 const CollectionDetail = lazy(() => import('./pages/CollectionDetail'))
 const Recordings = lazy(() => import('./pages/Recordings'))
+const RecordingEditor = lazy(() => import('./pages/RecordingEditor'))
 const Stats = lazy(() => import('./pages/Stats'))
 
 createRoot(document.getElementById('root')!).render(
@@ -78,6 +79,9 @@ createRoot(document.getElementById('root')!).render(
               } />
               <Route path="/recordings" element={
                 <Suspense fallback={<PageLoader />}><Recordings /></Suspense>
+              } />
+              <Route path="/recordings/:id/edit" element={
+                <Suspense fallback={<PageLoader />}><RecordingEditor /></Suspense>
               } />
               <Route path="/stats" element={
                 <Suspense fallback={<PageLoader />}><Stats /></Suspense>

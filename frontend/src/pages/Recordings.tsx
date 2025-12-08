@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Disc3, Search, Filter } from 'lucide-react';
@@ -52,6 +53,7 @@ interface RecordingsResponse {
  */
 export default function Recordings() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -147,12 +149,10 @@ export default function Recordings() {
   };
 
   /**
-   * Navegar para editor (V3-06 - futuro)
+   * Navegar para editor de gravação
    */
   const handleEdit = (id: string) => {
-    // TODO: Implementar em V3-06
-    console.log('Edit recording:', id);
-    toast.info(t('recording.editorComingSoon'));
+    navigate(`/recordings/${id}/edit`);
   };
 
   /**
