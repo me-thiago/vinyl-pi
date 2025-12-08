@@ -39,6 +39,8 @@ export function WaveformEditor({
         barWidth: 2,
         barRadius: 2,
         normalize: true,
+        // Cores mais visíveis para o cursor (playhead)
+        cursorColor: '#ef4444', // Red-500 para máxima visibilidade
       });
     }
   }, [init, streamUrl]);
@@ -74,6 +76,8 @@ export function WaveformEditor({
         ref={containerRef}
         className={cn(
           'w-full rounded-lg bg-muted/50 border overflow-hidden',
+          // Estilo customizado para cursor/playhead mais visível
+          '[&_[part=cursor]]:!w-[2px] [&_[part=cursor]]:!shadow-[0_0_4px_rgba(239,68,68,0.8)]',
           !isReady && 'min-h-[128px]'
         )}
       />

@@ -40,6 +40,15 @@ export interface TrimRegion {
   end: number;
 }
 
+/**
+ * Callback para quando uma região (marker) é atualizada pelo usuário
+ */
+export type OnMarkerRegionUpdated = (
+  markerId: string,
+  start: number,
+  end: number
+) => void;
+
 export interface UseWaveformReturn {
   // Estado
   isReady: boolean;
@@ -66,6 +75,7 @@ export interface UseWaveformReturn {
   updateMarker: (id: string, data: Partial<MarkerData>) => void;
   removeMarker: (id: string) => void;
   clearMarkers: () => void;
+  setOnMarkerRegionUpdated: (callback: OnMarkerRegionUpdated | null) => void;
 
   // Trim region
   setTrimRegion: (region: TrimRegion | null) => void;
@@ -89,6 +99,7 @@ export function useWaveform(): UseWaveformReturn {
   const regionsRef = useRef<RegionsPlugin | null>(null);
   const markersMapRef = useRef<Map<string, Region>>(new Map());
   const trimRegionRef = useRef<Region | null>(null);
+  const onMarkerRegionUpdatedRef = useRef<OnMarkerRegionUpdated | null>(null);
 
   // Estado
   const [isReady, setIsReady] = useState(false);
@@ -168,6 +179,11 @@ export function useWaveform(): UseWaveformReturn {
         // Se é a trim region, atualizar ref
         if (region.id === 'trim-region') {
           trimRegionRef.current = region;
+        } else {
+          // É um marker - chamar callback se existir
+          if (onMarkerRegionUpdatedRef.current) {
+            onMarkerRegionUpdatedRef.current(region.id, region.start, region.end);
+          }
         }
       });
 
@@ -312,6 +328,16 @@ export function useWaveform(): UseWaveformReturn {
     markersMapRef.current.clear();
   }, []);
 
+  /**
+   * Define callback para quando markers são atualizados pelo usuário via drag
+   */
+  const setOnMarkerRegionUpdated = useCallback(
+    (callback: OnMarkerRegionUpdated | null) => {
+      onMarkerRegionUpdatedRef.current = callback;
+    },
+    []
+  );
+
   // ============================================
   // Trim Region
   // ============================================
@@ -376,6 +402,7 @@ export function useWaveform(): UseWaveformReturn {
     updateMarker,
     removeMarker,
     clearMarkers,
+    setOnMarkerRegionUpdated,
 
     // Trim
     setTrimRegion,

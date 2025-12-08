@@ -162,7 +162,57 @@ export default function RecordingEditor() {
   }, [waveform.isReady, markers]);
 
   /**
+   * Handler para quando marker é arrastado no waveform
+   * Sincroniza com o estado local e salva no backend
+   */
+  const handleMarkerRegionUpdated = useCallback(
+    async (markerId: string, start: number, end: number) => {
+      // Atualizar estado local imediatamente para UI responsiva
+      setMarkers((prev) =>
+        prev.map((m) =>
+          m.id === markerId ? { ...m, startOffset: start, endOffset: end } : m
+        )
+      );
+
+      // Salvar no backend (fire and forget com retry opcional)
+      if (!id) return;
+
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/recordings/${id}/markers/${markerId}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startOffset: start, endOffset: end }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error('Failed to save marker position');
+        }
+      } catch (err) {
+        console.error('Error saving marker position:', err);
+      }
+    },
+    [id, apiUrl]
+  );
+
+  // Configurar callback de atualização de marker quando waveform estiver pronto
+  useEffect(() => {
+    if (waveform.isReady) {
+      waveform.setOnMarkerRegionUpdated(handleMarkerRegionUpdated);
+    }
+    return () => {
+      waveform.setOnMarkerRegionUpdated(null);
+    };
+  }, [waveform.isReady, handleMarkerRegionUpdated]);
+
+  /**
    * Adicionar novo marcador na posição atual
+   *
+   * Ao adicionar um novo marker:
+   * 1. A nova faixa começa na posição atual e vai até o fim do arquivo
+   * 2. A faixa anterior (se existir e sobrepor) tem seu endOffset ajustado
    */
   const handleAddMarker = async () => {
     if (!id || !recording) return;
@@ -178,7 +228,36 @@ export default function RecordingEditor() {
     const nextMarker = sortedMarkers.find((m) => m.startOffset > currentTime);
     const endOffset = nextMarker ? nextMarker.startOffset : duration;
 
+    // Encontrar faixa anterior que precisa ter seu endOffset ajustado
+    // (faixa que começa antes da posição atual e termina depois dela)
+    const previousMarker = sortedMarkers
+      .filter((m) => m.startOffset < currentTime && m.endOffset > currentTime)
+      .pop(); // Pegar a última (mais próxima da posição atual)
+
     try {
+      // Se há faixa anterior que sobrepõe, ajustar seu endOffset primeiro
+      if (previousMarker) {
+        const adjustResponse = await fetch(
+          `${apiUrl}/api/recordings/${id}/markers/${previousMarker.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endOffset: currentTime }),
+          }
+        );
+
+        if (adjustResponse.ok) {
+          // Atualizar estado local e região no waveform
+          setMarkers((prev) =>
+            prev.map((m) =>
+              m.id === previousMarker.id ? { ...m, endOffset: currentTime } : m
+            )
+          );
+          waveform.updateMarker(previousMarker.id, { endOffset: currentTime });
+        }
+      }
+
+      // Criar novo marcador
       const response = await fetch(`${apiUrl}/api/recordings/${id}/markers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

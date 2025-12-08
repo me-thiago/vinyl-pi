@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { createReadStream, statSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, isAbsolute } from 'path';
 import { RecordingManager } from '../services/recording-manager';
 import { SessionManager } from '../services/session-manager';
 import prisma from '../prisma/client';
@@ -310,9 +310,14 @@ export function createRecordingsRouter(deps: RecordingsRouterDeps): Router {
 
   /**
    * Helper para obter caminho absoluto do arquivo FLAC
+   * Resolve caminhos relativos baseado no CWD do processo
    */
   const getAbsoluteFilePath = (filePath: string): string => {
-    return join(recordingsPath, filePath);
+    // Primeiro determinar o recordingsPath absoluto
+    const baseDir = isAbsolute(recordingsPath)
+      ? recordingsPath
+      : resolve(process.cwd(), recordingsPath);
+    return join(baseDir, filePath);
   };
 
   /**
