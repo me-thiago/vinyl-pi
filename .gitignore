@@ -53,3 +53,9 @@ tmp/
 temp/
 *.tmp
 
+# Recordings (FLAC files)
+backend/data/recordings/
+
+# External documentation
+DOCUMENTACAO-COMPLETA*.md
+
