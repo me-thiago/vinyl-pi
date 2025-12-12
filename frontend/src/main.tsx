@@ -20,6 +20,33 @@ Sentry.init({
       blockAllMedia: false,
     }),
   ],
+  /**
+   * Filtra ruído comum de extensões do browser.
+   *
+   * Exemplo real observado: UnhandledRejection com stack em `chrome-extension://...`
+   * e mensagem "User rejected the request." (code 4001).
+   *
+   * Isso NÃO é bug do Vinyl-OS e polui o Sentry.
+   */
+  beforeSend(event) {
+    try {
+      const values = event.exception?.values ?? []
+      const stackFrames = values.flatMap((v) => v.stacktrace?.frames ?? [])
+      const hasChromeExtensionFrame = stackFrames.some((f) => (f.filename ?? '').startsWith('chrome-extension://'))
+
+      // Alguns casos vêm como "extra.__serialized__" (Promise rejeitada com objeto)
+      const serialized = (event.extra as { __serialized__?: { code?: number; message?: string } } | undefined)?.__serialized__
+      const isKnownExtensionNoise =
+        hasChromeExtensionFrame ||
+        (serialized?.code === 4001 && serialized?.message?.toLowerCase().includes('user rejected') === true)
+
+      if (isKnownExtensionNoise) return null
+    } catch {
+      // Se o filtro falhar, não impedir envio do evento
+    }
+
+    return event
+  },
   // Performance Monitoring - 10% das transações
   tracesSampleRate: 0.1,
   // Session Replay - 10% normal, 100% quando há erro
