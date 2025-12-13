@@ -220,7 +220,7 @@ export function createStatsRouter(): Router {
       ]);
 
       // Top álbuns (por contagem de sessões distintas)
-      // Usando raw query porque Prisma não suporta COUNT(DISTINCT) em groupBy
+      // V3a-09: Migrado para usar SessionAlbum em vez de Track
       const topAlbumsRaw = await prisma.$queryRaw<{
         albumId: string;
         title: string;
@@ -228,14 +228,14 @@ export function createStatsRouter(): Router {
         coverUrl: string | null;
         sessionCount: bigint;
       }[]>`
-        SELECT 
+        SELECT
           a.id as "albumId",
           a.title,
           a.artist,
           a."coverUrl",
-          COUNT(DISTINCT t."sessionId") as "sessionCount"
+          COUNT(DISTINCT sa."sessionId") as "sessionCount"
         FROM "Album" a
-        JOIN "Track" t ON t."albumId" = a.id
+        JOIN "SessionAlbum" sa ON sa."albumId" = a.id
         GROUP BY a.id, a.title, a.artist, a."coverUrl"
         ORDER BY "sessionCount" DESC
         LIMIT 5
@@ -251,15 +251,16 @@ export function createStatsRouter(): Router {
       }));
 
       // Top artistas (por contagem de sessões distintas)
+      // V3a-09: Migrado para usar SessionAlbum em vez de Track
       const topArtistsRaw = await prisma.$queryRaw<{
         artist: string;
         sessionCount: bigint;
       }[]>`
-        SELECT 
+        SELECT
           a.artist,
-          COUNT(DISTINCT t."sessionId") as "sessionCount"
+          COUNT(DISTINCT sa."sessionId") as "sessionCount"
         FROM "Album" a
-        JOIN "Track" t ON t."albumId" = a.id
+        JOIN "SessionAlbum" sa ON sa."albumId" = a.id
         GROUP BY a.artist
         ORDER BY "sessionCount" DESC
         LIMIT 5
@@ -271,10 +272,10 @@ export function createStatsRouter(): Router {
         sessionCount: Number(a.sessionCount)
       }));
 
-      // Álbuns únicos tocados (via Track com albumId)
-      const uniqueAlbumsPlayedRaw = await prisma.track.groupBy({
+      // Álbuns únicos tocados (via SessionAlbum)
+      // V3a-09: Migrado para usar SessionAlbum em vez de Track
+      const uniqueAlbumsPlayedRaw = await prisma.sessionAlbum.groupBy({
         by: ['albumId'],
-        where: { albumId: { not: null } }
       });
 
       const stats: ListeningStats = {
