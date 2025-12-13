@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { LanguageToggle } from '@/components/language-toggle';
 import { MiniVuMeter } from './MiniVuMeter';
 import { RecognitionButton, MatchConfirmation, type ButtonState } from '@/components/Recognition';
 import { useRecognition, type RecognizedTrack, type AlbumMatchItem } from '@/hooks/useRecognition';
@@ -380,6 +381,12 @@ export function PlayerBar({
             <div className="flex items-center justify-between">
               <span className="text-sm">{t('nav.theme')}</span>
               <ThemeToggle />
+            </div>
+          </div>
+          <div className="px-2 py-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">{t('nav.language')}</span>
+              <LanguageToggle />
             </div>
           </div>
         </DropdownMenuContent>

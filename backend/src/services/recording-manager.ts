@@ -8,8 +8,12 @@ import { createLogger } from '../utils/logger';
 import { eventBus } from '../utils/event-bus';
 import prisma from '../prisma/client';
 import { RecordingStatus } from '@prisma/client';
+import { SettingsService } from './settings-service';
 
 const logger = createLogger('RecordingManager');
+
+// V3a-08: Default máximo de gravação (1 hora) se não configurado
+const DEFAULT_MAX_DURATION_MINUTES = 60;
 
 /**
  * Configuração de gravação
@@ -65,6 +69,7 @@ export interface RecordingManagerStatus {
  */
 export class RecordingManager extends EventEmitter {
   private config: RecordingConfig;
+  private settingsService: SettingsService | null = null;
   private ffmpegProcess: ChildProcess | null = null;
   private outputStream: WriteStream | null = null;
   private currentRecordingId: string | null = null;
@@ -74,14 +79,23 @@ export class RecordingManager extends EventEmitter {
   private fileSizeCheckInterval: NodeJS.Timeout | null = null;
   private currentFilePath: string | null = null;
   private bytesWritten: number = 0;
+  private maxDurationTimer: NodeJS.Timeout | null = null; // V3a-08
 
-  constructor(config: RecordingConfig) {
+  constructor(config: RecordingConfig, settingsService?: SettingsService) {
     super();
     this.config = {
       ...config,
       compressionLevel: config.compressionLevel || 5,
     };
+    this.settingsService = settingsService || null;
     logger.info(`RecordingManager initialized with FIFO: ${config.flacFifoPath}`);
+  }
+
+  /**
+   * Define o SettingsService (para injeção após inicialização)
+   */
+  setSettingsService(settingsService: SettingsService): void {
+    this.settingsService = settingsService;
   }
 
   /**
@@ -244,7 +258,10 @@ export class RecordingManager extends EventEmitter {
 
     logger.info(`Recording started: ${relativePath} (ID: ${recordingId})`);
     this.emit('recording_started', { recording });
-    
+
+    // V3a-08: Iniciar timer de duração máxima
+    this.startMaxDurationTimer();
+
     // Emit EventBus event for cross-component communication
     await eventBus.publish('recording.started', {
       recording: {
@@ -285,10 +302,13 @@ export class RecordingManager extends EventEmitter {
     const startTime = this.recordingStartTime;
     const filePath = this.currentFilePath;
 
-    // 1. Parar verificação de tamanho
+    // 1. Parar timer de duração máxima (V3a-08)
+    this.stopMaxDurationTimer();
+
+    // 2. Parar verificação de tamanho
     this.stopFileSizeMonitor();
 
-    // 2. Fechar stream de escrita
+    // 3. Fechar stream de escrita
     await this.closeOutputStream();
 
     // 3. Calcular duração e tamanho
@@ -582,6 +602,53 @@ export class RecordingManager extends EventEmitter {
     if (this.fileSizeCheckInterval) {
       clearInterval(this.fileSizeCheckInterval);
       this.fileSizeCheckInterval = null;
+    }
+  }
+
+  /**
+   * V3a-08: Inicia timer de duração máxima
+   * Para a gravação automaticamente após o tempo configurado
+   * @private
+   */
+  private startMaxDurationTimer(): void {
+    // Obter duração máxima das settings ou usar default
+    let maxMinutes = DEFAULT_MAX_DURATION_MINUTES;
+    if (this.settingsService) {
+      try {
+        maxMinutes = this.settingsService.getNumber('recording.maxDurationMinutes');
+      } catch {
+        logger.warn('Não foi possível obter recording.maxDurationMinutes, usando default');
+      }
+    }
+
+    const maxMs = maxMinutes * 60 * 1000;
+    logger.info(`Max duration timer started: ${maxMinutes} minutes`);
+
+    this.maxDurationTimer = setTimeout(async () => {
+      logger.warn(`Recording max duration reached (${maxMinutes} min), auto-stopping`);
+
+      try {
+        await this.stopRecording();
+
+        // Emitir evento específico para auto-stop
+        await eventBus.publish('recording.auto_stopped', {
+          reason: 'max_duration_reached',
+          maxMinutes,
+        });
+      } catch (err) {
+        logger.error('Erro ao auto-parar gravação', { error: err });
+      }
+    }, maxMs);
+  }
+
+  /**
+   * V3a-08: Para timer de duração máxima
+   * @private
+   */
+  private stopMaxDurationTimer(): void {
+    if (this.maxDurationTimer) {
+      clearTimeout(this.maxDurationTimer);
+      this.maxDurationTimer = null;
     }
   }
 }

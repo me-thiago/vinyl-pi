@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   Music,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Disc
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -126,6 +127,10 @@ export default function Settings() {
   const [pendingAutoDelay, setPendingAutoDelay] = useState<number | null>(null)
   const [pendingPreferredService, setPendingPreferredService] = useState<string | null>(null)
   const [pendingSampleDuration, setPendingSampleDuration] = useState<number | null>(null)
+
+  // Recording settings (V3a-08)
+  const [pendingMaxDuration, setPendingMaxDuration] = useState<number | null>(null)
+  const [savingRecording, setSavingRecording] = useState(false)
 
   // Buscar settings
   const fetchSettings = useCallback(async () => {
@@ -264,6 +269,36 @@ export default function Settings() {
     (pendingAutoDelay !== null && pendingAutoDelay !== recognitionStatus?.settings.autoDelay) ||
     (pendingPreferredService !== null && pendingPreferredService !== recognitionStatus?.settings.preferredService) ||
     (pendingSampleDuration !== null && pendingSampleDuration !== recognitionStatus?.settings.sampleDuration)
+
+  // Recording values (V3a-08)
+  const currentMaxDuration = pendingMaxDuration ?? (getSettingValue('recording.maxDurationMinutes') || 60)
+  const hasMaxDurationChange = pendingMaxDuration !== null && pendingMaxDuration !== getSettingValue('recording.maxDurationMinutes')
+
+  // Salvar max duration (V3a-08)
+  const saveMaxDuration = useCallback(async () => {
+    if (pendingMaxDuration === null) return
+
+    try {
+      setSavingRecording(true)
+      const response = await fetch(`${API_BASE}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'recording.maxDurationMinutes': pendingMaxDuration })
+      })
+
+      if (!response.ok) throw new Error(t('settings.saveError'))
+
+      const data = await response.json()
+      setSettings(data.settings)
+      setPendingMaxDuration(null)
+      setSuccessMessage(t('common.success'))
+      setTimeout(() => setSuccessMessage(null), 5000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.unknownError'))
+    } finally {
+      setSavingRecording(false)
+    }
+  }, [pendingMaxDuration, t])
 
   // Salvar buffer
   const saveBuffer = useCallback(async () => {
@@ -709,7 +744,52 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {/* Card 4: Sistema (read-only) */}
+            {/* Card 4: Gravação (V3a-08) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Disc className="w-5 h-5" />
+                  {t('recording.title')}
+                </CardTitle>
+                <CardDescription>
+                  {t('recording.maxDurationDesc')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>{t('recording.maxDuration')}</Label>
+                    <span className="font-mono text-sm tabular-nums">
+                      {currentMaxDuration} {t('recording.minutes')}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[currentMaxDuration]}
+                    onValueChange={([value]: number[]) => setPendingMaxDuration(value)}
+                    min={15}
+                    max={180}
+                    step={15}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>15 min</span>
+                    <span>180 min</span>
+                  </div>
+                </div>
+
+                {hasMaxDurationChange && (
+                  <Button
+                    onClick={saveMaxDuration}
+                    disabled={savingRecording}
+                    className="w-full"
+                  >
+                    {savingRecording ? t('common.saving') : t('common.save')}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Card 5: Sistema (read-only) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

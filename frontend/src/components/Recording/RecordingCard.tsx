@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Music, Trash2, Edit, Link as LinkIcon } from 'lucide-react';
+import { Music, Trash2, Edit, Link as LinkIcon, Unlink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,7 @@ interface RecordingCardProps {
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onLink?: (id: string) => void;
+  onUnlink?: (id: string) => void; // V3a-08: Desvincular do álbum
   hideAlbumInfo?: boolean; // V3-05: Ocultar info do álbum (usado na página do álbum)
 }
 
@@ -45,7 +46,7 @@ interface RecordingCardProps {
  * Card individual para exibição de gravação
  * Usado na listagem de gravações
  */
-export function RecordingCard({ recording, onDelete, onEdit, onLink, hideAlbumInfo }: RecordingCardProps) {
+export function RecordingCard({ recording, onDelete, onEdit, onLink, onUnlink, hideAlbumInfo }: RecordingCardProps) {
   const { t } = useTranslation();
 
   // Formatar duração
@@ -149,6 +150,18 @@ export function RecordingCard({ recording, onDelete, onEdit, onLink, hideAlbumIn
                 title={t('recording.linkToAlbum')}
               >
                 <LinkIcon className="w-4 h-4" />
+              </Button>
+            )}
+
+            {/* Desvincular do álbum (V3a-08) */}
+            {recording.album && onUnlink && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onUnlink(recording.id)}
+                title={t('recording.unlink')}
+              >
+                <Unlink className="w-4 h-4" />
               </Button>
             )}
 

@@ -126,6 +126,17 @@ export const SETTINGS_DEFINITIONS: SettingDefinition[] = [
     min: 10,
     max: 60,
     unit: 's'
+  },
+  // Recording settings (V3a-08)
+  {
+    key: 'recording.maxDurationMinutes',
+    defaultValue: 60,
+    type: 'number',
+    label: 'Max Recording Duration',
+    description: 'Tempo máximo de gravação antes do auto-stop',
+    min: 15,
+    max: 180,
+    unit: 'min'
   }
 ];
 

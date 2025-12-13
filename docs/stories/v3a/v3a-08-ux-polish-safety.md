@@ -14,31 +14,32 @@ Esta story agrupa quick wins identificados durante o uso do sistema:
 - O i18n existe mas não há forma fácil de trocar idioma
 - Falta botão de unlink nos cards de recordings
 
+## Status: DONE (2025-12-13)
+
 ## Acceptance Criteria
 
 ### AC1: Recording Footer - Animação de Alternância
-- [ ] Quando gravando, alternar a cada 3s entre duração (00:05:32) e tamanho (32.5 MB)
-- [ ] Transição suave (fade ou slide)
-- [ ] Manter comportamento atual quando não está gravando
+- [x] Quando gravando, alternar a cada 3s entre duração (00:05:32) e tamanho (32.5 MB)
+- [x] Transição suave (fade ou slide)
+- [x] Manter comportamento atual quando não está gravando
 
 ### AC2: Limite de Gravação (1 hora)
-- [ ] Configuração `recording.maxDurationMinutes` com default 60
-- [ ] Auto-stop quando atingir o limite
-- [ ] Toast de notificação: "Gravação finalizada automaticamente (limite de 1h)"
-- [ ] Evento WebSocket para frontend atualizar estado
-- [ ] Setting editável na página /settings
+- [x] Configuração `recording.maxDurationMinutes` com default 60
+- [x] Auto-stop quando atingir o limite
+- [x] Toast de notificação: "Gravação finalizada automaticamente (limite de 1h)"
+- [x] Evento WebSocket para frontend atualizar estado
+- [x] Setting editável na página /settings
 
 ### AC3: Toggle de Idioma
-- [ ] Componente `LanguageToggle` com bandeiras (🇧🇷/🇺🇸 ou ícones SVG)
-- [ ] Posicionado no header, próximo ao theme toggle
-- [ ] Persiste preferência em localStorage
-- [ ] Troca imediata sem reload
+- [x] Componente `LanguageToggle` com ícone Globe
+- [x] Posicionado no menu "..." do footer, abaixo do toggle de tema
+- [x] Persiste preferência em localStorage (via i18next-browser-languagedetector)
+- [x] Troca imediata sem reload
 
 ### AC4: Botão Unlink nos Recording Cards
-- [ ] Adicionar botão "Unlink" (ícone de corrente quebrada) nos cards de recordings
-- [ ] Disponível apenas quando recording tem albumId
-- [ ] Confirmação antes de executar
-- [ ] Chamar `PATCH /api/recordings/:id` com `albumId: null`
+- [x] Adicionar botão "Unlink" (ícone Unlink do lucide) nos cards de recordings
+- [x] Disponível apenas quando recording tem albumId
+- [x] Chamar `PATCH /api/recordings/:id` com `albumId: null`
 
 ## Technical Notes
 

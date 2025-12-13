@@ -141,6 +141,7 @@ export class SocketManager implements Destroyable {
       'audio.stop',
       'recording.started', // V3a: Gravação iniciada
       'recording.stopped', // V3a: Gravação parada
+      'recording.auto_stopped', // V3a-08: Auto-stop por limite de duração
     ];
 
     // Subscrever a cada evento
@@ -190,6 +191,13 @@ export class SocketManager implements Destroyable {
           // V3a: Emitir evento específico para gravação parada
           this.io.emit('recording_stopped', {
             recording: payload.recording,
+            timestamp: new Date().toISOString()
+          });
+        } else if (eventType === 'recording.auto_stopped') {
+          // V3a-08: Emitir evento específico para auto-stop
+          this.io.emit('recording_auto_stopped', {
+            reason: payload.reason,
+            maxMinutes: payload.maxMinutes,
             timestamp: new Date().toISOString()
           });
         }

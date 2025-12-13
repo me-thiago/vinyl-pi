@@ -23,6 +23,7 @@ export type EventType =
   // V3a - Recording events
   | 'recording.started'
   | 'recording.stopped'
+  | 'recording.auto_stopped' // V3a-08: Auto-stop por limite de duração
   | 'recording.deleted'
   | 'recording.trimmed'
   | 'storage.alert'

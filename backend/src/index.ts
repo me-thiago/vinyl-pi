@@ -316,6 +316,10 @@ settingsService.initialize().then(async () => {
 
   logger.info('Configurações carregadas e aplicadas');
 
+  // V3a-08: Injetar settingsService no RecordingManager para limite de duração
+  recordingManager.setSettingsService(settingsService);
+  logger.info('RecordingManager configurado com SettingsService');
+
   // Iniciar AutoRecognitionService SOMENTE após SettingsService estar pronto
   // Isso evita race condition onde handleSessionStarted chamaria settingsService.get()
   // antes de initialize() completar (causaria: "SettingsService not initialized")

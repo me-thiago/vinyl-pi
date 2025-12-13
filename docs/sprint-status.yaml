@@ -114,7 +114,7 @@ development_status:
   v3-05-ui-detalhe-album: done             # Página expandida com gravações + correção thumbnail álbum
   v3-06-editor-audio: done              # Waveform + trim + marcadores
   v3a-07-refactor-audio-manager: done       # Tech debt: extrair FFmpegProcessManager, FifoManager, FFmpegArgsBuilder
-  v3a-08-ux-polish-safety: drafted         # Footer animation, limite 1h, toggle idioma, botão unlink
+  v3a-08-ux-polish-safety: done             # Footer animation, limite 1h, toggle idioma, botão unlink
   v3a-09-edit-session-albums: drafted      # Adicionar/remover álbuns manualmente em sessões
   epic-v3a-retrospective: optional
 

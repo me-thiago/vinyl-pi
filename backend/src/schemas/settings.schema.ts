@@ -91,6 +91,14 @@ export const settingsUpdateSchema = z
       .min(10, { message: 'recognition.autoDelay deve ser >= 10 segundos' })
       .max(60, { message: 'recognition.autoDelay deve ser <= 60 segundos' })
       .optional(),
+
+    // Recording settings (V3a-08)
+    'recording.maxDurationMinutes': z
+      .number({ message: 'recording.maxDurationMinutes deve ser um número' })
+      .int({ message: 'recording.maxDurationMinutes deve ser um número inteiro' })
+      .min(15, { message: 'recording.maxDurationMinutes deve ser >= 15 minutos' })
+      .max(180, { message: 'recording.maxDurationMinutes deve ser <= 180 minutos' })
+      .optional(),
   })
   .strict();
 

@@ -28,9 +28,17 @@ export function Layout() {
     }
   }, [t]);
 
-  // WebSocket para eventos globais (V2-12)
+  // Handler para auto-stop de gravação (V3a-08)
+  const handleRecordingAutoStopped = useCallback((data: { maxMinutes: number }) => {
+    toast.warning(t('recording.autoStopped', { minutes: data.maxMinutes }), {
+      duration: 8000,
+    });
+  }, [t]);
+
+  // WebSocket para eventos globais (V2-12, V3a-08)
   useSocket({
     onRecognitionStarted: handleRecognitionStarted,
+    onRecordingAutoStopped: handleRecordingAutoStopped,
   });
 
   // Buscar configuração de buffer da API

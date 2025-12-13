@@ -35,7 +35,8 @@
     "stats": "Statistics",
     "diagnostics": "Diagnostics",
     "settings": "Settings",
-    "theme": "Theme"
+    "theme": "Theme",
+    "language": "Language"
   },
   "home": {
     "title": "Live Vinyl Visualizer",
@@ -384,7 +385,11 @@
     "stop": "Stop",
     "started": "Recording started",
     "stopped": "Recording stopped",
+    "autoStopped": "Recording auto-stopped ({{minutes}} min limit)",
     "error": "Recording error",
+    "maxDuration": "Max Duration",
+    "maxDurationDesc": "Maximum recording time before auto-stop",
+    "minutes": "minutes",
     "noAlbum": "No linked album",
     "tracks": "tracks",
     "status": {

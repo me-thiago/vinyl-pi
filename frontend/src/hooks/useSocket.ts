@@ -59,6 +59,15 @@ export interface RecognitionStartedPayload {
 }
 
 /**
+ * Payload de auto-stop de gravação (V3a-08)
+ */
+export interface RecordingAutoStoppedPayload {
+  reason: string;
+  maxMinutes: number;
+  timestamp: string;
+}
+
+/**
  * Callbacks para eventos do socket
  */
 export interface SocketCallbacks {
@@ -68,6 +77,7 @@ export interface SocketCallbacks {
   onSessionStarted?: (data: { id: string; startedAt: string }) => void;
   onSessionEnded?: (data: { id: string; endedAt: string; durationSeconds: number; eventCount: number }) => void;
   onRecognitionStarted?: (data: RecognitionStartedPayload) => void;
+  onRecordingAutoStopped?: (data: RecordingAutoStoppedPayload) => void; // V3a-08
 }
 
 /**
@@ -188,6 +198,11 @@ export function useSocket(callbacks?: SocketCallbacks): UseSocketReturn {
     // Handler de reconhecimento iniciado (V2-12)
     socket.on('recognition_started', (data: RecognitionStartedPayload) => {
       callbacksRef.current?.onRecognitionStarted?.(data);
+    });
+
+    // Handler de auto-stop de gravação (V3a-08)
+    socket.on('recording_auto_stopped', (data: RecordingAutoStoppedPayload) => {
+      callbacksRef.current?.onRecordingAutoStopped?.(data);
     });
   }, []);
 

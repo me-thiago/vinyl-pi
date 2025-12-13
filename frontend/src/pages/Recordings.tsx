@@ -174,6 +174,29 @@ export default function Recordings() {
   };
 
   /**
+   * Desvincular gravação do álbum (V3a-08)
+   */
+  const handleUnlink = async (id: string) => {
+    try {
+      const response = await fetch(`${apiUrl}/api/recordings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: null }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to unlink recording');
+      }
+
+      toast.success(t('recording.unlinked'));
+      fetchRecordings(); // Recarregar lista
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to unlink recording';
+      toast.error(t('recording.unlinkError'), { description: message });
+    }
+  };
+
+  /**
    * Recarregar quando filtros mudarem
    */
   useEffect(() => {
@@ -283,6 +306,7 @@ export default function Recordings() {
                 onDelete={handleDelete}
                 onEdit={handleEdit}
                 onLink={handleLink}
+                onUnlink={handleUnlink}
               />
             ))}
           </div>
