@@ -433,6 +433,9 @@
     "notFound": "Recording not found",
     "loadError": "Error loading recording",
     "backToList": "Back to list",
+    "mobileNotSupported": "Editor not available on mobile devices",
+    "mobileNotSupportedDesc": "The audio editor requires features that are not available in mobile browsers. Please access this page from a computer.",
+    "viewOnDesktop": "Access from a computer to edit",
     "info": {
       "title": "Information",
       "duration": "Duration",

@@ -1,7 +1,7 @@
 # Story V3-06: Editor de Áudio
 
 **Epic:** V3a - Gravação & Fundação
-**Status:** drafted
+**Status:** done
 
 **User Story:**
 Como usuário,

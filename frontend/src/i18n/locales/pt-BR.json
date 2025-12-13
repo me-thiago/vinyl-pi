@@ -460,6 +460,9 @@
     "notFound": "Gravação não encontrada",
     "loadError": "Erro ao carregar gravação",
     "backToList": "Voltar para lista",
+    "mobileNotSupported": "Editor não disponível em dispositivos móveis",
+    "mobileNotSupportedDesc": "O editor de áudio requer recursos que não estão disponíveis em navegadores móveis. Por favor, acesse esta página de um computador.",
+    "viewOnDesktop": "Acesse de um computador para editar",
     "info": {
       "title": "Informações",
       "duration": "Duração",
