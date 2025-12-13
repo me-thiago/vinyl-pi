@@ -71,7 +71,7 @@ export function AlbumRecordings({
 
   const handleUnlink = async (recordingId: string) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
       const response = await fetch(`${apiUrl}/api/recordings/${recordingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -95,7 +95,7 @@ export function AlbumRecordings({
 
   const handleDelete = async (recordingId: string) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
       const response = await fetch(`${apiUrl}/api/recordings/${recordingId}`, {
         method: 'DELETE',
       });

@@ -49,7 +49,7 @@ export function LinkRecordingDialog({
   const [linking, setLinking] = useState(false);
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
 
   // Buscar álbuns quando o modal abre
   useEffect(() => {

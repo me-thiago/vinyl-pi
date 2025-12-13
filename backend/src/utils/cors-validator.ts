@@ -21,6 +21,9 @@ const logger = createLogger('CorsValidator');
  * - 172.16.0.0/12  (172.16.x.x - 172.31.x.x)
  * - 192.168.0.0/16 (192.168.x.x)
  * - localhost/loopback (127.x.x.x)
+ *
+ * Redes VPN/Tailscale:
+ * - 100.64.0.0/10  (100.64.x.x - 100.127.x.x) - Tailscale CGNAT range
  */
 const LOCAL_PATTERNS: RegExp[] = [
   // localhost e 127.0.0.1 (loopback)
@@ -35,6 +38,9 @@ const LOCAL_PATTERNS: RegExp[] = [
 
   // Rede privada classe B: 172.16.x.x - 172.31.x.x
   /^https?:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+
+  // Tailscale VPN: 100.64.x.x - 100.127.x.x (CGNAT range usado por Tailscale)
+  /^https?:\/\/100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
 ];
 
 /**

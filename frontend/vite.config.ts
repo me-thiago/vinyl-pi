@@ -42,6 +42,10 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 500,
   },
+  preview: {
+    // Permitir acesso via Tailscale MagicDNS
+    allowedHosts: ['vinyl-os.tailda19c1.ts.net'],
+  },
   server: {
     proxy: {
       '/stream': {

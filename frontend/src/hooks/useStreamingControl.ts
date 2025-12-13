@@ -18,7 +18,7 @@ interface UseStreamingControlReturn {
   refreshStatus: () => Promise<void>;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
 
 export function useStreamingControl(): UseStreamingControlReturn {
   const [isStreaming, setIsStreaming] = useState(false);

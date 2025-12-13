@@ -132,7 +132,7 @@ export default function RecordingEditor() {
   const [error, setError] = useState<string | null>(null);
   const [isTrimming, setIsTrimming] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
   const streamUrl = `${apiUrl}/api/recordings/${id}/stream`;
 
   /**

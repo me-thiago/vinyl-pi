@@ -136,6 +136,43 @@ describe('CORS Validator', () => {
       });
     });
 
+    describe('Tailscale VPN (100.64-127.x.x)', () => {
+      it('should allow 100.64.x.x (start of Tailscale range)', () => {
+        expect(isLocalOrigin('http://100.64.0.1')).toBe(true);
+        expect(isLocalOrigin('http://100.64.100.50')).toBe(true);
+      });
+
+      it('should allow 100.69.x.x (common Tailscale IP)', () => {
+        expect(isLocalOrigin('http://100.69.209.71')).toBe(true);
+        expect(isLocalOrigin('http://100.69.209.71:5173')).toBe(true);
+      });
+
+      it('should allow 100.100.x.x (middle of Tailscale range)', () => {
+        expect(isLocalOrigin('http://100.100.100.100')).toBe(true);
+        expect(isLocalOrigin('http://100.100.50.25:8080')).toBe(true);
+      });
+
+      it('should allow 100.127.x.x (end of Tailscale range)', () => {
+        expect(isLocalOrigin('http://100.127.255.255')).toBe(true);
+        expect(isLocalOrigin('http://100.127.0.1:3000')).toBe(true);
+      });
+
+      it('should allow Tailscale IPs with ports', () => {
+        expect(isLocalOrigin('http://100.64.0.1:3000')).toBe(true);
+        expect(isLocalOrigin('https://100.69.209.71:443')).toBe(true);
+      });
+
+      it('should NOT allow 100.63.x.x (before Tailscale range)', () => {
+        expect(isLocalOrigin('http://100.63.0.1')).toBe(false);
+        expect(isLocalOrigin('http://100.63.100.50')).toBe(false);
+      });
+
+      it('should NOT allow 100.128.x.x (after Tailscale range)', () => {
+        expect(isLocalOrigin('http://100.128.0.1')).toBe(false);
+        expect(isLocalOrigin('http://100.200.100.50')).toBe(false);
+      });
+    });
+
     describe('external origins (should be blocked)', () => {
       it('should block external domains', () => {
         expect(isLocalOrigin('https://evil.com')).toBe(false);

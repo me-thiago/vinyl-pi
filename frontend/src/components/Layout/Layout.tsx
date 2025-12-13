@@ -45,7 +45,7 @@ export function Layout() {
   useEffect(() => {
     const fetchBufferSetting = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
         const response = await fetch(`${apiUrl}/api/settings`);
         if (response.ok) {
           const data = await response.json();

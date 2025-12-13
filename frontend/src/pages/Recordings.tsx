@@ -72,7 +72,7 @@ export default function Recordings() {
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 20;
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
 
   /**
    * Buscar gravações da API

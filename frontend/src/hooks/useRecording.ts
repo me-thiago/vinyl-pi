@@ -33,7 +33,7 @@ export function useRecording() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
 
   /**
    * Buscar status atual da gravação

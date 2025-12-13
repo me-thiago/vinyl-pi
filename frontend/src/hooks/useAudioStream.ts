@@ -298,7 +298,7 @@ export function useAudioStream({
 
       // Fetch stream WAV (baixa latência)
       // Usa VITE_API_URL do .env ou fallback para localhost
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
       const effectiveUrl = `${apiUrl}/stream.wav`;
 
       let response: Response;
