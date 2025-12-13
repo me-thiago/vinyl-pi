@@ -71,7 +71,7 @@ export function AddAlbumDialog({ sessionId, open, onOpenChange, onSuccess }: Pro
   const fetchAlbums = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_HOST}/api/albums?limit=500`);
+      const res = await fetch(`${API_HOST}/api/albums?limit=100`);
       const data = await res.json();
       setAlbums(data.data || []);
     } catch (err) {
