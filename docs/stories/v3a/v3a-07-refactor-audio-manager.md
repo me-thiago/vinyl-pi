@@ -1,7 +1,7 @@
 # Story V3a-07: Refatoração AudioManager - Arquitetura Modular
 
 **Epic:** V3a - Gravação & Fundação
-**Status:** drafted
+**Status:** done
 **Tipo:** Tech Debt / Refatoração
 **Prioridade:** Baixa (executar após V3-06, antes de V3b)
 

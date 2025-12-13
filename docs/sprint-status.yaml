@@ -112,21 +112,25 @@ development_status:
   v3-03-gravacao-flac-manual: done           # API start/stop + RecordingManager
   v3-04-ui-gravacoes: done                   # Listagem + botão Record no footer
   v3-05-ui-detalhe-album: done             # Página expandida com gravações + correção thumbnail álbum
-  v3-06-editor-audio: drafted              # Waveform + trim + marcadores
-  v3a-07-refactor-audio-manager: drafted   # Tech debt: extrair FFmpegProcessManager, FifoManager, FFmpegArgsBuilder
+  v3-06-editor-audio: done              # Waveform + trim + marcadores
+  v3a-07-refactor-audio-manager: done       # Tech debt: extrair FFmpegProcessManager, FifoManager, FFmpegArgsBuilder
+  v3a-08-ux-polish-safety: drafted         # Footer animation, limite 1h, toggle idioma, botão unlink
+  v3a-09-edit-session-albums: drafted      # Adicionar/remover álbuns manualmente em sessões
   epic-v3a-retrospective: optional
 
   # Epic V3b - Reconhecimento Offline (🟡 Médio-Alto risco)
   # Tech-spec: pendente (após V3a)
   # Depende de V3a completo
   epic-v3b: backlog
-  v3-07-schema-chromaprints: backlog       # Tabela chromaprints por faixa
-  v3-08-geracao-chromaprint: backlog       # Serviço fpcalc + processamento FLAC
-  v3-09-segmentacao-faixas: backlog        # Usar marcadores do editor
-  v3-10-ui-geracao-fingerprints: backlog   # Botão na página do álbum
-  v3-11-matching-engine: backlog           # Comparar fingerprints (maior risco)
-  v3-12-integracao-local-first: backlog    # Modificar RecognitionService
-  v3-13-ui-now-playing-offline: backlog    # Badge "Local" vs "AudD"
+  v3b-01-album-tracks-table: drafted       # Nova tabela AlbumTrack (tracklist por álbum)
+  v3b-02-discogs-tracklist-sync: drafted   # Importar tracklist do Discogs
+  v3b-03-schema-chromaprints: backlog      # Adicionar chromaprint em AlbumTrack
+  v3b-04-geracao-chromaprint: backlog      # Serviço fpcalc + processamento FLAC
+  v3b-05-segmentacao-faixas: backlog       # Usar marcadores do editor → AlbumTrack
+  v3b-06-ui-geracao-fingerprints: backlog  # Botão na página do álbum
+  v3b-07-matching-engine: backlog          # Comparar fingerprints (maior risco)
+  v3b-08-integracao-local-first: backlog   # Modificar RecognitionService
+  v3b-09-ui-now-playing-offline: backlog   # Badge "Local" vs "AudD"
   epic-v3b-retrospective: optional
 
   # Epic V3c - Análise & Insights (🔴 Alto risco)
