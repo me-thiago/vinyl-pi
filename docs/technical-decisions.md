@@ -1130,6 +1130,77 @@ sudo iptables -I ts-input 2 -s 100.65.157.28 -j ACCEPT  # IP do MacBook
 
 ---
 
+## SessionAlbum: Relação Direta Session ↔ Album
+
+### Decisão: Criar tabela intermediária SessionAlbum
+
+**Data:** 2025-12-13
+**Contexto:** Story V3a-09 - Edit Session Albums
+**Status:** ✅ Implementado
+
+### Problema
+
+O modelo anterior usava `Track` para vincular álbuns às sessões:
+
+```
+Session (1) ───→ (N) Track (N) ───→ (1) Album
+```
+
+**Track** é uma tabela de **log de reconhecimento** — registra eventos técnicos (confidence, source, timestamp). Usar ela para "álbuns ouvidos" misturava dois conceitos:
+- Log de eventos técnicos (reconhecimento)
+- Curadoria do histórico de escuta
+
+### Solução
+
+Nova tabela `SessionAlbum` para relação muitos-para-muitos direta:
+
+```
+Session (N) ←────→ (N) Album
+         │
+    SessionAlbum
+```
+
+**Schema:**
+```prisma
+model SessionAlbum {
+  id        String   @id @default(uuid())
+  sessionId String
+  albumId   String
+  source    String   @default("manual") // "manual" | "recognition"
+  addedAt   DateTime @default(now())
+  notes     String?  // "Lado A", "Primeiro disco", etc.
+
+  @@unique([sessionId, albumId])
+}
+```
+
+### Fluxo de Dados
+
+**Reconhecimento automático:**
+1. AudD API → Match na coleção
+2. Cria Track (log técnico) ← como antes
+3. **NOVO:** Cria SessionAlbum com `source: 'recognition'` via upsert
+
+**Edição manual:**
+1. Botão "+ Adicionar Álbum" → POST `/api/sessions/:id/albums`
+2. Cria SessionAlbum com `source: 'manual'`
+3. Botão "Remover" → DELETE `/api/sessions/:id/albums/:albumId`
+
+### Decisões Adicionais
+
+| Decisão | Alternativa | Justificativa |
+|---------|-------------|---------------|
+| Aceitar perda de `recognizedTrack` | Preservar trackTitle no SessionAlbum | Simplifica modelo; addedAt é suficiente |
+| Migrar dados existentes | Só novos dados | Preserva histórico de escuta |
+| source como String | enum | Flexibilidade para fontes futuras |
+
+### Referências
+
+- Story: `docs/stories/v3a/v3a-09-edit-session-albums.md`
+- Commit: `0715730 feat(v3a-09): add SessionAlbum relationship`
+
+---
+
 **Última revisão:** 2025-12-13
-**Próxima revisão:** Quando implementar V3
+**Próxima revisão:** Quando implementar V3b
 

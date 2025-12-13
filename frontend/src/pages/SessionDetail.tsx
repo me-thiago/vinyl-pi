@@ -261,8 +261,12 @@ export default function SessionDetailPage() {
               </CardContent>
             </Card>
 
-            {/* V2-09: Álbuns Tocados */}
-            <AlbumsPlayed albums={session.albums} />
+            {/* V3a-09: Álbuns Tocados */}
+            <AlbumsPlayed
+              albums={session.albums}
+              sessionId={session.id}
+              onRefresh={fetchSession}
+            />
 
             {/* Timeline de Eventos */}
             <Card>

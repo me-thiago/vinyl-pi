@@ -12,6 +12,14 @@ jest.mock('../../prisma/client', () => ({
       findMany: jest.fn(),
       findUnique: jest.fn(),
       count: jest.fn()
+    },
+    album: {
+      findUnique: jest.fn()
+    },
+    sessionAlbum: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn()
     }
   }
 }));
@@ -68,7 +76,7 @@ describe('Sessions Router', () => {
     });
 
     it('should return sessions from database', async () => {
-      // V2-09: Mock sessions now include tracks for albumCount calculation
+      // V3a-09: Mock sessions now use _count.sessionAlbums for albumCount
       const mockSessions = [
         {
           id: 'session-1',
@@ -76,11 +84,7 @@ describe('Sessions Router', () => {
           endedAt: new Date('2025-01-01T11:00:00.000Z'),
           durationSeconds: 3600,
           eventCount: 10,
-          tracks: [
-            { albumId: 'album-1' },
-            { albumId: 'album-1' }, // Same album, should count as 1
-            { albumId: 'album-2' }
-          ]
+          _count: { sessionAlbums: 2 }
         },
         {
           id: 'session-2',
@@ -88,7 +92,7 @@ describe('Sessions Router', () => {
           endedAt: null,
           durationSeconds: 0,
           eventCount: 5,
-          tracks: [] // No albums
+          _count: { sessionAlbums: 0 }
         }
       ];
 
@@ -101,14 +105,14 @@ describe('Sessions Router', () => {
       expect(response.body.total).toBe(2);
       expect(response.body.hasMore).toBe(false);
 
-      // V2-09: Now includes albumCount
+      // V3a-09: albumCount comes from _count.sessionAlbums
       expect(response.body.sessions[0]).toEqual({
         id: 'session-1',
         startedAt: '2025-01-01T10:00:00.000Z',
         endedAt: '2025-01-01T11:00:00.000Z',
         durationSeconds: 3600,
         eventCount: 10,
-        albumCount: 2 // 2 unique albums
+        albumCount: 2
       });
 
       expect(response.body.sessions[1].endedAt).toBeNull();
@@ -156,14 +160,14 @@ describe('Sessions Router', () => {
       });
 
       it('should calculate hasMore correctly', async () => {
-        // V2-09: Include tracks array for albumCount calculation
+        // V3a-09: Include _count.sessionAlbums for albumCount calculation
         mockFindMany.mockResolvedValue([{
           id: '1',
           startedAt: new Date(),
           endedAt: null,
           durationSeconds: 0,
           eventCount: 0,
-          tracks: []
+          _count: { sessionAlbums: 0 }
         }]);
         mockCount.mockResolvedValue(50);
 
@@ -311,7 +315,7 @@ describe('Sessions Router', () => {
 
   describe('GET /api/sessions/:id', () => {
     it('should return session with events and albums', async () => {
-      // V2-09: Mock session now includes tracks for album grouping
+      // V3a-09: Mock session now includes sessionAlbums for album list
       const mockSession = {
         id: 'session-123',
         startedAt: new Date('2025-01-01T10:00:00.000Z'),
@@ -332,11 +336,11 @@ describe('Sessions Router', () => {
             metadata: { levelDb: -30 }
           }
         ],
-        tracks: [
+        sessionAlbums: [
           {
-            albumId: 'album-1',
-            title: 'Money',
-            recognizedAt: new Date('2025-01-01T10:15:00.000Z'),
+            source: 'recognition',
+            addedAt: new Date('2025-01-01T10:15:00.000Z'),
+            notes: null,
             album: {
               id: 'album-1',
               title: 'The Dark Side of the Moon',
@@ -373,7 +377,7 @@ describe('Sessions Router', () => {
             metadata: { levelDb: -30 }
           }
         ],
-        // V2-09: Now includes albums array
+        // V3a-09: Albums now include source, addedAt, notes
         albums: [
           {
             id: 'album-1',
@@ -381,10 +385,9 @@ describe('Sessions Router', () => {
             artist: 'Pink Floyd',
             year: 1973,
             coverUrl: 'https://example.com/cover.jpg',
-            recognizedTrack: {
-              title: 'Money',
-              recognizedAt: '2025-01-01T10:15:00.000Z'
-            }
+            source: 'recognition',
+            addedAt: '2025-01-01T10:15:00.000Z',
+            notes: null
           }
         ]
       });
@@ -399,8 +402,8 @@ describe('Sessions Router', () => {
       expect(response.body.error.message).toContain('Sessão não encontrada');
     });
 
-    it('should order events by timestamp ascending and include tracks', async () => {
-      // V2-09: Update test to reflect new query that includes tracks
+    it('should order events by timestamp ascending and include sessionAlbums', async () => {
+      // V3a-09: Update test to reflect new query that includes sessionAlbums
       await request(app).get('/api/sessions/session-123');
 
       expect(mockFindUnique).toHaveBeenCalledWith({
@@ -415,10 +418,9 @@ describe('Sessions Router', () => {
               metadata: true
             }
           },
-          // V2-09: Now includes tracks for album grouping
-          tracks: {
-            where: { albumId: { not: null } },
-            orderBy: { recognizedAt: 'asc' },
+          // V3a-09: Now includes sessionAlbums
+          sessionAlbums: {
+            orderBy: { addedAt: 'asc' },
             include: {
               album: {
                 select: { id: true, title: true, artist: true, year: true, coverUrl: true }
@@ -437,6 +439,134 @@ describe('Sessions Router', () => {
       expect(response.status).toBe(500);
       expect(response.body.error.message).toBe('Erro ao buscar sessão');
       expect(response.body.error.code).toBe('SESSION_FETCH_ERROR');
+    });
+  });
+
+  // V3a-09: Testes para novos endpoints de SessionAlbum
+  describe('POST /api/sessions/:id/albums', () => {
+    const mockAlbumFindUnique = prisma.album.findUnique as jest.Mock;
+    const mockSessionAlbumFindUnique = prisma.sessionAlbum.findUnique as jest.Mock;
+    const mockSessionAlbumCreate = prisma.sessionAlbum.create as jest.Mock;
+
+    const mockAlbum = {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      title: 'Kind of Blue',
+      artist: 'Miles Davis',
+      year: 1959,
+      coverUrl: 'http://example.com/cover.jpg'
+    };
+
+    beforeEach(() => {
+      mockFindUnique.mockResolvedValue({ id: 'session-1' }); // Session exists
+      mockAlbumFindUnique.mockResolvedValue(mockAlbum);
+      mockSessionAlbumFindUnique.mockResolvedValue(null); // Not already linked
+    });
+
+    it('should add album to session successfully', async () => {
+      mockSessionAlbumCreate.mockResolvedValue({
+        album: mockAlbum,
+        source: 'manual',
+        addedAt: new Date('2025-01-01T10:30:00.000Z'),
+        notes: 'Lado B'
+      });
+
+      const response = await request(app)
+        .post('/api/sessions/session-1/albums')
+        .send({
+          albumId: '550e8400-e29b-41d4-a716-446655440000',
+          notes: 'Lado B'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data).toMatchObject({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        title: 'Kind of Blue',
+        source: 'manual',
+        notes: 'Lado B'
+      });
+    });
+
+    it('should return 404 when session not found', async () => {
+      mockFindUnique.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post('/api/sessions/non-existent/albums')
+        .send({ albumId: '550e8400-e29b-41d4-a716-446655440000' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe('SESSION_NOT_FOUND');
+    });
+
+    it('should return 404 when album not found', async () => {
+      mockAlbumFindUnique.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post('/api/sessions/session-1/albums')
+        .send({ albumId: '550e8400-e29b-41d4-a716-446655440000' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe('ALBUM_NOT_FOUND');
+    });
+
+    it('should return 409 when album already in session', async () => {
+      mockSessionAlbumFindUnique.mockResolvedValue({ id: 'existing-link' });
+
+      const response = await request(app)
+        .post('/api/sessions/session-1/albums')
+        .send({ albumId: '550e8400-e29b-41d4-a716-446655440000' });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('ALBUM_ALREADY_IN_SESSION');
+    });
+
+    it('should return 400 when albumId is invalid UUID', async () => {
+      const response = await request(app)
+        .post('/api/sessions/session-1/albums')
+        .send({ albumId: 'not-a-uuid' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 400 when albumId is missing', async () => {
+      const response = await request(app)
+        .post('/api/sessions/session-1/albums')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('DELETE /api/sessions/:id/albums/:albumId', () => {
+    const mockSessionAlbumDeleteMany = prisma.sessionAlbum.deleteMany as jest.Mock;
+
+    it('should remove album from session successfully', async () => {
+      mockSessionAlbumDeleteMany.mockResolvedValue({ count: 1 });
+
+      const response = await request(app)
+        .delete('/api/sessions/session-1/albums/550e8400-e29b-41d4-a716-446655440000');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.deleted).toBe(1);
+    });
+
+    it('should return 404 when album not in session', async () => {
+      mockSessionAlbumDeleteMany.mockResolvedValue({ count: 0 });
+
+      const response = await request(app)
+        .delete('/api/sessions/session-1/albums/550e8400-e29b-41d4-a716-446655440000');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe('ALBUM_NOT_IN_SESSION');
+    });
+
+    it('should return 400 when albumId is invalid UUID', async () => {
+      const response = await request(app)
+        .delete('/api/sessions/session-1/albums/not-a-uuid');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
   });
 });

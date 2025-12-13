@@ -25,7 +25,10 @@
     "page": "Page",
     "of": "of",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "change": "Change",
+    "add": "Add",
+    "remove": "Remove"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -178,7 +181,18 @@
     "noAlbumsPlayed": "No albums identified in this session",
     "identifiedAt": "Identified at {{time}}",
     "identifiedVia": "\"{{track}}\"",
-    "viewAlbum": "View"
+    "viewAlbum": "View",
+    "manual": "Manual",
+    "auto": "Auto",
+    "addedAt": "Added at {{time}}",
+    "addAlbum": "Add Album",
+    "addAlbumTitle": "Add Album to Session",
+    "searchAlbumPlaceholder": "Search album...",
+    "noAlbumsFound": "No albums found",
+    "notesLabel": "Notes (optional)",
+    "notesPlaceholder": "E.g.: Side A, First disc...",
+    "removeAlbumTitle": "Remove Album",
+    "removeAlbumDesc": "Are you sure you want to remove \"{{title}}\" from this session?"
   },
   "diagnostics": {
     "title": "Diagnostics",

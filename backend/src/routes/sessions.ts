@@ -3,7 +3,15 @@ import prisma from '../prisma/client';
 import { SessionManager } from '../services/session-manager';
 import { createLogger } from '../utils/logger';
 import { validate } from '../middleware/validate';
-import { sessionsQuerySchema, sessionIdParamSchema, SessionsQueryInput } from '../schemas';
+import {
+  sessionsQuerySchema,
+  sessionIdParamSchema,
+  SessionsQueryInput,
+  addSessionAlbumSchema,
+  sessionAlbumParamSchema,
+  AddSessionAlbumInput,
+  SessionAlbumParam,
+} from '../schemas';
 
 const logger = createLogger('SessionsRouter');
 
@@ -33,23 +41,17 @@ interface SessionsResponse {
 }
 
 /**
- * Info do track reconhecido para exibição
+ * V3a-09: Álbum na sessão (via SessionAlbum)
  */
-interface RecognizedTrackInfo {
-  title: string;
-  recognizedAt: string;
-}
-
-/**
- * Álbum tocado na sessão (agrupado dos tracks)
- */
-interface SessionAlbum {
+interface SessionAlbumResponse {
   id: string;
   title: string;
   artist: string;
   year: number | null;
   coverUrl: string | null;
-  recognizedTrack: RecognizedTrackInfo;
+  source: string;      // 'manual' | 'recognition'
+  addedAt: string;
+  notes: string | null;
 }
 
 /**
@@ -67,7 +69,7 @@ interface SessionDetailResponse {
     timestamp: string;
     metadata: object | null;
   }[];
-  albums: SessionAlbum[];
+  albums: SessionAlbumResponse[];  // V3a-09: Atualizado para usar SessionAlbum
 }
 
 /**
@@ -77,6 +79,8 @@ interface SessionDetailResponse {
  * - GET /api/sessions - Lista sessões com filtros e paginação
  * - GET /api/sessions/:id - Detalhes de uma sessão com eventos
  * - GET /api/sessions/active - Retorna sessão ativa (se houver)
+ * - POST /api/sessions/:id/albums - V3a-09: Adiciona álbum manualmente à sessão
+ * - DELETE /api/sessions/:id/albums/:albumId - V3a-09: Remove álbum da sessão
  */
 export function createSessionsRouter(deps?: SessionsRouterDependencies): Router {
   const router = Router();
@@ -119,7 +123,7 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
       }
 
       // Buscar sessões e total em paralelo
-      // V2-09: Incluir tracks para contar álbuns únicos
+      // V3a-09: Usar _count de sessionAlbums para contar álbuns
       const [sessions, total] = await Promise.all([
         prisma.session.findMany({
           where,
@@ -132,9 +136,8 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
             endedAt: true,
             durationSeconds: true,
             eventCount: true,
-            tracks: {
-              where: { albumId: { not: null } },
-              select: { albumId: true }
+            _count: {
+              select: { sessionAlbums: true }
             }
           }
         }),
@@ -143,18 +146,14 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
 
       // Formatar resposta com albumCount
       const response: SessionsResponse = {
-        sessions: sessions.map(session => {
-          // V2-09: Contar álbuns únicos (Set remove duplicatas)
-          const uniqueAlbumIds = new Set(session.tracks.map(t => t.albumId));
-          return {
-            id: session.id,
-            startedAt: session.startedAt.toISOString(),
-            endedAt: session.endedAt?.toISOString() || null,
-            durationSeconds: session.durationSeconds,
-            eventCount: session.eventCount,
-            albumCount: uniqueAlbumIds.size
-          };
-        }),
+        sessions: sessions.map(session => ({
+          id: session.id,
+          startedAt: session.startedAt.toISOString(),
+          endedAt: session.endedAt?.toISOString() || null,
+          durationSeconds: session.durationSeconds,
+          eventCount: session.eventCount,
+          albumCount: session._count.sessionAlbums  // V3a-09
+        })),
         total,
         hasMore: offset + sessions.length < total
       };
@@ -221,10 +220,9 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
               metadata: true
             }
           },
-          // V2-09: Incluir tracks com albumId para agrupar álbuns tocados
-          tracks: {
-            where: { albumId: { not: null } },
-            orderBy: { recognizedAt: 'asc' },
+          // V3a-09: Usar sessionAlbums em vez de tracks
+          sessionAlbums: {
+            orderBy: { addedAt: 'asc' },
             include: {
               album: {
                 select: { id: true, title: true, artist: true, year: true, coverUrl: true }
@@ -241,24 +239,17 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
         return;
       }
 
-      // V2-09: Agrupar tracks por albumId, pegar primeiro reconhecimento de cada álbum
-      const albumsMap = new Map<string, SessionAlbum>();
-      for (const track of session.tracks) {
-        if (track.album && track.albumId && !albumsMap.has(track.albumId)) {
-          albumsMap.set(track.albumId, {
-            id: track.album.id,
-            title: track.album.title,
-            artist: track.album.artist,
-            year: track.album.year,
-            coverUrl: track.album.coverUrl,
-            recognizedTrack: {
-              title: track.title,
-              recognizedAt: track.recognizedAt.toISOString()
-            }
-          });
-        }
-      }
-      const albums = Array.from(albumsMap.values());
+      // V3a-09: Mapear sessionAlbums para formato da resposta
+      const albums: SessionAlbumResponse[] = session.sessionAlbums.map((sa) => ({
+        id: sa.album.id,
+        title: sa.album.title,
+        artist: sa.album.artist,
+        year: sa.album.year,
+        coverUrl: sa.album.coverUrl,
+        source: sa.source,
+        addedAt: sa.addedAt.toISOString(),
+        notes: sa.notes,
+      }));
 
       const response: SessionDetailResponse = {
         id: session.id,
@@ -284,6 +275,122 @@ export function createSessionsRouter(deps?: SessionsRouterDependencies): Router 
       });
     }
   });
+
+  /**
+   * POST /api/sessions/:id/albums
+   * V3a-09: Adiciona um álbum manualmente à sessão
+   */
+  router.post(
+    '/sessions/:id/albums',
+    validate(sessionIdParamSchema, 'params'),
+    validate(addSessionAlbumSchema, 'body'),
+    async (req: Request<{ id: string }, unknown, AddSessionAlbumInput>, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { albumId, notes } = req.body;
+
+        // Verificar se sessão existe
+        const session = await prisma.session.findUnique({ where: { id } });
+        if (!session) {
+          res.status(404).json({
+            error: { message: 'Sessão não encontrada', code: 'SESSION_NOT_FOUND' }
+          });
+          return;
+        }
+
+        // Verificar se álbum existe
+        const album = await prisma.album.findUnique({ where: { id: albumId } });
+        if (!album) {
+          res.status(404).json({
+            error: { message: 'Álbum não encontrado', code: 'ALBUM_NOT_FOUND' }
+          });
+          return;
+        }
+
+        // Verificar se já existe vínculo
+        const existing = await prisma.sessionAlbum.findUnique({
+          where: { sessionId_albumId: { sessionId: id, albumId } },
+        });
+        if (existing) {
+          res.status(409).json({
+            error: { message: 'Álbum já está nesta sessão', code: 'ALBUM_ALREADY_IN_SESSION' }
+          });
+          return;
+        }
+
+        // Criar vínculo
+        const sessionAlbum = await prisma.sessionAlbum.create({
+          data: {
+            sessionId: id,
+            albumId,
+            source: 'manual',
+            notes,
+          },
+          include: {
+            album: {
+              select: { id: true, title: true, artist: true, year: true, coverUrl: true },
+            },
+          },
+        });
+
+        logger.info(`Álbum adicionado manualmente à sessão: sessionId=${id}, albumId=${albumId}`);
+
+        res.status(201).json({
+          data: {
+            id: sessionAlbum.album.id,
+            title: sessionAlbum.album.title,
+            artist: sessionAlbum.album.artist,
+            year: sessionAlbum.album.year,
+            coverUrl: sessionAlbum.album.coverUrl,
+            source: sessionAlbum.source,
+            addedAt: sessionAlbum.addedAt.toISOString(),
+            notes: sessionAlbum.notes,
+          }
+        });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao adicionar álbum à sessão', { error: errorMsg });
+        res.status(500).json({
+          error: { message: 'Erro ao adicionar álbum', code: 'ADD_ALBUM_ERROR' }
+        });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/sessions/:id/albums/:albumId
+   * V3a-09: Remove um álbum da sessão
+   */
+  router.delete(
+    '/sessions/:id/albums/:albumId',
+    validate(sessionAlbumParamSchema, 'params'),
+    async (req: Request<SessionAlbumParam>, res: Response) => {
+      try {
+        const { id, albumId } = req.params;
+
+        const deleted = await prisma.sessionAlbum.deleteMany({
+          where: { sessionId: id, albumId },
+        });
+
+        if (deleted.count === 0) {
+          res.status(404).json({
+            error: { message: 'Álbum não encontrado nesta sessão', code: 'ALBUM_NOT_IN_SESSION' }
+          });
+          return;
+        }
+
+        logger.info(`Álbum removido da sessão: sessionId=${id}, albumId=${albumId}`);
+
+        res.json({ data: { deleted: deleted.count } });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('Erro ao remover álbum da sessão', { error: errorMsg });
+        res.status(500).json({
+          error: { message: 'Erro ao remover álbum', code: 'REMOVE_ALBUM_ERROR' }
+        });
+      }
+    }
+  );
 
   return router;
 }

@@ -80,16 +80,17 @@ enum RecordingStatus {
 // ============================================
 
 model Session {
-  id              String       @id @default(uuid())
-  startedAt       DateTime     @default(now())
+  id              String         @id @default(uuid())
+  startedAt       DateTime       @default(now())
   endedAt         DateTime?
-  durationSeconds Int          @default(0)
-  eventCount      Int          @default(0)
+  durationSeconds Int            @default(0)
+  eventCount      Int            @default(0)
   audioEvents     AudioEvent[]
-  tracks          Track[]      // V2: Tracks reconhecidos nesta sessão
-  recordings      Recording[]  // V3a: Gravações realizadas nesta sessão
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  tracks          Track[]        // V2: Tracks reconhecidos nesta sessão
+  recordings      Recording[]    // V3a: Gravações realizadas nesta sessão
+  sessionAlbums   SessionAlbum[] // V3a-09: Álbuns ouvidos nesta sessão
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([startedAt(sort: Desc)])
 }
@@ -134,6 +135,7 @@ model Album {
   archived         Boolean         @default(false) // true = usuário não possui mais
   tracks           Track[]
   recordings       Recording[]     // V3a: Gravações vinculadas a este álbum
+  sessionAlbums    SessionAlbum[]  // V3a-09: Sessões onde este álbum foi ouvido
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -227,4 +229,20 @@ model TrackMarker {
 
   @@unique([recordingId, trackNumber])
   @@index([recordingId])
+}
+
+/// V3a-09: Álbum ouvido durante uma sessão (relação many-to-many)
+model SessionAlbum {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  albumId   String
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  source    String   @default("manual") // "manual" | "recognition"
+  addedAt   DateTime @default(now())
+  notes     String?  // "Lado A", "Primeiro disco", etc.
+
+  @@unique([sessionId, albumId])
+  @@index([sessionId])
+  @@index([albumId])
 }

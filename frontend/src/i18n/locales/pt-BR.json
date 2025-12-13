@@ -25,7 +25,10 @@
     "page": "Página",
     "of": "de",
     "previous": "Anterior",
-    "next": "Próxima"
+    "next": "Próxima",
+    "change": "Alterar",
+    "add": "Adicionar",
+    "remove": "Remover"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -178,7 +181,18 @@
     "noAlbumsPlayed": "Nenhum álbum identificado nesta sessão",
     "identifiedAt": "Identificado às {{time}}",
     "identifiedVia": "\"{{track}}\"",
-    "viewAlbum": "Ver"
+    "viewAlbum": "Ver",
+    "manual": "Manual",
+    "auto": "Auto",
+    "addedAt": "Adicionado às {{time}}",
+    "addAlbum": "Adicionar Álbum",
+    "addAlbumTitle": "Adicionar Álbum à Sessão",
+    "searchAlbumPlaceholder": "Buscar álbum...",
+    "noAlbumsFound": "Nenhum álbum encontrado",
+    "notesLabel": "Notas (opcional)",
+    "notesPlaceholder": "Ex: Lado A, Primeiro disco...",
+    "removeAlbumTitle": "Remover Álbum",
+    "removeAlbumDesc": "Tem certeza que deseja remover \"{{title}}\" desta sessão?"
   },
   "diagnostics": {
     "title": "Diagnóstico",

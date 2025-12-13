@@ -537,6 +537,30 @@ export async function recognize(options: RecognizeOptions): Promise<RecognitionR
 
     logger.info(`Track persistido: id=${track.id}, albumId=${linkedAlbumId}`);
 
+    // V3a-09: Criar SessionAlbum se houve vinculação automática
+    if (linkedAlbumId) {
+      try {
+        await prisma.sessionAlbum.upsert({
+          where: {
+            sessionId_albumId: {
+              sessionId,
+              albumId: linkedAlbumId,
+            },
+          },
+          create: {
+            sessionId,
+            albumId: linkedAlbumId,
+            source: 'recognition',
+          },
+          update: {}, // Não atualiza se já existe
+        });
+        logger.info(`SessionAlbum criado/existente: sessionId=${sessionId}, albumId=${linkedAlbumId}`);
+      } catch (err) {
+        // Não falhar o reconhecimento se SessionAlbum falhar
+        logger.warn('Falha ao criar SessionAlbum', { error: err });
+      }
+    }
+
     // 7. Emitir evento track.recognized
     await eventBus.publish('track.recognized', {
       track: {
