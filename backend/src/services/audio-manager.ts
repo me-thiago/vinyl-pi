@@ -1,7 +1,5 @@
-import { spawn, exec, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { unlink, access } from 'fs';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { createLogger } from '../utils/logger';
 import { getListenerCount } from './icecast-stats';
 import {
@@ -9,26 +7,30 @@ import {
   DEFAULT_RING_BUFFER_CONFIG,
   RingBufferStats,
 } from '../utils/ring-buffer';
-
-const execAsync = promisify(exec);
-const unlinkAsync = promisify(unlink);
-const accessAsync = promisify(access);
+import { FFmpegProcessManager } from '../utils/ffmpeg-process';
+import { FifoManager } from '../utils/fifo-manager';
+import {
+  FFmpegArgsBuilder,
+  AudioConfig as FFmpegAudioConfig,
+  StreamingConfig as FFmpegStreamingConfig,
+  FifoPaths,
+} from '../utils/ffmpeg-args';
 
 const logger = createLogger('AudioManager');
 
 /**
- * Configuração de captura de áudio
+ * Configuracao de captura de audio
  */
 export interface AudioConfig {
   device: string;          // Device ALSA (ex: "plughw:1,0")
   sampleRate: number;      // Sample rate em Hz (ex: 48000)
-  channels: number;        // Número de canais (1=mono, 2=stereo)
+  channels: number;        // Numero de canais (1=mono, 2=stereo)
   bitDepth: number;        // Bit depth (8, 16, 24, 32)
   bufferSize: number;      // Buffer size em samples (512-2048)
 }
 
 /**
- * Configuração de streaming para Icecast2
+ * Configuracao de streaming para Icecast2
  */
 export interface StreamingConfig {
   icecastHost: string;     // Host do Icecast2 (ex: "localhost")
@@ -36,109 +38,91 @@ export interface StreamingConfig {
   icecastPassword: string; // Password do source
   mountPoint: string;      // Mount point (ex: "/stream")
   bitrate: number;         // Bitrate MP3 em kbps (ex: 320)
-  fallbackSilence: boolean; // Usar fallback de silêncio quando input falha
+  fallbackSilence: boolean; // Usar fallback de silencio quando input falha
 }
 
 /**
  * Status do streaming
  */
 export interface StreamingStatus {
-  active: boolean;         // Se streaming está ativo
-  listeners?: number;      // Número de listeners (se disponível)
+  active: boolean;         // Se streaming esta ativo
+  listeners?: number;      // Numero de listeners (se disponivel)
   bitrate: number;         // Bitrate configurado
   mountPoint: string;      // Mount point
   error?: string;          // Mensagem de erro (se houver)
 }
 
 /**
- * Status da captura de áudio
+ * Status da captura de audio
  */
 export interface AudioCaptureStatus {
-  isCapturing: boolean;    // Se está capturando atualmente
+  isCapturing: boolean;    // Se esta capturando atualmente
   device: string;          // Device ALSA em uso
-  levelDb?: number;        // Nível de áudio em dB (se disponível)
+  levelDb?: number;        // Nivel de audio em dB (se disponivel)
   error?: string;          // Mensagem de erro (se houver)
 }
 
 /**
- * Gerenciador de captura de áudio via ALSA/FFmpeg
+ * Gerenciador de captura de audio via ALSA/FFmpeg
  *
- * Responsável por capturar áudio do dispositivo ALSA configurado
- * usando FFmpeg como child process, com detecção de erros e logging.
+ * Responsavel por capturar audio do dispositivo ALSA configurado
+ * usando FFmpeg como child process, com deteccao de erros e logging.
  *
- * ⚠️ LIFECYCLE NOTE: This is a long-lived singleton service that exists
- * for the entire application lifetime. EventBus subscriptions (when added)
- * are intentionally NOT cleaned up, as this service is never destroyed
- * during normal operation.
+ * Arquitetura (Quad-Path):
+ * - FFmpeg #1 (Main): ALSA -> stdout (PCM) + 3 FIFOs
+ * - FFmpeg #2 (MP3): FIFO -> MP3 -> Icecast2
+ * - FFmpeg #3 (Recognition): FIFO -> stdout -> Ring Buffer
+ * - FFmpeg #4 (FLAC): Gerenciado por RecordingManager
  *
- * If you need to create components with shorter lifecycles that use EventBus,
- * see utils/lifecycle.ts for proper cleanup patterns.
- *
- * Example of proper EventBus usage (for future integration):
- * ```typescript
- * // When adding EventBus subscriptions to AudioManager:
- * import { eventBus, EventHandler } from '../utils/event-bus';
- *
- * class AudioManager extends EventEmitter {
- *   // For singletons: No need to store handlers for cleanup
- *   constructor() {
- *     // ✅ OK for singletons: Direct subscription without cleanup
- *     eventBus.subscribe('audio.start', async (payload) => {
- *       this.handleAudioStart(payload);
- *     });
- *   }
- *   // ✅ No destroy() method needed - singleton lives forever
- * }
- * ```
- *
- * For short-lived components, use this pattern instead:
- * ```typescript
- * import { createSubscriptionManager, Destroyable } from '../utils/lifecycle';
- *
- * class SessionManager implements Destroyable {
- *   private subscriptions = createSubscriptionManager();
- *
- *   constructor() {
- *     // ✅ Tracked for cleanup
- *     this.subscriptions.subscribe('silence.detected', async (p) => {...});
- *   }
- *
- *   async destroy() {
- *     // ✅ Automatic cleanup of all subscriptions
- *     this.subscriptions.cleanup();
- *   }
- * }
- * ```
+ * @see utils/ffmpeg-process.ts - Lifecycle de processos
+ * @see utils/ffmpeg-args.ts - Builder de argumentos
+ * @see utils/fifo-manager.ts - CRUD de FIFOs
  */
 export class AudioManager extends EventEmitter {
-  private ffmpegProcess: ChildProcess | null = null;
-  private ffmpegMp3Process: ChildProcess | null = null; // Segundo FFmpeg para MP3
-  private ffmpegRecognitionProcess: ChildProcess | null = null; // Terceiro FFmpeg para recognition (passthrough)
+  // Processos FFmpeg gerenciados
+  private mainProcess: FFmpegProcessManager | null = null;
+  private mp3Process: FFmpegProcessManager | null = null;
+  private recognitionProcess: FFmpegProcessManager | null = null;
+
+  // Gerenciador de FIFOs
+  private fifoManager = new FifoManager();
+
+  // Configuracao
   private config: AudioConfig;
   private streamingConfig?: StreamingConfig;
+
+  // Estado
   private isCapturing: boolean = false;
   private isStreaming: boolean = false;
   private currentError?: string;
   private levelDb?: number;
-  private fifoPath: string = '/tmp/vinyl-audio.fifo';
-  private recognitionFifoPath: string = '/tmp/vinyl-recognition.fifo';
-  private flacFifoPath: string = '/tmp/vinyl-flac.fifo';  // V3a: FIFO3 para gravação FLAC
+
+  // Caminhos dos FIFOs
+  private readonly fifoPaths: FifoPaths = {
+    mp3Fifo: '/tmp/vinyl-audio.fifo',
+    recognitionFifo: '/tmp/vinyl-recognition.fifo',
+    flacFifo: '/tmp/vinyl-flac.fifo',
+  };
+
+  // Rate limiting de logs
   private logRateLimiter = new Map<string, number>();
-  private LOG_RATE_LIMIT_MS = 5000; // Log mesmo erro max 1x/5s
+  private LOG_RATE_LIMIT_MS = 5000;
+
+  // Retry para recovery
   private retryCount = 0;
   private MAX_RETRIES = 3;
 
-  // Ring Buffer para captura instantânea de áudio (recognition)
+  // Ring Buffer para captura instantanea de audio (recognition)
   private recognitionBuffer: AudioRingBuffer;
 
   /**
-   * Cria uma instância do AudioManager
-   * @param config Configuração de captura de áudio
+   * Cria uma instancia do AudioManager
+   * @param config Configuracao de captura de audio
    */
   constructor(config?: Partial<AudioConfig>) {
     super();
 
-    // Configuração padrão com overrides
+    // Configuracao padrao com overrides
     this.config = {
       device: config?.device || 'plughw:1,0',
       sampleRate: config?.sampleRate || 48000,
@@ -152,7 +136,7 @@ export class AudioManager extends EventEmitter {
       throw new Error(`Buffer size must be between 512 and 2048 samples, got ${this.config.bufferSize}`);
     }
 
-    // Inicializar Ring Buffer para recognition (20 segundos de histórico)
+    // Inicializar Ring Buffer para recognition (20 segundos de historico)
     this.recognitionBuffer = new AudioRingBuffer({
       ...DEFAULT_RING_BUFFER_CONFIG,
       sampleRate: this.config.sampleRate,
@@ -166,8 +150,7 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Inicia a captura de áudio
-   * @returns Promise que resolve quando captura iniciar
+   * Inicia a captura de audio (modo simples, sem streaming)
    */
   async start(): Promise<void> {
     if (this.isCapturing) {
@@ -176,22 +159,23 @@ export class AudioManager extends EventEmitter {
     }
 
     try {
-      // Validar device ALSA antes de iniciar
       await this.validateDevice();
 
-      // Construir comando FFmpeg
-      const args = this.buildFFmpegArgs();
+      const args = FFmpegArgsBuilder.buildCaptureArgs(
+        this.getFFmpegAudioConfig(),
+        this.config.bufferSize
+      );
 
-      logger.info(`Starting FFmpeg with args: ${args.join(' ')}`);
-
-      // Spawn processo FFmpeg
-      // NOTA: stdout é 'ignore' por enquanto - V1.5 conectará ao Icecast
-      this.ffmpegProcess = spawn('ffmpeg', args, {
-        stdio: ['ignore', 'ignore', 'pipe']  // stdin: ignore, stdout: ignore, stderr: pipe
+      this.mainProcess = new FFmpegProcessManager({
+        name: 'Main',
+        args,
+        onStderr: (data) => this.handleMainStderr(data),
+        onExit: (code, signal) => this.handleMainExit(code, signal),
+        onError: (err) => this.handleMainError(err),
+        stdio: ['ignore', 'ignore', 'pipe'],
       });
 
-      // Configurar handlers
-      this.setupProcessHandlers();
+      await this.mainProcess.start();
 
       this.isCapturing = true;
       this.currentError = undefined;
@@ -208,115 +192,33 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Para a captura de áudio
-   *
-   * Implementa cleanup atômico para evitar race conditions entre SIGTERM/SIGKILL paths.
-   * O cleanup é idempotente e garante que todas as flags de estado sejam resetadas
-   * exatamente uma vez, mesmo se o evento 'exit' e o timeout forçado ocorrerem
-   * simultaneamente.
-   *
-   * @returns Promise que resolve quando captura parar
+   * Para a captura de audio
    */
   async stop(): Promise<void> {
-    if (!this.isCapturing || !this.ffmpegProcess) {
+    if (!this.isCapturing || !this.mainProcess) {
       logger.warn('Audio capture not running');
       return;
     }
 
-    return new Promise((resolve) => {
-      if (!this.ffmpegProcess) {
-        this.resetState();
-        resolve();
-        return;
-      }
+    await this.mainProcess.stop();
+    this.resetState();
 
-      let cleanupCalled = false;
-      const processRef = this.ffmpegProcess;
-
-      const cleanup = () => {
-        if (cleanupCalled) return;  // ✅ Idempotente - evita múltiplas execuções
-        cleanupCalled = true;
-
-        this.resetState();  // ✅ Reset atômico de TODAS as flags
-        logger.info('Audio capture stopped');
-        this.emit('stopped');
-        resolve();
-      };
-
-      // Event handler: chamado quando processo terminar (SIGTERM ou SIGKILL)
-      processRef.once('exit', cleanup);
-
-      // Enviar SIGTERM para parar graciosamente
-      processRef.kill('SIGTERM');
-
-      // Timeout: SIGKILL se processo não terminar em 2s (reduzido de 5s)
-      setTimeout(() => {
-        if (!processRef || cleanupCalled) return;
-
-        if (!processRef.killed) {
-          logger.warn('FFmpeg did not stop gracefully, sending SIGKILL');
-          processRef.kill('SIGKILL');
-        }
-
-        // Aguardar mais 500ms para evento 'exit' após SIGKILL
-        // Se evento não ocorrer, forçar kill -9 do sistema
-        setTimeout(async () => {
-          if (cleanupCalled) return;
-          
-          logger.warn('FFmpeg did not respond to SIGKILL, force killing');
-          await this.forceKillProcess(processRef, 'FFmpeg main');
-          cleanup();  // ✅ Safe: idempotente, não duplica se já foi chamado
-        }, 500);
-      }, 2000); // Timeout reduzido para 2s
-    });
+    logger.info('Audio capture stopped');
+    this.emit('stopped');
   }
 
   /**
-   * Reseta atomicamente o estado interno do AudioManager
-   *
-   * Este método centraliza toda a lógica de reset de estado para garantir
-   * consistência. É chamado por todos os exit paths (stop, handlers, error recovery).
-   *
-   * CRÍTICO: Todas as flags devem ser atualizadas juntas para evitar estado inconsistente
-   * onde isStreaming=true mas ffmpegProcess=null.
-   *
-   * @private
-   */
-  private resetState(): void {
-    this.isCapturing = false;
-    this.isStreaming = false;
-    this.ffmpegProcess = null;
-    this.ffmpegMp3Process = null;
-    this.ffmpegRecognitionProcess = null;
-    this.streamingConfig = undefined;
-    this.currentError = undefined;
-
-    // Limpar ring buffer
-    this.recognitionBuffer.clear();
-
-    // Cleanup FIFO se existir
-    this.cleanupFifo().catch(err => {
-      logger.warn(`Failed to cleanup FIFO during reset: ${err}`);
-    });
-  }
-
-  /**
-   * Reinicia a captura de áudio
-   * @returns Promise que resolve quando captura reiniciar
+   * Reinicia a captura de audio
    */
   async restart(): Promise<void> {
     logger.info('Restarting audio capture');
     await this.stop();
-
-    // Aguardar um pouco antes de reiniciar
     await new Promise(resolve => setTimeout(resolve, 1000));
-
     await this.start();
   }
 
   /**
    * Retorna o status atual da captura
-   * @returns Status da captura de áudio
    */
   getStatus(): AudioCaptureStatus {
     return {
@@ -331,17 +233,15 @@ export class AudioManager extends EventEmitter {
    * Inicia streaming dual: Raw PCM para frontend + MP3 para Icecast2
    *
    * Arquitetura:
-   * ALSA → FFmpeg #1 (principal) → stdout (Raw PCM) → Express /stream.wav
-   *                               → FIFO (Raw PCM) → FFmpeg #2 → MP3 → Icecast2
-   *
-   * @param config Configuração de streaming
-   * @returns Promise que resolve quando streaming iniciar
+   * ALSA -> FFmpeg #1 (principal) -> stdout (Raw PCM) -> Express /stream.wav
+   *                               -> FIFO1 (Raw PCM) -> FFmpeg #2 -> MP3 -> Icecast2
+   *                               -> FIFO2 (Raw PCM) -> FFmpeg #3 -> Ring Buffer
+   *                               -> FIFO3 (Raw PCM) -> FFmpeg #4 -> FLAC (RecordingManager)
    */
   async startStreaming(config: StreamingConfig): Promise<void> {
-    // ✅ Validação proativa: detectar estado inconsistente
+    // Validacao proativa: detectar estado inconsistente
     if (this.isStreaming) {
-      const processExists = this.ffmpegProcess && !this.ffmpegProcess.killed;
-
+      const processExists = this.mainProcess?.isRunning();
       if (!processExists) {
         logger.warn('Detected inconsistent state: isStreaming=true but no process. Auto-recovering...');
         this.resetState();
@@ -352,67 +252,80 @@ export class AudioManager extends EventEmitter {
     }
 
     try {
-      // Validar device ALSA antes de iniciar
       await this.validateDevice();
-
-      // Armazenar config de streaming
       this.streamingConfig = config;
 
-      // Criar FIFO para comunicação entre processos FFmpeg
-      await this.createFifo();
+      // Criar FIFOs
+      await this.fifoManager.create([
+        this.fifoPaths.mp3Fifo,
+        this.fifoPaths.recognitionFifo,
+        this.fifoPaths.flacFifo,
+      ]);
 
-      // Construir comandos FFmpeg
-      const mainArgs = this.buildStreamingFFmpegArgs(config);
-      const mp3Args = this.buildMp3FFmpegArgs(config);
+      // Construir argumentos
+      const mainArgs = FFmpegArgsBuilder.buildMainArgs(
+        this.getFFmpegAudioConfig(),
+        this.fifoPaths
+      );
+      const mp3Args = FFmpegArgsBuilder.buildMp3Args(
+        this.fifoPaths.mp3Fifo,
+        { sampleRate: this.config.sampleRate, channels: this.config.channels },
+        this.getFFmpegStreamingConfig(config)
+      );
+      const recognitionArgs = FFmpegArgsBuilder.buildRecognitionArgs(
+        this.fifoPaths.recognitionFifo,
+        { sampleRate: this.config.sampleRate, channels: this.config.channels }
+      );
 
       logger.info(`Starting main FFmpeg with args: ${mainArgs.join(' ')}`);
       logger.info(`Starting MP3 FFmpeg with args: ${mp3Args.join(' ')}`);
-
-      // Iniciar leitores dos FIFOs PRIMEIRO
-      // IMPORTANTE: Leitores devem estar esperando antes do writer escrever nos FIFOs
-
-      // 1. Leitor do FIFO MP3 (FFmpeg → Icecast)
-      this.ffmpegMp3Process = spawn('ffmpeg', mp3Args, {
-        stdio: ['ignore', 'ignore', 'pipe']  // stderr para logs
-      });
-
-      // Configurar handlers para processo MP3
-      this.setupMp3ProcessHandlers();
-
-      // 2. FFmpeg #3: Leitor do FIFO Recognition (passthrough → Ring Buffer)
-      // Este FFmpeg lê continuamente do FIFO e escreve PCM no stdout.
-      // O stdout é lido pelo Node.js e alimenta o Ring Buffer.
-      // Isso garante:
-      // - FIFO sempre tem um leitor (sem bloqueio do FFmpeg principal)
-      // - Ring Buffer sempre tem os últimos 20s de áudio
-      // - Recognition pode capturar instantaneamente do buffer
-      const recognitionArgs = this.buildRecognitionFFmpegArgs();
       logger.info(`Starting Recognition FFmpeg with args: ${recognitionArgs.join(' ')}`);
 
-      this.ffmpegRecognitionProcess = spawn('ffmpeg', recognitionArgs, {
-        stdio: ['ignore', 'pipe', 'pipe'] // stdout=pipe (PCM para ring buffer), stderr=pipe (logs)
+      // 1. Iniciar leitores dos FIFOs PRIMEIRO (importante para evitar bloqueio)
+
+      // FFmpeg #2: MP3 -> Icecast
+      this.mp3Process = new FFmpegProcessManager({
+        name: 'MP3',
+        args: mp3Args,
+        onStderr: (data) => this.handleMp3Stderr(data),
+        onExit: (code, signal) => this.handleMp3Exit(code, signal),
+        onError: (err) => this.handleMp3Error(err),
+        stdio: ['ignore', 'ignore', 'pipe'],
       });
+      await this.mp3Process.start();
 
-      // Configurar handlers para alimentar o Ring Buffer
-      this.setupRecognitionProcessHandlers();
-      logger.info('Started recognition FFmpeg passthrough process');
+      // FFmpeg #3: Recognition -> Ring Buffer
+      this.recognitionProcess = new FFmpegProcessManager({
+        name: 'Recognition',
+        args: recognitionArgs,
+        onStdout: (data) => this.recognitionBuffer.write(data),
+        onStderr: (data) => this.handleRecognitionStderr(data),
+        onExit: (code, signal) => this.handleRecognitionExit(code, signal),
+        onError: (err) => this.handleRecognitionError(err),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      await this.recognitionProcess.start();
 
-      // Aguardar 100ms para garantir que ambos os leitores abriram os FIFOs
+      // Aguardar leitores abrirem FIFOs
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Iniciar FFmpeg principal (ALSA → stdout + FIFO)
-      this.ffmpegProcess = spawn('ffmpeg', mainArgs, {
-        stdio: ['ignore', 'pipe', 'pipe']  // stdout=pipe (Raw PCM), stderr=pipe (logs)
+      // 2. FFmpeg #1: Main (ALSA -> stdout + FIFOs)
+      this.mainProcess = new FFmpegProcessManager({
+        name: 'Main',
+        args: mainArgs,
+        onStderr: (data) => this.handleMainStderr(data),
+        onExit: (code, signal) => this.handleMainExit(code, signal),
+        onError: (err) => this.handleMainError(err),
+        useForceKill: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
-
-      // Configurar handlers para processo principal
-      this.setupProcessHandlers();
+      await this.mainProcess.start();
 
       this.isCapturing = true;
       this.isStreaming = true;
       this.currentError = undefined;
 
-      logger.info(`Dual streaming started: PCM→Express + MP3→Icecast2 (${config.icecastHost}:${config.icecastPort}${config.mountPoint})`);
+      logger.info(`Dual streaming started: PCM->Express + MP3->Icecast2 (${config.icecastHost}:${config.icecastPort}${config.mountPoint})`);
       this.emit('streaming_started', {
         host: config.icecastHost,
         port: config.icecastPort,
@@ -425,16 +338,13 @@ export class AudioManager extends EventEmitter {
       this.currentError = errorMsg;
       logger.error(`Failed to start streaming: ${errorMsg}`);
 
-      // Cleanup em caso de erro
-      await this.cleanupFifo();
-
+      await this.cleanupOnError();
       throw error;
     }
   }
 
   /**
    * Para o streaming (todos os processos FFmpeg e auxiliares)
-   * @returns Promise que resolve quando streaming parar
    */
   async stopStreaming(): Promise<void> {
     if (!this.isStreaming) {
@@ -442,80 +352,39 @@ export class AudioManager extends EventEmitter {
       return;
     }
 
-    // Parar processo principal
-    await this.stop();
+    // Parar processos em paralelo
+    const stopPromises: Promise<void>[] = [];
 
-    // Parar processo MP3
-    if (this.ffmpegMp3Process && !this.ffmpegMp3Process.killed) {
-      logger.info('Stopping MP3 FFmpeg process');
-      const mp3ProcessRef = this.ffmpegMp3Process;
-      mp3ProcessRef.kill('SIGTERM');
-
-      // Aguardar processo terminar com timeout mais agressivo
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(async () => {
-          if (mp3ProcessRef && !mp3ProcessRef.killed) {
-            logger.warn('MP3 FFmpeg did not stop gracefully, sending SIGKILL');
-            mp3ProcessRef.kill('SIGKILL');
-
-            // Force kill se SIGKILL não funcionar
-            setTimeout(async () => {
-              await this.forceKillProcess(mp3ProcessRef, 'FFmpeg MP3');
-              resolve();
-            }, 500);
-          } else {
-            resolve();
-          }
-        }, 2000); // Timeout reduzido para 2s
-
-        mp3ProcessRef?.once('exit', () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
+    if (this.mainProcess?.isRunning()) {
+      stopPromises.push(this.mainProcess.stop());
+    }
+    if (this.mp3Process?.isRunning()) {
+      stopPromises.push(this.mp3Process.stop());
+    }
+    if (this.recognitionProcess?.isRunning()) {
+      stopPromises.push(this.recognitionProcess.stop());
     }
 
-    // Parar FFmpeg #3 (recognition passthrough)
-    if (this.ffmpegRecognitionProcess && !this.ffmpegRecognitionProcess.killed) {
-      logger.info('Stopping recognition FFmpeg process');
-      const recognitionProcessRef = this.ffmpegRecognitionProcess;
-      recognitionProcessRef.kill('SIGTERM');
-
-      // Aguardar processo terminar com timeout
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(async () => {
-          if (recognitionProcessRef && !recognitionProcessRef.killed) {
-            logger.warn('Recognition FFmpeg did not stop gracefully, sending SIGKILL');
-            recognitionProcessRef.kill('SIGKILL');
-          }
-          resolve();
-        }, 2000);
-
-        recognitionProcessRef?.once('exit', () => {
-          clearTimeout(timeout);
-          resolve();
-        });
-      });
-    }
+    await Promise.all(stopPromises);
 
     // Limpar Ring Buffer
     this.recognitionBuffer.clear();
 
     // Limpar FIFOs
-    await this.cleanupFifo();
+    await this.fifoManager.cleanup([
+      this.fifoPaths.mp3Fifo,
+      this.fifoPaths.recognitionFifo,
+      this.fifoPaths.flacFifo,
+    ]);
 
-    this.isStreaming = false;
-    this.streamingConfig = undefined;
-    this.ffmpegMp3Process = null;
-    this.ffmpegRecognitionProcess = null;
+    this.resetState();
 
     logger.info('Streaming stopped (all processes)');
     this.emit('streaming_stopped');
   }
 
   /**
-   * Retorna o status atual do streaming (síncrono, sem listeners)
-   * @returns Status do streaming
+   * Retorna o status atual do streaming (sincrono, sem listeners)
    */
   getStreamingStatus(): StreamingStatus {
     return {
@@ -529,7 +398,6 @@ export class AudioManager extends EventEmitter {
 
   /**
    * Retorna o status atual do streaming com contagem de listeners
-   * @returns Status do streaming com listeners
    */
   async getStreamingStatusWithListeners(): Promise<StreamingStatus> {
     const listeners = this.isStreaming ? await getListenerCount() : 0;
@@ -544,13 +412,10 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Captura áudio do Ring Buffer para recognition
+   * Captura audio do Ring Buffer para recognition
    *
-   * Retorna os últimos N segundos de áudio do buffer circular.
-   * Esta operação é INSTANTÂNEA - não precisa esperar captura.
-   *
-   * @param seconds Segundos de áudio para capturar (max: 20s)
-   * @returns Buffer com dados PCM ou null se não houver dados suficientes
+   * @param seconds Segundos de audio para capturar (max: 20s)
+   * @returns Buffer com dados PCM ou null se nao houver dados suficientes
    */
   captureFromBuffer(seconds: number): Buffer | null {
     if (!this.isStreaming) {
@@ -568,126 +433,128 @@ export class AudioManager extends EventEmitter {
   }
 
   /**
-   * Verifica se há áudio suficiente no buffer para captura
-   *
-   * @param seconds Segundos necessários
-   * @returns true se há dados suficientes
+   * Verifica se ha audio suficiente no buffer para captura
    */
   hasEnoughAudioForCapture(seconds: number): boolean {
     return this.recognitionBuffer.hasEnoughData(seconds);
   }
 
   /**
-   * Retorna estatísticas do Ring Buffer
+   * Retorna estatisticas do Ring Buffer
    */
   getRecognitionBufferStats(): RingBufferStats {
     return this.recognitionBuffer.getStats();
   }
 
   /**
-   * Retorna quantos segundos de áudio estão disponíveis no buffer
+   * Retorna quantos segundos de audio estao disponiveis no buffer
    */
   getAvailableAudioSeconds(): number {
     return this.recognitionBuffer.getAvailableSeconds();
   }
 
   /**
-   * Retorna o caminho do FIFO3 para gravação FLAC (V3a)
-   *
-   * O RecordingManager usa este path para iniciar FFmpeg #4
-   * que lê PCM do FIFO e grava FLAC.
-   *
-   * @returns Caminho do FIFO FLAC
+   * Retorna o caminho do FIFO3 para gravacao FLAC
    */
   getFlacFifoPath(): string {
-    return this.flacFifoPath;
+    return this.fifoPaths.flacFifo;
   }
 
   /**
    * Retorna o stream WAV (stdout do FFmpeg)
-   *
-   * Usado pelo endpoint /stream.wav para servir áudio PCM de baixa latência.
-   * Valida que o processo está rodando e o stdout está disponível.
-   *
-   * @returns ReadableStream do WAV ou null se não disponível
    */
   getWavStream(): NodeJS.ReadableStream | null {
-    if (!this.isStreaming || !this.ffmpegProcess) {
+    if (!this.isStreaming || !this.mainProcess) {
       logger.warn('Cannot get WAV stream: streaming not active');
       return null;
     }
 
-    if (!this.ffmpegProcess.stdout) {
-      logger.error('Cannot get WAV stream: stdout not available');
-      return null;
-    }
-
-    return this.ffmpegProcess.stdout;
+    return this.mainProcess.getStdout();
   }
 
   /**
-   * Cria Named Pipes (FIFOs) para compartilhar áudio entre processos
-   *
-   * Três FIFOs são criados (V3a: Quad-Path Architecture):
-   * 1. vinyl-audio.fifo - Para FFmpeg MP3 → Icecast2
-   * 2. vinyl-recognition.fifo - Para recognition service (captura de samples)
-   * 3. vinyl-flac.fifo - Para FFmpeg FLAC → Recording (V3a)
-   *
-   * @private
+   * Cleanup quando objeto e destruido
    */
-  private async createFifo(): Promise<void> {
-    const fifoPaths = [this.fifoPath, this.recognitionFifoPath, this.flacFifoPath];
-
-    for (const fifoPath of fifoPaths) {
-      try {
-        // Verificar se FIFO já existe
-        await accessAsync(fifoPath);
-        // Existe, remover primeiro
-        await unlinkAsync(fifoPath);
-        logger.info(`Removed existing FIFO at ${fifoPath}`);
-      } catch (err) {
-        // Não existe, OK
-      }
-
-      try {
-        // Criar FIFO usando comando mkfifo do sistema
-        await execAsync(`mkfifo ${fifoPath}`);
-        // Ajustar permissões
-        await execAsync(`chmod 666 ${fifoPath}`);
-        logger.info(`Created FIFO at ${fifoPath}`);
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to create FIFO ${fifoPath}: ${errorMsg}`);
-        throw new Error(`Failed to create FIFO ${fifoPath}: ${errorMsg}`);
-      }
+  async cleanup(): Promise<void> {
+    if (this.isCapturing) {
+      await this.stop();
     }
   }
 
+  // ============================================
+  // Metodos privados
+  // ============================================
+
   /**
-   * Remove Named Pipes (FIFOs) - V3a: inclui FIFO3 (FLAC)
-   * @private
+   * Reseta atomicamente o estado interno
    */
-  private async cleanupFifo(): Promise<void> {
-    const fifoPaths = [this.fifoPath, this.recognitionFifoPath, this.flacFifoPath];
-
-    for (const fifoPath of fifoPaths) {
-      try {
-        await unlinkAsync(fifoPath);
-        logger.info(`Cleaned up FIFO at ${fifoPath}`);
-      } catch (err) {
-        // Ignorar erro se não existir
-        logger.debug(`FIFO cleanup (may not exist): ${fifoPath}`);
-      }
-    }
+  private resetState(): void {
+    this.isCapturing = false;
+    this.isStreaming = false;
+    this.mainProcess = null;
+    this.mp3Process = null;
+    this.recognitionProcess = null;
+    this.streamingConfig = undefined;
+    this.currentError = undefined;
+    this.recognitionBuffer.clear();
   }
 
   /**
-   * Valida se o device ALSA está disponível
-   * @private
+   * Cleanup em caso de erro durante startStreaming
+   */
+  private async cleanupOnError(): Promise<void> {
+    const stopPromises: Promise<void>[] = [];
+
+    if (this.mainProcess?.isRunning()) {
+      stopPromises.push(this.mainProcess.stop());
+    }
+    if (this.mp3Process?.isRunning()) {
+      stopPromises.push(this.mp3Process.stop());
+    }
+    if (this.recognitionProcess?.isRunning()) {
+      stopPromises.push(this.recognitionProcess.stop());
+    }
+
+    await Promise.all(stopPromises);
+
+    await this.fifoManager.cleanup([
+      this.fifoPaths.mp3Fifo,
+      this.fifoPaths.recognitionFifo,
+      this.fifoPaths.flacFifo,
+    ]);
+
+    this.resetState();
+  }
+
+  /**
+   * Converte config para FFmpegAudioConfig
+   */
+  private getFFmpegAudioConfig(): FFmpegAudioConfig {
+    return {
+      device: this.config.device,
+      sampleRate: this.config.sampleRate,
+      channels: this.config.channels,
+    };
+  }
+
+  /**
+   * Converte StreamingConfig para FFmpegStreamingConfig
+   */
+  private getFFmpegStreamingConfig(config: StreamingConfig): FFmpegStreamingConfig {
+    return {
+      icecastHost: config.icecastHost,
+      icecastPort: config.icecastPort,
+      icecastPassword: config.icecastPassword,
+      mountPoint: config.mountPoint,
+      bitrate: config.bitrate,
+    };
+  }
+
+  /**
+   * Valida se o device ALSA esta disponivel
    */
   private async validateDevice(): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Usar arecord para verificar se device existe
       const arecord = spawn('arecord', ['-l']);
       let output = '';
 
@@ -701,8 +568,6 @@ export class AudioManager extends EventEmitter {
           return;
         }
 
-        // Verificar se device está listado
-        // Device plughw:1,0 corresponde a card 1, device 0
         const deviceMatch = this.config.device.match(/plughw:(\d+),(\d+)/);
         if (deviceMatch) {
           const cardNum = deviceMatch[1];
@@ -724,345 +589,116 @@ export class AudioManager extends EventEmitter {
     });
   }
 
-  /**
-   * Constrói argumentos para o comando FFmpeg
-   * @private
-   */
-  private buildFFmpegArgs(): string[] {
-    return [
-      '-f', 'alsa',
-      '-i', this.config.device,
-      '-ar', this.config.sampleRate.toString(),
-      '-ac', this.config.channels.toString(),
-      '-f', 's16le',
-      '-bufsize', this.config.bufferSize.toString(),
-      '-' // Output para stdout
-    ];
+  // ============================================
+  // Handlers de processo
+  // ============================================
+
+  private handleMainStderr(output: string): void {
+    if (this.isNonCriticalLog(output)) return;
+
+    const logKey = `stderr-${output.substring(0, 50)}`;
+    if (!this.shouldLog(logKey)) return;
+
+    logger.info(`FFmpeg stderr: ${output}`);
+
+    if (this.detectDeviceError(output)) {
+      this.handleDeviceDisconnected(output);
+    }
+
+    if (output.includes('error') || output.includes('Error')) {
+      logger.error(`FFmpeg ERROR detected: ${output}`);
+    }
   }
 
-  /**
-   * Constrói argumentos para o comando FFmpeg principal (ALSA → stdout + FIFOs)
-   *
-   * Usa -map para triplicar output:
-   * 1. Raw PCM → stdout (pipe:1) - baixa latência para Express /stream.wav
-   * 2. Raw PCM → FIFO1 - para segundo FFmpeg processar MP3 → Icecast2
-   * 3. Raw PCM → FIFO2 - para recognition service capturar samples
-   *
-   * @private
-   */
-  private buildStreamingFFmpegArgs(streamConfig: StreamingConfig): string[] {
-    const args: string[] = [];
+  private handleMainExit(code: number | null, signal: NodeJS.Signals | null): void {
+    const isControlledShutdown =
+      (code === null || code === 0) &&
+      (!signal || signal === 'SIGTERM' || signal === 'SIGKILL');
 
-    // Sobrescrever arquivos automaticamente sem perguntar
-    args.push('-y');
-
-    // Log apenas erros (reduzir tamanho de logs)
-    args.push('-loglevel', 'error');
-
-    // Input ALSA principal
-    args.push('-f', 'alsa');
-    args.push('-i', this.config.device);
-    args.push('-ar', this.config.sampleRate.toString());
-    args.push('-ac', this.config.channels.toString());
-
-    // Output 1: Raw PCM para stdout (pipe:1)
-    // Frontend constrói AudioBuffer manualmente
-    args.push('-map', '0:a');
-    args.push('-c:a', 'pcm_s16le');
-    args.push('-f', 's16le');
-    args.push('pipe:1');
-
-    // Output 2: Raw PCM para FIFO (MP3 → Icecast2)
-    // Segundo FFmpeg lerá daqui e enviará MP3 para Icecast2
-    args.push('-map', '0:a');
-    args.push('-c:a', 'pcm_s16le');
-    args.push('-f', 's16le');
-    args.push(this.fifoPath);
-
-    // Output 3: Raw PCM para FIFO de Recognition
-    // Recognition service lê daqui quando precisa capturar samples
-    args.push('-map', '0:a');
-    args.push('-c:a', 'pcm_s16le');
-    args.push('-f', 's16le');
-    args.push(this.recognitionFifoPath);
-
-    // Output 4: Raw PCM para FIFO de FLAC Recording (V3a)
-    // RecordingManager lê daqui e grava FLAC via FFmpeg #4
-    args.push('-map', '0:a');
-    args.push('-c:a', 'pcm_s16le');
-    args.push('-f', 's16le');
-    args.push(this.flacFifoPath);
-
-    return args;
-  }
-
-  /**
-   * Constrói argumentos para segundo FFmpeg (FIFO → MP3 → Icecast2)
-   * @private
-   */
-  private buildMp3FFmpegArgs(streamConfig: StreamingConfig): string[] {
-    const args: string[] = [];
-
-    // Sobrescrever arquivos automaticamente sem perguntar
-    args.push('-y');
-
-    // Log apenas erros (reduzir tamanho de logs)
-    args.push('-loglevel', 'error');
-
-    // Input: FIFO com raw PCM
-    args.push('-f', 's16le');
-    args.push('-ar', this.config.sampleRate.toString());
-    args.push('-ac', this.config.channels.toString());
-    args.push('-i', this.fifoPath);
-
-    // Output: MP3 para Icecast2 usando libmp3lame
-    args.push('-c:a', 'libmp3lame');
-    args.push('-b:a', `${streamConfig.bitrate}k`);
-    args.push('-f', 'mp3');
-    args.push('-content_type', 'audio/mpeg');
-
-    // URL Icecast2
-    const icecastUrl = `icecast://source:${streamConfig.icecastPassword}@${streamConfig.icecastHost}:${streamConfig.icecastPort}${streamConfig.mountPoint}`;
-    args.push(icecastUrl);
-
-    return args;
-  }
-
-  /**
-   * Constrói argumentos para FFmpeg #3 (FIFO Recognition → stdout passthrough)
-   *
-   * Este FFmpeg apenas lê do FIFO e escreve PCM no stdout.
-   * Não faz nenhum processamento - apenas passthrough.
-   *
-   * @private
-   */
-  private buildRecognitionFFmpegArgs(): string[] {
-    const args: string[] = [];
-
-    // Sobrescrever arquivos automaticamente sem perguntar
-    args.push('-y');
-
-    // Log apenas erros (reduzir tamanho de logs)
-    args.push('-loglevel', 'error');
-
-    // Input: FIFO com raw PCM
-    args.push('-f', 's16le');
-    args.push('-ar', this.config.sampleRate.toString());
-    args.push('-ac', this.config.channels.toString());
-    args.push('-i', this.recognitionFifoPath);
-
-    // Output: PCM para stdout (passthrough, sem encoding)
-    args.push('-c:a', 'copy'); // Passthrough, sem re-encoding
-    args.push('-f', 's16le');
-    args.push('pipe:1'); // stdout
-
-    return args;
-  }
-
-  /**
-   * Configura handlers para FFmpeg #3 (Recognition passthrough → Ring Buffer)
-   *
-   * O stdout do FFmpeg alimenta continuamente o Ring Buffer.
-   * Isso garante que sempre há áudio disponível para captura instantânea.
-   *
-   * @private
-   */
-  private setupRecognitionProcessHandlers(): void {
-    if (!this.ffmpegRecognitionProcess) return;
-
-    // Handler principal: alimentar Ring Buffer com dados do stdout
-    this.ffmpegRecognitionProcess.stdout?.on('data', (data: Buffer) => {
-      this.recognitionBuffer.write(data);
-    });
-
-    // Monitorar stderr para erros
-    this.ffmpegRecognitionProcess.stderr?.on('data', (data) => {
-      const output = data.toString();
-
-      // Filtrar logs não-críticos
-      if (this.isNonCriticalLog(output)) {
-        return;
-      }
-
-      // Rate limit logs repetidos
-      const logKey = `recognition-stderr-${output.substring(0, 50)}`;
-      if (!this.shouldLog(logKey)) {
-        return;
-      }
-
-      logger.info(`FFmpeg Recognition stderr: ${output}`);
-
-      // Detectar erros
-      if (output.includes('error') || output.includes('Error')) {
-        logger.error(`FFmpeg Recognition ERROR: ${output}`);
-      }
-    });
-
-    // Handler de saída
-    this.ffmpegRecognitionProcess.on('exit', (code, signal) => {
-      logger.info(`FFmpeg Recognition process exited with code ${code}, signal ${signal}`);
-
-      // Se saída inesperada (não controlada), logar
-      if (code !== 0 && code !== null && this.isStreaming) {
-        logger.error(`FFmpeg Recognition exited unexpectedly with code ${code}`);
-      }
-    });
-
-    // Handler de erro
-    this.ffmpegRecognitionProcess.on('error', (err) => {
-      logger.error(`FFmpeg Recognition process error: ${err.message}`);
-    });
-  }
-
-  /**
-   * Configura handlers para o processo FFmpeg MP3 (FIFO → Icecast2)
-   * @private
-   */
-  private setupMp3ProcessHandlers(): void {
-    if (!this.ffmpegMp3Process) return;
-
-    // Monitorar stderr para logs
-    this.ffmpegMp3Process.stderr?.on('data', (data) => {
-      const output = data.toString();
-      
-      // Filtrar logs não-críticos
-      if (this.isNonCriticalLog(output)) {
-        return;
-      }
-
-      // Rate limit logs repetidos
-      const logKey = `mp3-stderr-${output.substring(0, 50)}`;
-      if (!this.shouldLog(logKey)) {
-        return;
-      }
-
-      logger.info(`FFmpeg MP3 stderr: ${output}`);
-
-      // Detectar erros
-      if (output.includes('error') || output.includes('Error')) {
-        logger.error(`FFmpeg MP3 ERROR: ${output}`);
-      }
-    });
-
-    // Handler de saída
-    this.ffmpegMp3Process.on('exit', (code, signal) => {
-      logger.info(`FFmpeg MP3 process exited with code ${code}, signal ${signal}`);
-
-      // Se saída inesperada (não controlada), logar
-      if (code !== 0 && code !== null && this.isStreaming) {
-        logger.error(`FFmpeg MP3 exited unexpectedly with code ${code}`);
-      }
-    });
-
-    // Handler de erro
-    this.ffmpegMp3Process.on('error', (err) => {
-      logger.error(`FFmpeg MP3 process error: ${err.message}`);
-    });
-  }
-
-  /**
-   * Configura handlers para o processo FFmpeg principal (ALSA → stdout + FIFO)
-   *
-   * Os handlers garantem cleanup robusto usando resetState() diretamente,
-   * sem dependência de timeouts. Isso evita race conditions e garante que
-   * o estado seja sempre consistente com a realidade do processo.
-   *
-   * @private
-   */
-  private setupProcessHandlers(): void {
-    if (!this.ffmpegProcess) return;
-
-    // Monitorar stderr para erros e metadata
-    this.ffmpegProcess.stderr?.on('data', (data) => {
-      const output = data.toString();
-
-      // Filtrar logs não-críticos
-      if (this.isNonCriticalLog(output)) {
-        return;
-      }
-
-      // Rate limit logs repetidos
-      const logKey = `stderr-${output.substring(0, 50)}`;
-      if (!this.shouldLog(logKey)) {
-        return;
-      }
-
-      // Log COMPLETO do stderr para debug (verbose mode)
-      logger.info(`FFmpeg stderr: ${output}`);
-
-      // Detectar erros de dispositivo
-      if (this.detectDeviceError(output)) {
-        this.handleDeviceDisconnected(output);
-      }
-
-      // Extrair nível de áudio se disponível
-      this.extractAudioLevel(output);
-
-      // Log erros específicos
-      if (output.includes('error') || output.includes('Error')) {
-        logger.error(`FFmpeg ERROR detected: ${output}`);
-      }
-    });
-
-    // Handler de saída do processo
-    // NOTA: Este handler é registrado com .on(), mas o método stop() usa .once()
-    // para registrar seu próprio cleanup handler. Ambos podem coexistir.
-    // Este handler permanente é para detectar crashes inesperados (fora de stop()).
-    this.ffmpegProcess.on('exit', (code, signal) => {
-      // Nota: NÃO resetamos estado aqui se stop() foi chamado
-      // O stop() usa .once() e gerencia o cleanup via seu próprio handler
-      // Este handler só atua para crashes inesperados quando flags ainda estão true
-
-      // Se código é null/0/undefined E signal é SIGTERM/SIGKILL/undefined, provavelmente é stop() controlado
-      // (undefined pode ocorrer em testes quando handler é chamado manualmente)
-      const isControlledShutdown =
-        (code === null || code === 0 || code === undefined) &&
-        (!signal || signal === 'SIGTERM' || signal === 'SIGKILL');
-
-      // Se flags ainda estão true mas processo morreu, pode ser crash inesperado
-      // Mas se isControlledShutdown, deixamos o stop() handler fazer o cleanup
-      if ((this.isCapturing || this.isStreaming) && !isControlledShutdown) {
-        // Processo morreu inesperadamente (crash, erro, etc.)
-        const wasStreaming = this.isStreaming;
-        this.resetState();
-
-        if (code !== 0 && code !== null && code !== undefined) {
-          const errorMsg = `FFmpeg exited unexpectedly with code ${code}`;
-          this.currentError = errorMsg;
-          logger.error(errorMsg);
-          this.emit('error', { code, message: errorMsg });
-          
-          // Tentar recovery automático se estava streaming
-          if (wasStreaming) {
-            this.handleUnexpectedExit(code).catch(err => {
-              logger.error(`Recovery handler failed: ${err}`);
-            });
-          }
-        } else if (signal && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
-          logger.warn(`FFmpeg terminated unexpectedly by signal ${signal}`);
-        }
-
-        // Emitir evento de parada se estava streaming
-        if (wasStreaming) {
-          this.emit('streaming_stopped');
-        }
-      }
-    });
-
-    // Handler de erro do processo
-    this.ffmpegProcess.on('error', (err) => {
-      // Erro crítico do processo - resetar estado imediatamente
+    if ((this.isCapturing || this.isStreaming) && !isControlledShutdown) {
+      const wasStreaming = this.isStreaming;
       this.resetState();
-      this.currentError = err.message;
-      logger.error(`FFmpeg process error: ${err.message}`);
-      this.emit('error', { message: err.message });
-    });
+
+      if (code !== 0 && code !== null) {
+        const errorMsg = `FFmpeg exited unexpectedly with code ${code}`;
+        this.currentError = errorMsg;
+        logger.error(errorMsg);
+        this.emit('error', { code, message: errorMsg });
+
+        if (wasStreaming) {
+          this.handleUnexpectedExit(code).catch(err => {
+            logger.error(`Recovery handler failed: ${err}`);
+          });
+        }
+      }
+
+      if (wasStreaming) {
+        this.emit('streaming_stopped');
+      }
+    }
   }
 
-  /**
-   * Detecta erros relacionados ao dispositivo ALSA
-   * @private
-   */
+  private handleMainError(err: Error): void {
+    this.resetState();
+    this.currentError = err.message;
+    logger.error(`FFmpeg process error: ${err.message}`);
+    this.emit('error', { message: err.message });
+  }
+
+  private handleMp3Stderr(output: string): void {
+    if (this.isNonCriticalLog(output)) return;
+
+    const logKey = `mp3-stderr-${output.substring(0, 50)}`;
+    if (!this.shouldLog(logKey)) return;
+
+    logger.info(`FFmpeg MP3 stderr: ${output}`);
+
+    if (output.includes('error') || output.includes('Error')) {
+      logger.error(`FFmpeg MP3 ERROR: ${output}`);
+    }
+  }
+
+  private handleMp3Exit(code: number | null, signal: NodeJS.Signals | null): void {
+    logger.info(`FFmpeg MP3 process exited with code ${code}, signal ${signal}`);
+
+    if (code !== 0 && code !== null && this.isStreaming) {
+      logger.error(`FFmpeg MP3 exited unexpectedly with code ${code}`);
+    }
+  }
+
+  private handleMp3Error(err: Error): void {
+    logger.error(`FFmpeg MP3 process error: ${err.message}`);
+  }
+
+  private handleRecognitionStderr(output: string): void {
+    if (this.isNonCriticalLog(output)) return;
+
+    const logKey = `recognition-stderr-${output.substring(0, 50)}`;
+    if (!this.shouldLog(logKey)) return;
+
+    logger.info(`FFmpeg Recognition stderr: ${output}`);
+
+    if (output.includes('error') || output.includes('Error')) {
+      logger.error(`FFmpeg Recognition ERROR: ${output}`);
+    }
+  }
+
+  private handleRecognitionExit(code: number | null, signal: NodeJS.Signals | null): void {
+    logger.info(`FFmpeg Recognition process exited with code ${code}, signal ${signal}`);
+
+    if (code !== 0 && code !== null && this.isStreaming) {
+      logger.error(`FFmpeg Recognition exited unexpectedly with code ${code}`);
+    }
+  }
+
+  private handleRecognitionError(err: Error): void {
+    logger.error(`FFmpeg Recognition process error: ${err.message}`);
+  }
+
+  // ============================================
+  // Utilitarios
+  // ============================================
+
   private detectDeviceError(output: string): boolean {
     const deviceErrors = [
       'No such file or directory',
@@ -1070,14 +706,9 @@ export class AudioManager extends EventEmitter {
       'No such device',
       'Cannot open audio device'
     ];
-
     return deviceErrors.some(error => output.includes(error));
   }
 
-  /**
-   * Trata desconexão do dispositivo
-   * @private
-   */
   private handleDeviceDisconnected(output: string): void {
     const errorMsg = `Device disconnected: ${output.trim()}`;
     this.currentError = errorMsg;
@@ -1088,37 +719,32 @@ export class AudioManager extends EventEmitter {
       error: errorMsg
     });
 
-    // Parar captura
     this.stop().catch(err => {
       logger.error(`Failed to stop after device disconnect: ${err.message}`);
     });
   }
 
-  /**
-   * Trata saída inesperada do FFmpeg com retry automático
-   * @private
-   */
   private async handleUnexpectedExit(code: number): Promise<void> {
     if (this.retryCount >= this.MAX_RETRIES) {
       logger.error('Max retries reached, giving up');
-      this.emit('recovery_failed', { 
-        retries: this.retryCount, 
-        lastError: this.currentError 
+      this.emit('recovery_failed', {
+        retries: this.retryCount,
+        lastError: this.currentError
       });
       return;
     }
-    
+
     this.retryCount++;
-    const delay = Math.pow(2, this.retryCount - 1) * 1000; // 1s, 2s, 4s
-    
+    const delay = Math.pow(2, this.retryCount - 1) * 1000;
+
     logger.warn(`FFmpeg crashed, retrying in ${delay}ms (attempt ${this.retryCount}/${this.MAX_RETRIES})`);
-    
+
     await new Promise(resolve => setTimeout(resolve, delay));
-    
+
     try {
       if (this.streamingConfig) {
         await this.startStreaming(this.streamingConfig);
-        this.retryCount = 0; // Reset on success
+        this.retryCount = 0;
         logger.info('FFmpeg recovery successful');
       }
     } catch (err) {
@@ -1128,54 +754,6 @@ export class AudioManager extends EventEmitter {
     }
   }
 
-  /**
-   * Extrai nível de áudio do output do FFmpeg
-   * @private
-   */
-  private extractAudioLevel(output: string): void {
-    // FFmpeg pode emitir metadata de volume se configurado com -af volumedetect
-    // Por enquanto, apenas preparar a interface para futuro enhancement
-
-    // Exemplo de parsing futuro:
-    // const levelMatch = output.match(/mean_volume: ([-\d.]+) dB/);
-    // if (levelMatch) {
-    //   this.levelDb = parseFloat(levelMatch[1]);
-    //   this.emit('audio_level', { levelDb: this.levelDb });
-    // }
-  }
-
-  /**
-   * Force kill de um processo usando kill -9 do sistema
-   * @private
-   */
-  private async forceKillProcess(
-    process: ChildProcess | null,
-    name: string
-  ): Promise<void> {
-    if (!process || !process.pid) return;
-    
-    const pid = process.pid;
-    
-    // Verificar se processo ainda existe
-    try {
-      process.kill(0); // Apenas testa se existe
-    } catch {
-      return; // Processo já morreu
-    }
-    
-    // Force kill com comando do sistema
-    try {
-      await execAsync(`kill -9 ${pid}`);
-      logger.info(`Force killed ${name} process (PID ${pid})`);
-    } catch (err) {
-      logger.warn(`Could not force kill ${name}: ${err}`);
-    }
-  }
-
-  /**
-   * Filtrar logs não-críticos do FFmpeg para reduzir volume
-   * @private
-   */
   private isNonCriticalLog(output: string): boolean {
     const nonCriticalPatterns = [
       'non monotonically increasing dts',
@@ -1186,33 +764,20 @@ export class AudioManager extends EventEmitter {
     return nonCriticalPatterns.some(pattern => output.includes(pattern));
   }
 
-  /**
-   * Verificar se deve logar baseado em rate limiting
-   * @private
-   */
   private shouldLog(key: string): boolean {
     const now = Date.now();
     const lastLog = this.logRateLimiter.get(key) || 0;
-    
+
     if (now - lastLog > this.LOG_RATE_LIMIT_MS) {
       this.logRateLimiter.set(key, now);
       return true;
     }
     return false;
   }
-
-  /**
-   * Cleanup quando objeto é destruído
-   */
-  async cleanup(): Promise<void> {
-    if (this.isCapturing) {
-      await this.stop();
-    }
-  }
 }
 
 /**
- * Configuração padrão de áudio
+ * Configuracao padrao de audio
  */
 export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   device: 'plughw:1,0',
