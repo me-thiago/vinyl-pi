@@ -355,7 +355,37 @@
     "sessions_one": "{{count}} session",
     "sessions_other": "{{count}} sessions",
     "noData": "No data yet",
-    "noListeningData": "No albums identified yet. Use the 🎵 button on the player to record what you're listening to."
+    "noListeningData": "No albums identified yet. Use the 🎵 button on the player to record what you're listening to.",
+    "tabs": {
+      "overview": "Overview",
+      "collection": "Collection",
+      "listening": "Listening",
+      "rankings": "Rankings"
+    },
+    "overview": {
+      "mostPlayed": "Most played",
+      "favoriteArtist": "Favorite artist"
+    },
+    "collection": {
+      "discogsRate": "Via Discogs",
+      "formatDistribution": "Format Distribution",
+      "decadeDistribution": "Decade Distribution"
+    },
+    "listening": {
+      "unplayed": "Unplayed",
+      "explorationRate": "Exploration Rate",
+      "explorationLow": "Many records still to discover in your collection!",
+      "explorationMedium": "You're exploring your collection well.",
+      "explorationGood": "Great exploration! You know your records well.",
+      "explorationExcellent": "Excellent! You know almost your entire collection.",
+      "insights": "Insights",
+      "avgAlbumsPerSession": "Average albums per session",
+      "sessionsPerAlbum": "Average sessions per album"
+    },
+    "rankings": {
+      "topAlbums": "Top Albums",
+      "topArtists": "Top Artists"
+    }
   },
   "export": {
     "exportCollection": "Export Collection",
