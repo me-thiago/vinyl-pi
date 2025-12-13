@@ -12,7 +12,7 @@
  * @module pages/RecordingEditor
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import {
   Clock,
   HardDrive,
   Music2,
+  Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,10 +88,42 @@ function formatDuration(seconds: number | null): string {
   return `${m}m ${s}s`;
 }
 
+/**
+ * Detecta se o dispositivo é mobile ou se o navegador não suporta FLAC
+ * iOS Safari não suporta FLAC no elemento <audio>
+ */
+function useIsMobileOrUnsupported(): boolean {
+  return useMemo(() => {
+    const userAgent = navigator.userAgent || navigator.vendor;
+
+    // Detectar iOS (iPhone, iPad, iPod)
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+
+    // Detectar Android
+    const isAndroid = /android/i.test(userAgent);
+
+    // Detectar se é touch device com tela pequena (mobile)
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isSmallScreen = window.innerWidth < 768;
+
+    // iOS Safari não suporta FLAC - sempre bloquear
+    if (isIOS) return true;
+
+    // Android com tela pequena - provavelmente mobile
+    if (isAndroid && isSmallScreen) return true;
+
+    // Touch device com tela pequena - provavelmente mobile
+    if (isTouchDevice && isSmallScreen) return true;
+
+    return false;
+  }, []);
+}
+
 export default function RecordingEditor() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const waveform = useWaveform();
+  const isMobileOrUnsupported = useIsMobileOrUnsupported();
 
   // State
   const [recording, setRecording] = useState<Recording | null>(null);
@@ -284,7 +317,7 @@ export default function RecordingEditor() {
       setMarkers((prev) => [...prev, newMarker]);
       waveform.addMarker(newMarker);
       toast.success(t('editor.markers.created', 'Marcador criado'));
-    } catch (err) {
+    } catch {
       toast.error(t('editor.markers.createError', 'Erro ao criar marcador'));
     }
   };
@@ -315,7 +348,7 @@ export default function RecordingEditor() {
       );
       waveform.updateMarker(markerId, data);
       toast.success(t('editor.markers.updated', 'Marcador atualizado'));
-    } catch (err) {
+    } catch {
       toast.error(t('editor.markers.updateError', 'Erro ao atualizar marcador'));
     }
   };
@@ -339,7 +372,7 @@ export default function RecordingEditor() {
       setMarkers((prev) => prev.filter((m) => m.id !== markerId));
       waveform.removeMarker(markerId);
       toast.success(t('editor.markers.deleted', 'Marcador removido'));
-    } catch (err) {
+    } catch {
       toast.error(t('editor.markers.deleteError', 'Erro ao remover marcador'));
     }
   };
@@ -390,6 +423,32 @@ export default function RecordingEditor() {
       <div className="container max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  // Mobile/Unsupported browser state
+  if (isMobileOrUnsupported) {
+    return (
+      <div className="container max-w-6xl mx-auto p-6">
+        <div className="text-center py-24">
+          <Monitor className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-semibold mb-2">
+            {t('editor.mobileNotSupported', 'Editor não disponível em dispositivos móveis')}
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            {t(
+              'editor.mobileNotSupportedDesc',
+              'O editor de áudio requer recursos que não estão disponíveis em navegadores móveis. Por favor, acesse esta página de um computador.'
+            )}
+          </p>
+          <Button asChild>
+            <Link to="/recordings">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {t('editor.backToList', 'Voltar para lista')}
+            </Link>
+          </Button>
         </div>
       </div>
     );
