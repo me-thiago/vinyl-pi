@@ -12,6 +12,7 @@
 3. [RAW PCM vs MP3 no Frontend](#raw-pcm-vs-mp3-no-frontend)
 4. [Constantes e Thresholds](#constantes-e-thresholds)
 5. [Quad-Path Architecture - FFmpeg #4 Always-On](#quad-path-architecture---ffmpeg-4-always-on)
+6. [Suporte a Acesso Remoto via Tailscale](#suporte-a-acesso-remoto-via-tailscale)
 
 ---
 
@@ -672,6 +673,7 @@ O Epic V1.5 foi criado após auditoria de código para endereçar gaps de segura
 | V2-04 | Discogs Collection Sync - Merge Strategy |
 | V2-06 | Migração ACRCloud → AudD, Ring Buffer, axios vs fetch |
 | V3-02 | Quad-Path Architecture - FFmpeg #4 Always-On vs Drain Swap |
+| Infra | Suporte a Acesso Remoto via Tailscale |
 
 ---
 
@@ -1024,6 +1026,110 @@ audioManager.on('streaming_stopped', () => {
 
 ---
 
-**Última revisão:** 2025-12-07
+## Suporte a Acesso Remoto via Tailscale
+
+### Decisão: Frontend com hostname dinâmico + CORS para Tailscale
+
+**Data:** 2025-12-13
+**Contexto:** Necessidade de acessar Vinyl-OS remotamente via Tailscale VPN
+**Status:** ✅ Implementado
+
+### Problema
+
+Ao tentar acessar o Vinyl-OS via Tailscale (IP `100.x.x.x`), duas barreiras foram identificadas:
+
+1. **CORS bloqueava IPs do Tailscale:** O validador só aceitava redes privadas RFC 1918
+2. **Frontend tinha IP hardcoded:** O arquivo `.env` definia `VITE_API_URL=http://192.168.86.35:3001`
+
+**Sintomas:**
+- Requisições para API falhavam com `net::ERR_CONNECTION_TIMED_OUT`
+- Console mostrava tentativas para `192.168.86.35:3001` mesmo acessando via `100.69.209.71`
+
+### Solução
+
+**1. CORS Validator - Adicionar range Tailscale:**
+
+```typescript
+// backend/src/utils/cors-validator.ts
+const LOCAL_PATTERNS: RegExp[] = [
+  // ... redes privadas RFC 1918 ...
+  
+  // Tailscale VPN: 100.64.x.x - 100.127.x.x (CGNAT range usado por Tailscale)
+  /^https?:\/\/100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+];
+```
+
+**2. Frontend - Hostname dinâmico:**
+
+```typescript
+// Antes (hardcoded - não funciona remotamente)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Depois (dinâmico - funciona em qualquer rede)
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
+```
+
+**3. Frontend .env - Comentar URLs hardcoded:**
+
+```bash
+# frontend/.env
+# VITE_API_URL=http://192.168.86.35:3001  # Comentado para usar fallback dinâmico
+# VITE_STREAM_URL=http://192.168.86.35:8000/stream
+```
+
+### Range Tailscale
+
+O Tailscale usa parte do range CGNAT (Carrier-Grade NAT) reservado pela IANA:
+
+| Range | Uso |
+|-------|-----|
+| `100.64.0.0/10` | CGNAT (RFC 6598) |
+| `100.64.0.0` - `100.127.255.255` | Tailscale aloca IPs aqui |
+
+### Firewall (iptables)
+
+O Tailscale gerencia suas próprias regras via chain `ts-input`. Por padrão, pode bloquear conexões de outros dispositivos da rede Tailscale.
+
+**Solução temporária (perde no reboot):**
+```bash
+sudo iptables -I ts-input 2 -s 100.65.157.28 -j ACCEPT  # IP do MacBook
+```
+
+**Solução permanente:** Configurar ACLs no admin console do Tailscale.
+
+### Benefícios
+
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Acesso local (192.168.x.x) | ✅ Funciona | ✅ Funciona |
+| Acesso Tailscale (100.x.x.x) | ❌ Bloqueado | ✅ Funciona |
+| Acesso MagicDNS (vinyl-os.xxx.ts.net) | ❌ Bloqueado | ✅ Funciona |
+
+### Arquivos Modificados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `backend/src/utils/cors-validator.ts` | Regex para Tailscale range |
+| `backend/src/__tests__/utils/cors-validator.test.ts` | 7 novos testes |
+| `frontend/src/**/*.ts(x)` (10 arquivos) | `localhost` → `window.location.hostname` |
+| `frontend/.env` | Comentado `VITE_API_URL` e `VITE_STREAM_URL` |
+| `frontend/vite.config.ts` | `allowedHosts` para MagicDNS |
+
+### Índice de Decisões por Story (Atualizado)
+
+| Story | Decisões Técnicas |
+|-------|-------------------|
+| ... | ... |
+| Tailscale | Suporte a Acesso Remoto via Tailscale |
+
+### Referências
+
+- Commit: `ceef0db feat: add Tailscale VPN support for remote access`
+- Tailscale IP ranges: https://tailscale.com/kb/1015/100.x-addresses
+- CGNAT RFC 6598: https://www.rfc-editor.org/rfc/rfc6598
+
+---
+
+**Última revisão:** 2025-12-13
 **Próxima revisão:** Quando implementar V3
 
