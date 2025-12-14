@@ -81,6 +81,7 @@ const tracklist = await discogsService.getTracklist(discogsId);
 await prisma.albumTrack.createMany({
   data: tracklist.map((track, index) => ({
     albumId: album.id,
+    // Discogs: position (ex. "A1") é opcional no schema, mas deve vir aqui quando disponível
     position: track.position,
     trackNumber: index + 1,
     title: track.title,

@@ -1,7 +1,7 @@
 # Story V3-04: UI Gravações
 
 **Epic:** V3a - Gravação & Fundação
-**Status:** review
+**Status:** done
 
 **User Story:**
 Como usuário,

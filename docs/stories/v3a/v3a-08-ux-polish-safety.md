@@ -129,3 +129,13 @@ export function LanguageToggle() {
 ## Dependencies
 - V1.5-13 (i18n) — Já implementado
 - V3-03 (gravação) — Já implementado
+
+---
+
+## Adendo (pós-épico): Atualização na aba Stats
+
+No final do Epic V3a, foi feito um ajuste na **aba `/stats`** para manter as métricas de escuta coerentes com a nova modelagem do histórico:
+
+- **Mudança-chave:** estatísticas de escuta passaram a usar **`SessionAlbum`** (V3a-09) em vez de inferir via `Track` (log de reconhecimento).
+- **Impacto:** métricas como “top álbuns”, “top artistas” e “álbuns únicos tocados” refletem a curadoria real da sessão (manual + recognition), não apenas eventos de reconhecimento.
+- **Referência técnica:** `backend/src/routes/stats.ts` (comentários “V3a-09: Migrado para usar SessionAlbum em vez de Track” nos endpoints `/api/stats/listening`).

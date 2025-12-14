@@ -116,14 +116,15 @@ development_status:
   v3a-07-refactor-audio-manager: done       # Tech debt: extrair FFmpegProcessManager, FifoManager, FFmpegArgsBuilder
   v3a-08-ux-polish-safety: done             # Footer animation, limite 1h, toggle idioma, botão unlink
   v3a-09-edit-session-albums: done         # SessionAlbum: relação direta Session ↔ Album, add/remove manual
-  epic-v3a-retrospective: optional
+  epic-v3a-retrospective: completed
 
   # Epic V3b - Reconhecimento Offline (🟡 Médio-Alto risco)
   # Tech-spec: pendente (após V3a)
   # Depende de V3a completo
-  epic-v3b: backlog
+  epic-v3b: contexted
   v3b-01-album-tracks-table: drafted       # Nova tabela AlbumTrack (tracklist por álbum)
   v3b-02-discogs-tracklist-sync: drafted   # Importar tracklist do Discogs
+  v3b-spike-01-chromaprint-calibration: drafted # Spike: calibrar score/duração/robustez (fpcalc/Chromaprint)
   v3b-03-schema-chromaprints: backlog      # Adicionar chromaprint em AlbumTrack
   v3b-04-geracao-chromaprint: backlog      # Serviço fpcalc + processamento FLAC
   v3b-05-segmentacao-faixas: backlog       # Usar marcadores do editor → AlbumTrack

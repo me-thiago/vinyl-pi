@@ -96,7 +96,7 @@ ffmpeg -f s16le -ar 48000 -ac 2 -i /tmp/vinyl-flac.fifo \
 
 - FIFO3 deve ser criado no startup do AudioManager
 - FFmpeg #1 precisa `-f s16le /tmp/vinyl-flac.fifo` como output adicional
-- FFmpeg #4 só spawna quando `startRecording()` é chamado
+- FFmpeg #4 inicia junto com o streaming (always-on); `startRecording()` apenas alterna o destino de escrita (arquivo vs discard)
 - Usar `spawn()` com pipes para monitorar stderr do FFmpeg #4
 - Cleanup com timeout no SIGTERM (2s antes de SIGKILL)
 

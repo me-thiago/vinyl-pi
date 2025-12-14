@@ -5,6 +5,13 @@
 **Última atualização:** 2025-01-27  
 **Status:** ✅ Pronto para desenvolvimento
 
+> **Nota (2025-12):** “PRD v3.0” aqui é a **versão do documento de PRD**, e não o mesmo conceito que o “Epic V3”.  
+> Este PRD descreve requisitos e roadmap (V1–V4) em nível de produto. A execução do V3 foi fatiada em **V3a/V3b/V3c** para reduzir risco e registrar decisões incrementais, documentadas em:
+> - `docs/epic-v3-vision.md` (visão/decisões e fatiamento V3a/V3b/V3c)
+> - `docs/tech-spec-epic-v3a.md` (especificação técnica do V3a)
+>
+> Quando houver divergência entre PRD e execução (ex.: detalhes de gravação, pré-roll, segmentação), tratar como **decisão a ser reconciliada**: manter a cautela do PRD e registrar explicitamente a refutação/ajuste com justificativa em docs de visão/tech spec/decisões técnicas — em vez de “substituir” silenciosamente o PRD.
+
 ---
 
 ## 1. Resumo Executivo

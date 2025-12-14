@@ -88,12 +88,14 @@ ALSA → FFmpeg #1 (Main) → stdout (PCM → Express /stream.wav)
                         → FIFO3 (PCM → FFmpeg #4 → FLAC → Arquivo)  ← NOVO
 ```
 
-**Características do FFmpeg #4:**
-- Inicia sob demanda (não permanente como #2 e #3)
+**Características do FFmpeg #4 (decisão atualizada):**
+- **Always-on enquanto streaming estiver ativo** (consistente com #2 e #3)
 - Lê do FIFO3 (Named Pipe dedicado)
 - Encoding FLAC em tempo real
-- Output direto para arquivo no filesystem
-- Termina quando usuário para gravação
+- Output em **stdout (FLAC)** → Node.js decide destino
+  - Se gravando: escreve em arquivo
+  - Se não gravando: descarta dados
+- Termina quando o streaming para (SIGTERM graceful)
 
 ### Componentes Existentes Modificados
 
@@ -600,8 +602,9 @@ ffmpeg -i input.flac \
    a. Criar registro Recording no banco (status: 'recording')
    b. Criar diretório YYYY-MM se não existir
    c. Garantir FIFO3 existe (mkfifo se necessário)
-   d. Spawnar FFmpeg #4 lendo FIFO3, escrevendo no arquivo FLAC
-   e. FFmpeg #1 já está escrevendo no FIFO3 (sempre ativo quando streaming)
+   d. Garantir FFmpeg #4 ativo (iniciado junto do streaming)
+   e. Alternar modo para **escrever em arquivo** (Node.js passa a gravar o stdout do FFmpeg #4)
+   f. FFmpeg #1 já está escrevendo no FIFO3 (sempre ativo quando streaming)
 4. Retorna recording com id e status
 5. Frontend atualiza UI (botão muda para "Stop", indicador de gravação)
 6. WebSocket broadcast 'recording_started'
@@ -613,15 +616,17 @@ ffmpeg -i input.flac \
 1. Usuário clica botão "Stop"
 2. Frontend POST /api/recordings/stop { recordingId }
 3. Backend (RecordingManager):
-   a. Enviar SIGTERM para FFmpeg #4
-   b. Aguardar FFmpeg finalizar (graceful shutdown)
-   c. Calcular duração e tamanho do arquivo
-   d. Atualizar Recording (status: 'completed', durationSeconds, fileSizeBytes)
+   a. Alternar modo para **não escrever em arquivo** (Node.js volta a descartar stdout)
+   b. Calcular duração e tamanho do arquivo
+   c. Atualizar Recording (status: 'completed', durationSeconds, fileSizeBytes)
 4. Retorna recording atualizado
 5. Frontend atualiza UI (botão volta para "Record")
 6. WebSocket broadcast 'recording_stopped'
 7. Opcional: Frontend navega para página de edição
 ```
+
+**Safety guard (V3a-08):**
+- O modo **write** é manual (usuário inicia/parar), mas o backend deve **auto-parar** a gravação ao atingir `recording.maxDurationMinutes` (default 60) e notificar o frontend.
 
 **Workflow 3: Editar Gravação (Trim)**
 
@@ -975,7 +980,7 @@ V3-03 (Gravação)
 | Q2 | Pré-roll necessário? | **Decidido** | Não - usuário inicia e coloca disco |
 | Q3 | Split automático por silêncio? | **Decidido** | Não para V3a - marcação manual |
 | Q4 | Qual lib de waveform? | **Decidido** | wavesurfer.js |
-| Q5 | FIFO permanente ou sob demanda? | Aberto | Sugestão: permanente (simplifica) |
+| Q5 | FIFO/FFmpeg #4 permanente ou sob demanda? | **Decidido** | Always-on com discard quando não gravando |
 
 ---
 

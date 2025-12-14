@@ -30,21 +30,23 @@ Isso é fundamental para V3b (chromaprints por faixa) porque:
     albumId       String
     album         Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
 
-    position      String   // "A1", "A2", "B1", "B2" (formato Discogs)
+    // Tracklist / ordem
+    position      String?  // ex: "A1", "A2", "B1" (formato Discogs), opcional para input manual
     trackNumber   Int      // 1, 2, 3... (sequencial)
     title         String
-    duration      String?  // "3:45" formato Discogs
-    durationSec   Int?     // 225 (calculado)
+    duration      String?  // ex: "3:45" (formato Discogs) - opcional
+    durationSec   Int?     // 225 (calculado) - opcional
 
-    // V3b - Chromaprint
-    chromaprint   String?  // fingerprint base64
-    chromaprintAt DateTime?
+    // V3b - Mapping para gravação fonte (V3b: 1 gravação fonte por álbum)
+    // A geração de chromaprint/fingerprint NÃO fica nesta tabela (vai para tabela dedicada em V3b-03+).
+    markerId      String?  // TrackMarker.id (da gravação fonte) para mapear faixa ↔ marcador (opcional)
 
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
-    @@unique([albumId, position])
+    @@unique([albumId, trackNumber])
     @@index([albumId])
+    @@index([markerId])
   }
   ```
 - [ ] Relação Album 1:N AlbumTrack
@@ -67,7 +69,7 @@ Isso é fundamental para V3b (chromaprints por faixa) porque:
 - [ ] No editor de gravação, ao adicionar TrackMarker:
   - Dropdown para selecionar AlbumTrack do álbum vinculado
   - Se gravação não tem álbum vinculado, campo texto livre
-- [ ] Adicionar `albumTrackId` opcional em TrackMarker
+- [ ] Mapear `AlbumTrack.markerId` (1:1) para o `TrackMarker.id` da gravação fonte
 
 ## Technical Notes
 
@@ -79,12 +81,7 @@ model Album {
   albumTracks  AlbumTrack[]
 }
 
-// Adicionar em TrackMarker
-model TrackMarker {
-  // ... existing fields ...
-  albumTrackId String?
-  albumTrack   AlbumTrack? @relation(fields: [albumTrackId], references: [id], onDelete: SetNull)
-}
+// V3b: mapping faixa ↔ marcador via AlbumTrack.markerId (1:1) para a gravação fonte
 ```
 
 ### Duration Parsing

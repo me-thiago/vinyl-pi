@@ -39,7 +39,16 @@ ALSA → FFmpeg #1 → stdout (PCM → Express /stream.wav)
                  → FIFO3 (PCM → FFmpeg #4 → FLAC → Arquivo)  ← NOVO
 ```
 
-**Decisão:** FFmpeg #4 é sob demanda (inicia quando usuário clica Record, para quando clica Stop).
+**Decisão (atualizada):** FFmpeg #4 é **always-on enquanto o streaming estiver ativo** (lê FIFO3 continuamente) e entrega FLAC via stdout para o Node.js decidir o destino:
+- **Gravando:** escreve em arquivo
+- **Não gravando:** descarta os dados
+
+Motivo: elimina race conditions de “janela sem leitor” no FIFO3 e mantém consistência com os processos #2 e #3.
+
+**Importante (semântica de “manual”):**
+- “Always-on” se refere ao **processo** FFmpeg #4 (sempre lendo/encodando enquanto streaming está ativo).
+- “Gravação manual” se refere à **decisão de persistir** (write) — só acontece quando o usuário clica em **Record** (default é discard).
+- Guard-rail: **auto-stop** do modo write ao atingir `recording.maxDurationMinutes` (default 60) para evitar gravações “esquecidas”.
 
 ### 2. Formato de Gravação: FLAC
 

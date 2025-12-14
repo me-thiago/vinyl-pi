@@ -1,9 +1,12 @@
 # Story V3-07: Refatoração AudioManager - Arquitetura Modular
 
 **Epic:** V3a - Gravação & Fundação
-**Status:** drafted
+**Status:** deprecated
 **Tipo:** Tech Debt / Refatoração
 **Prioridade:** Baixa (executar após V3-06, antes de V3b)
+
+> **Nota:** este arquivo foi supersedido por `docs/stories/v3a/v3a-07-refactor-audio-manager.md` (status: done).  
+> Mantenha apenas a versão `v3a-07` como fonte de verdade para tracking.
 
 ## Contexto
 
